@@ -189,6 +189,34 @@ export async function relayDistill(targetDir, argv) {
   process.exit(result.status ?? 0);
 }
 
+export function relayBroadcastSkill(targetDir, filePath) {
+  const relayDir = path.join(targetDir, '.relay');
+
+  if (!fs.existsSync(relayDir)) {
+    console.error('Relay not initialized. Run: relay init');
+    return null;
+  }
+
+  if (!filePath) {
+    console.error('Usage: relay broadcast-skill <file>');
+    return null;
+  }
+
+  if (!fs.existsSync(filePath)) {
+    console.error(`File not found: ${filePath}`);
+    return null;
+  }
+
+  const skillName = path.basename(filePath);
+  const destDir = path.join(relayDir, 'broadcast', 'skills');
+  fs.mkdirSync(destDir, { recursive: true });
+
+  const destPath = path.join(destDir, skillName);
+  fs.copyFileSync(filePath, destPath);
+  console.log(`Broadcast: .relay/broadcast/skills/${skillName}`);
+  return destPath;
+}
+
 if (isMain(import.meta.url)) {
   const [, , command, ...rest] = process.argv;
 
@@ -198,12 +226,38 @@ if (isMain(import.meta.url)) {
     relayStatus(process.cwd());
   } else if (command === 'distill') {
     await relayDistill(process.cwd(), rest);
+  } else if (command === 'broadcast-skill') {
+    const filePath = rest[0];
+    const dest = relayBroadcastSkill(process.cwd(), filePath);
+    if (dest) {
+      const { GitSync } = await import('../lib/sync.mjs');
+      const sync = new GitSync();
+      let release = () => {};
+      try {
+        release = sync.lock(process.cwd());
+      } catch (e) {
+        if (e.message === 'LOCKED') {
+          console.error('relay: sync locked by another process');
+          process.exit(2);
+        }
+        throw e;
+      }
+      try {
+        sync.push(process.cwd(), 'broadcast');
+        console.log('Pushed to remote.');
+      } catch (e) {
+        console.error(`relay: push failed: ${e.message}`);
+      } finally {
+        release();
+      }
+    }
   } else {
     console.error(
       `Usage: relay <command>\n\nCommands:\n` +
-      `  init      Initialize relay in current repository\n` +
-      `  status    Show memory, watermark, and sync state\n` +
-      `  distill   Run distiller manually [--transcript <path>] [--force] [--dry-run] [--push]`
+      `  init              Initialize relay in current repository\n` +
+      `  status            Show memory, watermark, and sync state\n` +
+      `  distill           Run distiller manually [--transcript <path>] [--force] [--dry-run] [--push]\n` +
+      `  broadcast-skill   Broadcast a skill file to all teammates [<file>]`
     );
     process.exit(1);
   }
