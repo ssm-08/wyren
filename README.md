@@ -14,11 +14,13 @@ Shared brain for teams using Claude Code. One memory, every session warm.
 
 ```bash
 cd your-project
-node ~/.claude/plugins/relay/bin/relay.mjs init
+relay init
 git add .relay/memory.md
 git commit -m "chore: init relay"
 git push
 ```
+
+_`relay` is the CLI alias — set it up first via Dev install below (symlink or PATH)._
 
 Teammates just need the plugin installed — they don't run `init` again.
 
@@ -57,7 +59,7 @@ relay broadcast-skill <file>
 **Laptop A:**
 ```bash
 cd your-project
-node ~/.claude/plugins/relay/bin/relay.mjs init
+relay init
 git add .relay && git commit -m "chore: init relay" && git push
 ```
 Open Claude Code. Discuss the stack — pick SQLite, reject Postgres (too heavy), add a `user_id=1` workaround for fast iteration. After 5 turns:
@@ -72,7 +74,7 @@ Claude's **first message** names SQLite, mentions the rejected Postgres, flags `
 
 **Broadcast a skill:**
 ```bash
-node ~/.claude/plugins/relay/bin/relay.mjs broadcast-skill ./my-style-guide.md
+relay broadcast-skill ./my-style-guide.md
 ```
 Open Laptop A in a new session. Claude says: *"Loaded 1 team skill: `my-style-guide`."*
 
