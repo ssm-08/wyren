@@ -14,8 +14,9 @@ Relay is a Claude Code plugin that gives a team shared memory across every teamm
 
 - **Chunk 0 (pre-build docs site):** ✅ shipped. Astro Starlight, 19 content pages, Mermaid diagrams, GitHub Pages via Actions.
 - **Chunk 1 (distiller quality gate):** ✅ shipped. `distiller.mjs` + `lib/transcript.mjs` + `lib/memory.mjs` + `prompts/distill.md`. Gate passed first iteration: 34-line memory from 828-line transcript, hygiene test passed, blind A/B test 3/3. Uses `claude -p --bare` — `--bare` flag critical to strip global plugins/hooks from subprocess.
-- **Chunk 2 (plugin skeleton + injection):** ⏳ next. Plugin installable via `/plugins add`. `SessionStart` reads `memory.md` → injects as `additionalContext`. No distiller wired yet.
-- Chunks 3-5 follow. Total budget 48h.
+- **Chunk 2 (plugin skeleton + injection):** ✅ shipped. `.claude-plugin/plugin.json` + `hooks/hooks.json` + `hooks/run-hook.cmd` + `hooks/session-start.mjs` + `hooks/stop.mjs` (stub) + `bin/relay.mjs` + `lib/util.mjs`. 17 unit tests green. E2E verified via hook pipe test.
+- **Chunk 3 (distiller wired into Stop hook):** ⏳ next. `stop.mjs` spawns distiller detached after 5 turns. Tier 0 regex filter. Single-machine live distillation.
+- Chunks 4-5 follow. Total budget 48h.
 
 ## Repo layout
 

@@ -11,8 +11,8 @@ import { Badge } from '@astrojs/starlight/components';
 |---|---|---|---|
 | [0](/roadmap/overview/#chunk-0) | Pre-build | Documentation site | <Badge text="Shipped" variant="success" /> |
 | [1](/roadmap/1-distiller/) | 0-6 | Distiller quality gate | <Badge text="Shipped" variant="success" /> |
-| [2](/roadmap/2-skeleton/) | 6-14 | Plugin skeleton + injection | <Badge text="In progress" variant="caution" /> |
-| [3](/roadmap/3-distillation/) | 14-22 | Distiller wired to Stop hook | <Badge text="Pending" variant="default" /> |
+| [2](/roadmap/2-skeleton/) | 6-14 | Plugin skeleton + injection | <Badge text="Shipped" variant="success" /> |
+| [3](/roadmap/3-distillation/) | 14-22 | Distiller wired to Stop hook | <Badge text="In progress" variant="caution" /> |
 | [4](/roadmap/4-git-sync/) | 22-32 | Git sync layer | <Badge text="Pending" variant="default" /> |
 | [5](/roadmap/5-broadcast/) | 32-44 | Broadcast + polish + demo | <Badge text="Pending" variant="default" /> |
 | — | 44-48 | Buffer, demo rehearsal, fallback video | <Badge text="Pending" variant="default" /> |
@@ -42,11 +42,11 @@ Key detail: subprocess runs with `claude -p --bare` — strips global plugins/ho
 
 [Full Chunk 1 detail + test results →](/roadmap/1-distiller/)
 
-## Chunk 2 — Plugin skeleton + injection (Hours 6-14)
+## Chunk 2 — Plugin skeleton + injection (Hours 6-14) ✅
 
-Plugin installable via `/plugins add`. `SessionStart` hook reads `memory.md`, injects as `additionalContext`. No distiller yet, no git yet — just the injection pipe.
+**Shipped.** Plugin installs via `/plugins add ssm-08/relay`. `SessionStart` hook reads `.relay/memory.md` + broadcast files, injects as `additionalContext`. `relay init` sets up `.relay/` structure. 17 unit tests green. E2E verified via hook pipe test.
 
-**Exit criteria:** edit `memory.md` manually → next session's first reply reflects it. Hook < 500ms.
+New files: `.claude-plugin/plugin.json`, `hooks/hooks.json`, `hooks/run-hook.cmd`, `hooks/session-start.mjs`, `hooks/stop.mjs` (stub), `bin/relay.mjs`, `lib/util.mjs`.
 
 [Full Chunk 2 detail →](/roadmap/2-skeleton/)
 
