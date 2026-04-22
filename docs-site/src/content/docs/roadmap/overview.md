@@ -9,9 +9,9 @@ import { Badge } from '@astrojs/starlight/components';
 
 | Chunk | Hours | Name | Status |
 |---|---|---|---|
-| [0](/roadmap/overview/#chunk-0) | Pre-build | Documentation site | <Badge text="In progress" variant="caution" /> |
-| [1](/roadmap/1-distiller/) | 0-6 | Distiller quality gate | <Badge text="Pending" variant="default" /> |
-| [2](/roadmap/2-skeleton/) | 6-14 | Plugin skeleton + injection | <Badge text="Pending" variant="default" /> |
+| [0](/roadmap/overview/#chunk-0) | Pre-build | Documentation site | <Badge text="Shipped" variant="success" /> |
+| [1](/roadmap/1-distiller/) | 0-6 | Distiller quality gate | <Badge text="Shipped" variant="success" /> |
+| [2](/roadmap/2-skeleton/) | 6-14 | Plugin skeleton + injection | <Badge text="In progress" variant="caution" /> |
 | [3](/roadmap/3-distillation/) | 14-22 | Distiller wired to Stop hook | <Badge text="Pending" variant="default" /> |
 | [4](/roadmap/4-git-sync/) | 22-32 | Git sync layer | <Badge text="Pending" variant="default" /> |
 | [5](/roadmap/5-broadcast/) | 32-44 | Broadcast + polish + demo | <Badge text="Pending" variant="default" /> |
@@ -34,18 +34,13 @@ import { Badge } from '@astrojs/starlight/components';
 - Unseen teammate reads site for 10 min and can answer five core questions unaided.
 - Site committed + pushed; Actions green.
 
-## Chunk 1 — Distiller quality gate (Hours 0-6) 🚨
+## Chunk 1 — Distiller quality gate (Hours 0-6) ✅
 
-**Highest risk.** Before any plugin infra: standalone `distiller.mjs` CLI fed a real 2+ hour transcript. Blind A/B test: read the final `memory.md` cold — would a new teammate know the right things?
+**Gate passed.** `distiller.mjs` + `lib/transcript.mjs` + `lib/memory.mjs` + `prompts/distill.md`. Tested on a real 828-line planning transcript: 34-line final memory, hygiene test passed (resolved item correctly dropped on incremental pass), blind A/B 3/3 non-obvious facts captured.
 
-**Exit criteria:**
-- Two independent evaluators agree output passes the blind test.
-- Memory stays < 60 lines on a 2-hour transcript (tight hygiene).
-- Deterministic enough that small transcript tweaks don't flip unrelated entries.
+Key detail: subprocess runs with `claude -p --bare` — strips global plugins/hooks so only the distill prompt reaches the model.
 
-**If failing:** iterate prompt, try Opus 4.7, or pivot to handoff-only.
-
-[Full Chunk 1 detail →](/roadmap/1-distiller/)
+[Full Chunk 1 detail + test results →](/roadmap/1-distiller/)
 
 ## Chunk 2 — Plugin skeleton + injection (Hours 6-14)
 

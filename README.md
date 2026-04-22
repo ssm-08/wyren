@@ -17,9 +17,14 @@ A Claude Code plugin that:
 ```
 Vibejam/
 ├── docs-site/                  # Astro Starlight documentation site
+├── distiller.mjs               # standalone distiller CLI (Chunk 1)
+├── lib/
+│   ├── transcript.mjs          # JSONL parse + slice + prose render
+│   └── memory.mjs              # atomic memory.md read/write
+├── prompts/
+│   └── distill.md              # distiller system prompt
 ├── .github/workflows/docs.yml  # GitHub Pages deploy for docs-site
-├── README.md                   # (this file)
-└── (plugin source comes next — Chunks 1-5)
+└── README.md                   # (this file)
 ```
 
 ## Status
@@ -29,8 +34,8 @@ Built for a 48-hour hackathon. Six chunks:
 | Chunk | Status | What |
 |---|---|---|
 | 0 | ✅ Done | Documentation site (Astro Starlight) |
-| 1 | ⏳ Next | Distiller quality gate (hours 0-6) |
-| 2 | ⏳ | Plugin skeleton + injection (hours 6-14) |
+| 1 | ✅ Done | Distiller quality gate — `distiller.mjs`, `lib/transcript.mjs`, `lib/memory.mjs`, `prompts/distill.md` |
+| 2 | ⏳ Next | Plugin skeleton + injection (hours 6-14) |
 | 3 | ⏳ | Distiller wired to Stop hook (hours 14-22) |
 | 4 | ⏳ | Git sync layer (hours 22-32) |
 | 5 | ⏳ | Broadcast + polish + demo (hours 32-44) |
