@@ -13,8 +13,9 @@ Relay is a Claude Code plugin that gives a team shared memory across every teamm
 ## Current status
 
 - **Chunk 0 (pre-build docs site):** ✅ shipped. Astro Starlight, 19 content pages, Mermaid diagrams, GitHub Pages via Actions.
-- **Chunk 1 (distiller quality gate):** ⏳ next. Highest-risk chunk — standalone `distiller.mjs` CLI fed a real transcript, iterate prompt until blind A/B test passes. Do NOT proceed to Chunk 2 until Chunk 1's exit criteria pass (see plan).
-- Chunks 2-5 follow. Total budget 48h.
+- **Chunk 1 (distiller quality gate):** ✅ shipped. `distiller.mjs` + `lib/transcript.mjs` + `lib/memory.mjs` + `prompts/distill.md`. Gate passed first iteration: 34-line memory from 828-line transcript, hygiene test passed, blind A/B test 3/3. Uses `claude -p --bare` — `--bare` flag critical to strip global plugins/hooks from subprocess.
+- **Chunk 2 (plugin skeleton + injection):** ⏳ next. Plugin installable via `/plugins add`. `SessionStart` reads `memory.md` → injects as `additionalContext`. No distiller wired yet.
+- Chunks 3-5 follow. Total budget 48h.
 
 ## Repo layout
 
@@ -28,12 +29,16 @@ Vibejam/
 ├── README.md
 ├── .gitignore                  # excludes node_modules/, .claude/, .relay/state/, .relay/log
 ├── CLAUDE.md                   # this file
-└── (plugin source → Chunks 1–5)
+├── distiller.mjs               # Chunk 1: standalone distiller CLI
+├── lib/
+│   ├── transcript.mjs          # JSONL parse + slicer + prose renderer
+│   └── memory.mjs              # atomic read/write for memory.md
+├── prompts/
+│   └── distill.md              # distiller system prompt (core IP)
+└── (plugin source → Chunks 2–5)
     Eventually:
     ├── hooks/                  # SessionStart + Stop
-    ├── lib/                    # sync, transcript, memory
-    ├── prompts/distill.md      # core IP
-    ├── distiller.mjs
+    ├── lib/sync.mjs            # git sync
     └── bin/relay               # CLI
 ```
 
