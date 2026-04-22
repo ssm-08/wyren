@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
-import { updateWatermark } from '../hooks/stop.mjs';
+import { updateWatermark, shouldDistill } from '../hooks/stop.mjs';
 
 function makeTmpDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'relay-test-'));
@@ -67,4 +67,48 @@ test('updateWatermark persists last_uuid from previous state', () => {
   } finally {
     fs.rmSync(dir, { recursive: true });
   }
+});
+
+// shouldDistill tests
+
+test('shouldDistill returns false when distiller_running is true', () => {
+  const state = { distiller_running: true, turns_since_distill: 10 };
+  assert.equal(shouldDistill(state), false);
+});
+
+test('shouldDistill returns false when turns below threshold', () => {
+  const state = { turns_since_distill: 4 };
+  assert.equal(shouldDistill(state), false);
+});
+
+test('shouldDistill returns true when turns reach threshold', () => {
+  const state = { turns_since_distill: 5 };
+  assert.equal(shouldDistill(state), true);
+});
+
+test('shouldDistill returns true when turns exceed threshold', () => {
+  const state = { turns_since_distill: 8 };
+  assert.equal(shouldDistill(state), true);
+});
+
+test('shouldDistill returns true on idle trigger', () => {
+  const state = {
+    turns_since_distill: 2,
+    last_distilled_at: Date.now() - 3 * 60 * 1000, // 3min ago
+  };
+  assert.equal(shouldDistill(state), true);
+});
+
+test('shouldDistill returns false on idle trigger with no prior distillation', () => {
+  // no last_distilled_at means first-ever distillation; wait for turn threshold
+  const state = { turns_since_distill: 2 };
+  assert.equal(shouldDistill(state), false);
+});
+
+test('shouldDistill returns false when idle time is under 2min', () => {
+  const state = {
+    turns_since_distill: 2,
+    last_distilled_at: Date.now() - 60 * 1000, // only 1min ago
+  };
+  assert.equal(shouldDistill(state), false);
 });

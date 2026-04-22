@@ -15,8 +15,9 @@ Relay is a Claude Code plugin that gives a team shared memory across every teamm
 - **Chunk 0 (pre-build docs site):** ✅ shipped. Astro Starlight, 19 content pages, Mermaid diagrams, GitHub Pages via Actions.
 - **Chunk 1 (distiller quality gate):** ✅ shipped. `distiller.mjs` + `lib/transcript.mjs` + `lib/memory.mjs` + `prompts/distill.md`. Gate passed first iteration: 34-line memory from 828-line transcript, hygiene test passed, blind A/B test 3/3. Uses `claude -p --bare` — `--bare` flag critical to strip global plugins/hooks from subprocess.
 - **Chunk 2 (plugin skeleton + injection):** ✅ shipped. `.claude-plugin/plugin.json` + `hooks/hooks.json` + `hooks/run-hook.cmd` + `hooks/session-start.mjs` + `hooks/stop.mjs` (stub) + `bin/relay.mjs` + `lib/util.mjs`. 17 unit tests green. E2E verified via hook pipe test.
-- **Chunk 3 (distiller wired into Stop hook):** ⏳ next. `stop.mjs` spawns distiller detached after 5 turns. Tier 0 regex filter. Single-machine live distillation.
-- Chunks 4-5 follow. Total budget 48h.
+- **Chunk 3 (distiller wired into Stop hook):** ✅ shipped. `stop.mjs` spawns distiller detached after 5 turns (or 2min idle). Tier 0 regex filter in `lib/filter.mjs` — matches rendered transcript format `[tool_use Edit]`, not raw JSONL. Default model Haiku 4.5. `distiller_running` lock prevents concurrent runs. 29 unit tests green.
+- **Chunk 4 (git sync layer):** ⏳ next. `lib/sync.mjs` — `RelaySync` interface + `GitSync` impl. Push after distillation, pull on SessionStart. Cross-machine warm-start.
+- Chunk 5 follows. Total budget 48h.
 
 ## Repo layout
 
@@ -30,17 +31,22 @@ Vibejam/
 ├── README.md
 ├── .gitignore                  # excludes node_modules/, .claude/, .relay/state/, .relay/log
 ├── CLAUDE.md                   # this file
-├── distiller.mjs               # Chunk 1: standalone distiller CLI
+├── distiller.mjs               # Chunks 1+3: distiller CLI (Haiku 4.5 default, Tier 0 filter)
 ├── lib/
 │   ├── transcript.mjs          # JSONL parse + slicer + prose renderer
-│   └── memory.mjs              # atomic read/write for memory.md
+│   ├── memory.mjs              # atomic read/write for memory.md
+│   └── filter.mjs              # Tier 0 signal filter (hasTier0Signal)
 ├── prompts/
 │   └── distill.md              # distiller system prompt (core IP)
-└── (plugin source → Chunks 2–5)
-    Eventually:
-    ├── hooks/                  # SessionStart + Stop
-    ├── lib/sync.mjs            # git sync
-    └── bin/relay               # CLI
+├── hooks/                      # Chunk 2+3: plugin hooks
+│   ├── hooks.json              # hook manifest
+│   ├── run-hook.cmd            # Windows/Unix dispatcher
+│   ├── session-start.mjs       # injects memory + broadcast as additionalContext
+│   └── stop.mjs                # watermark + detached distiller spawn (5 turns / 2min idle)
+├── bin/
+│   └── relay.mjs               # CLI: relay init
+├── tests/                      # 29 unit tests (node:test)
+└── (Chunk 4 adds lib/sync.mjs)
 ```
 
 ## Non-obvious conventions

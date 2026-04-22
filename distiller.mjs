@@ -10,6 +10,7 @@ import {
   lastUuid,
 } from './lib/transcript.mjs';
 import { readMemory, writeMemoryAtomic } from './lib/memory.mjs';
+import { hasTier0Signal } from './lib/filter.mjs';
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 const CLAUDE_TIMEOUT_MS = 120_000;
@@ -100,14 +101,17 @@ function runClaude(prompt, model) {
   });
 }
 
-function writeWatermark(cwd, uuid) {
-  if (!cwd || !uuid) return;
+function writeWatermark(cwd, uuid, { clearRunning = false } = {}) {
+  if (!cwd) return;
   const statePath = path.join(cwd, '.relay', 'state', 'watermark.json');
   fs.mkdirSync(path.dirname(statePath), { recursive: true });
   let state = {};
   try { state = JSON.parse(fs.readFileSync(statePath, 'utf8')); } catch {}
-  state.last_uuid = uuid;
-  state.last_distilled_at = Date.now();
+  if (uuid) {
+    state.last_uuid = uuid;
+    state.last_distilled_at = Date.now();
+  }
+  if (clearRunning) delete state.distiller_running;
   fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
 }
 
@@ -120,7 +124,7 @@ async function main() {
   const outPath = args.out;
   const since = args.since && args.since !== 'true' ? args.since : '';
   const cwd = args.cwd && args.cwd !== 'true' ? args.cwd : '';
-  const model = args.model && args.model !== 'true' ? args.model : 'claude-sonnet-4-6';
+  const model = args.model && args.model !== 'true' ? args.model : 'claude-haiku-4-5-20251001';
   const dryRun = !!args['dry-run'];
 
   // --limit applies to raw lines before --since slice; useful for A/B testing only.
@@ -144,7 +148,7 @@ async function main() {
     console.error('empty transcript slice; nothing to distill');
     // Write watermark to end of limited lines so next run advances correctly
     const endUuid = lastUuid(limited) || lastUuid(lines);
-    if (endUuid) writeWatermark(cwd, endUuid);
+    if (endUuid) writeWatermark(cwd, endUuid, { clearRunning: true });
     process.exit(0);
   }
 
@@ -168,21 +172,34 @@ async function main() {
     return;
   }
 
+  // Tier 0: skip API call if slice has no actionable signal
+  if (!hasTier0Signal(transcriptSlice)) {
+    console.error('distiller: Tier 0 filter — no signal words; skipping API call');
+    const endUuid = lastUuid(sliced) || lastUuid(limited) || lastUuid(lines);
+    writeWatermark(cwd, endUuid, { clearRunning: true });
+    process.exit(0);
+  }
+
   console.error(
     `distiller: transcript=${transcriptPath} lines=${lines.length}` +
     ` slice_chars=${transcriptSlice.length} memory_chars=${existingMemory.length} model=${model}`
   );
 
-  const newMemory = await runClaude(fullPrompt, model);
-  const cleaned = newMemory.trim() + '\n';
-  writeMemoryAtomic(outPath, cleaned);
+  try {
+    const newMemory = await runClaude(fullPrompt, model);
+    const cleaned = newMemory.trim() + '\n';
+    writeMemoryAtomic(outPath, cleaned);
 
-  const newLastUuid = lastUuid(sliced) || lastUuid(limited) || lastUuid(lines);
-  writeWatermark(cwd, newLastUuid);
+    const newLastUuid = lastUuid(sliced) || lastUuid(limited) || lastUuid(lines);
+    writeWatermark(cwd, newLastUuid, { clearRunning: true });
 
-  console.error(
-    `distiller: wrote ${outPath} (${cleaned.length} chars). last_uuid=${newLastUuid}`
-  );
+    console.error(
+      `distiller: wrote ${outPath} (${cleaned.length} chars). last_uuid=${newLastUuid}`
+    );
+  } catch (e) {
+    try { writeWatermark(cwd, null, { clearRunning: true }); } catch {}
+    throw e;
+  }
 }
 
 main().catch((e) => {
