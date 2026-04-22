@@ -17,7 +17,7 @@ export function readBroadcastDir(broadcastDir) {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) walk(full);
-      else files.push(full);
+      else if (entry.name !== '.gitkeep') files.push(full);
     }
   }
   walk(broadcastDir);
