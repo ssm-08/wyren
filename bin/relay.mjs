@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import url from 'node:url';
-import { execSync, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { isMain } from '../lib/util.mjs';
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
@@ -99,12 +99,16 @@ export function relayStatus(targetDir) {
 
   // Git remote
   try {
-    const remote = execSync('git remote get-url origin', {
+    const r = spawnSync('git', ['remote', 'get-url', 'origin'], {
       cwd: targetDir,
       encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
-    console.log(`${label('Remote:')} origin → ${remote}`);
+    });
+    const remote = (r.stdout || '').trim();
+    if (r.status === 0 && remote) {
+      console.log(`${label('Remote:')} origin → ${remote}`);
+    } else {
+      console.log(`${label('Remote:')} (none configured)`);
+    }
   } catch {
     console.log(`${label('Remote:')} (none configured)`);
   }

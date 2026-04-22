@@ -2,6 +2,7 @@
   "name": "relay",
   "description": "Shared team memory across Claude Code sessions via git-synced memory.md",
   "version": "0.2.0",
+  "hooks": "hooks/hooks.json",
   "author": {
     "name": "ssm-08",
     "url": "https://github.com/ssm-08"

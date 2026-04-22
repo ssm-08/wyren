@@ -14,7 +14,15 @@ Steps:
    "## Handoff notes\n<entry>\n\n"
 6. Write atomically: write the full updated content to .relay/memory.md.tmp, then rename it to .relay/memory.md.
 7. Run: node bin/relay.mjs distill --push
-   If that errors with "No transcript found", fall back to:
-   git add .relay/memory.md && git commit -m "[relay] handoff note" && git push
+   If that errors with "No transcript found", fall back to these steps (handle conflicts):
+   a. git add .relay/memory.md
+   b. git commit -m "[relay] handoff note"
+   c. git push
+   d. If git push fails with "non-fast-forward" or "rejected":
+      git fetch && git reset --mixed FETCH_HEAD
+      git add .relay/memory.md
+      git commit -m "[relay] handoff note"
+      git push
+   e. If push still fails, tell the user: "Push failed — remote has diverged. Run 'relay status' to diagnose, then re-run /relay-handoff."
 8. Confirm to the user: "Handoff note written and pushed. Teammates will see it at their next SessionStart."
 """

@@ -114,7 +114,9 @@ function writeWatermark(cwd, uuid, { clearRunning = false, transcript = '' } = {
   }
   if (transcript) state.last_transcript = transcript;
   if (clearRunning) delete state.distiller_running;
-  fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
+  const tmp = `${statePath}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(state, null, 2));
+  fs.renameSync(tmp, statePath);
 }
 
 async function main() {

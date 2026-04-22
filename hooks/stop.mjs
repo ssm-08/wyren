@@ -10,6 +10,12 @@ const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 const TURNS_THRESHOLD = 5;
 const IDLE_MS = 2 * 60 * 1000;
 
+function writeWatermarkAtomic(watermarkPath, state) {
+  const tmp = `${watermarkPath}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(state, null, 2));
+  fs.renameSync(tmp, watermarkPath);
+}
+
 export function updateWatermark(relayDir) {
   const stateDir = path.join(relayDir, 'state');
   fs.mkdirSync(stateDir, { recursive: true });
@@ -23,7 +29,7 @@ export function updateWatermark(relayDir) {
   state.turns_since_distill = (state.turns_since_distill ?? 0) + 1;
   state.last_turn_at = Date.now();
 
-  fs.writeFileSync(watermarkPath, JSON.stringify(state, null, 2));
+  writeWatermarkAtomic(watermarkPath, state);
   return state;
 }
 
@@ -69,10 +75,11 @@ export function spawnDistiller({ relayDir, transcriptPath, since, cwd }) {
     stdio: ['ignore', logFd, logFd],
   });
   proc.on('error', (e) => {
-    if (typeof logFd === 'number') { try { fs.closeSync(logFd); } catch {} }
     process.stderr.write(`[relay] distiller spawn failed: ${e.message}\n`);
   });
   proc.unref();
+  // close parent's copy — child already inherited its own fd
+  if (typeof logFd === 'number') { try { fs.closeSync(logFd); } catch {} }
 }
 
 async function main() {
@@ -86,11 +93,21 @@ async function main() {
     const state = updateWatermark(relayDir);
 
     if (shouldDistill(state) && transcript_path) {
-      // mark running + reset counter before spawn so concurrent turns don't double-trigger
+      // openSync('wx') is atomic — EEXIST if another Stop hook beat us here
+      const triggerLock = path.join(relayDir, 'state', 'distill-trigger.lock');
+      try {
+        fs.closeSync(fs.openSync(triggerLock, 'wx'));
+      } catch {
+        process.exit(0); // another process won the race
+      }
+
       const watermarkPath = path.join(relayDir, 'state', 'watermark.json');
       state.distiller_running = true;
       state.turns_since_distill = 0;
-      fs.writeFileSync(watermarkPath, JSON.stringify(state, null, 2));
+      writeWatermarkAtomic(watermarkPath, state);
+
+      // release trigger lock immediately — distiller_running flag takes over
+      try { fs.unlinkSync(triggerLock); } catch {}
 
       spawnDistiller({
         relayDir,

@@ -88,6 +88,12 @@ export default defineConfig({
 					],
 				},
 				{
+					label: 'Guides',
+					items: [
+						{ label: 'Two-system test', slug: 'guides/two-system-test' },
+					],
+				},
+				{
 					label: 'Meta',
 					items: [
 						{ label: 'Demo script', slug: 'demo' },

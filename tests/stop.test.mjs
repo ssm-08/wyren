@@ -112,3 +112,43 @@ test('shouldDistill returns false when idle time is under 2min', () => {
   };
   assert.equal(shouldDistill(state), false);
 });
+
+test('updateWatermark writes atomically (no partial read during write)', () => {
+  // Verifies tmp+rename pattern: watermark.json is never in a partial-write state.
+  // We can't simulate a mid-write crash, but we can verify no .tmp file lingers.
+  const dir = makeTmpDir();
+  const relayDir = path.join(dir, '.relay');
+  fs.mkdirSync(relayDir);
+  try {
+    updateWatermark(relayDir);
+    const stateDir = path.join(relayDir, 'state');
+    const files = fs.readdirSync(stateDir);
+    const tmpFiles = files.filter((f) => f.includes('.tmp'));
+    assert.equal(tmpFiles.length, 0, 'No .tmp files should linger after atomic write');
+    assert.ok(fs.existsSync(path.join(stateDir, 'watermark.json')));
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
+
+test('trigger lock prevents double-spawn: second openSync(wx) throws EEXIST', () => {
+  // Simulates C2 fix: two concurrent Stop hooks race on distill-trigger.lock.
+  // First wins; second sees EEXIST and skips spawn.
+  const dir = makeTmpDir();
+  const relayDir = path.join(dir, '.relay');
+  fs.mkdirSync(path.join(relayDir, 'state'), { recursive: true });
+  const triggerLock = path.join(relayDir, 'state', 'distill-trigger.lock');
+  try {
+    // First hook claims the lock
+    fs.closeSync(fs.openSync(triggerLock, 'wx'));
+    // Second hook should fail
+    assert.throws(
+      () => fs.closeSync(fs.openSync(triggerLock, 'wx')),
+      { code: 'EEXIST' },
+      'Second openSync(wx) must throw EEXIST'
+    );
+  } finally {
+    try { fs.unlinkSync(triggerLock); } catch {}
+    fs.rmSync(dir, { recursive: true });
+  }
+});
