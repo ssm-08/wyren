@@ -91,3 +91,40 @@ test('buildContext omits broadcast section when broadcast dir is empty', () => {
     fs.rmSync(dir, { recursive: true });
   }
 });
+
+test('buildContext includes acknowledgment instruction when skills present', () => {
+  const dir = makeTmpDir();
+  try {
+    fs.mkdirSync(path.join(dir, '.relay', 'broadcast', 'skills'), { recursive: true });
+    fs.writeFileSync(path.join(dir, '.relay', 'memory.md'), '## Decisions\n- Use SQLite\n', 'utf8');
+    fs.writeFileSync(
+      path.join(dir, '.relay', 'broadcast', 'skills', 'frontend-style.md'),
+      '# Frontend Style\nUse 2-space indent.',
+      'utf8'
+    );
+    const result = buildContext(dir);
+    assert.ok(result.includes('frontend-style'), `Missing skill name in: ${result}`);
+    assert.ok(result.includes('Acknowledge'), `Missing acknowledgment instruction in: ${result}`);
+    assert.ok(result.includes('Loaded'), `Missing "Loaded" in: ${result}`);
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
+
+test('buildContext no acknowledgment when broadcast has no skills', () => {
+  const dir = makeTmpDir();
+  try {
+    fs.mkdirSync(path.join(dir, '.relay', 'broadcast'), { recursive: true });
+    fs.writeFileSync(path.join(dir, '.relay', 'memory.md'), '## Decisions\n- Use SQLite\n', 'utf8');
+    fs.writeFileSync(
+      path.join(dir, '.relay', 'broadcast', 'team.md'),
+      '# Team notes\nStandup at 9am.',
+      'utf8'
+    );
+    const result = buildContext(dir);
+    assert.ok(result.includes('Relay Broadcast'), `Should have broadcast section in: ${result}`);
+    assert.ok(!result.includes('Acknowledge'), `Should NOT have acknowledgment when no skills: ${result}`);
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});

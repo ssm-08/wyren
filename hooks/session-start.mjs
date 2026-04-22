@@ -36,7 +36,22 @@ export function buildContext(cwd) {
 
   const parts = [];
   if (memory.trim()) parts.push(`# Relay Memory\n\n${memory.trim()}`);
-  if (broadcast.trim()) parts.push(`# Relay Broadcast\n\n${broadcast.trim()}`);
+  if (broadcast.trim()) {
+    const skillsDir = path.join(relayDir, 'broadcast', 'skills');
+    const skillFiles = fs.existsSync(skillsDir)
+      ? fs.readdirSync(skillsDir).filter((f) => f !== '.gitkeep')
+      : [];
+    let broadcastSection = `# Relay Broadcast\n\n${broadcast.trim()}`;
+    if (skillFiles.length > 0) {
+      const names = skillFiles
+        .map((f) => '`' + path.basename(f, path.extname(f)) + '`')
+        .join(', ');
+      broadcastSection +=
+        `\n\n_Relay: ${skillFiles.length} team skill(s) loaded — ${names}.` +
+        ` Acknowledge in your first response with one line: "Loaded ${skillFiles.length} team skill(s): ${names}."_`;
+    }
+    parts.push(broadcastSection);
+  }
 
   return parts.join('\n\n---\n\n');
 }
