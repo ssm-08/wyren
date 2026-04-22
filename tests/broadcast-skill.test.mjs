@@ -55,7 +55,8 @@ test('relayBroadcastSkill copies file to .relay/broadcast/skills/<basename>', ()
     assert.equal(result, expected);
     assert.ok(fs.existsSync(expected), 'Skill file should exist at destination');
     const content = fs.readFileSync(expected, 'utf8');
-    assert.ok(content.includes('2-space indent'), 'Content should be copied verbatim');
+    const srcContent = fs.readFileSync(srcPath, 'utf8');
+    assert.equal(content, srcContent, 'Copied file must be byte-for-byte identical to source');
   } finally {
     fs.rmSync(dir, { recursive: true });
   }
@@ -92,7 +93,7 @@ test('relayBroadcastSkill overwrites existing skill with same name', () => {
     relayBroadcastSkill(dir, srcPath);
 
     const content = fs.readFileSync(destPath, 'utf8');
-    assert.ok(content.includes('New content'), 'Should overwrite with new content');
+    assert.equal(content, '# New content', 'Should overwrite with exact new content');
   } finally {
     fs.rmSync(dir, { recursive: true });
   }

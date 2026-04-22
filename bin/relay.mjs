@@ -27,6 +27,10 @@ export function relayInit(targetDir) {
   fs.mkdirSync(path.join(relayDir, 'broadcast'), { recursive: true });
   fs.writeFileSync(path.join(relayDir, 'broadcast', '.gitkeep'), '', 'utf8');
 
+  // Create .relay/broadcast/skills/ with .gitkeep so git tracks it before any skill is broadcast
+  fs.mkdirSync(path.join(relayDir, 'broadcast', 'skills'), { recursive: true });
+  fs.writeFileSync(path.join(relayDir, 'broadcast', 'skills', '.gitkeep'), '', 'utf8');
+
   // Update .gitignore — idempotent
   const gitignorePath = path.join(targetDir, '.gitignore');
   let existing = '';
@@ -229,27 +233,26 @@ if (isMain(import.meta.url)) {
   } else if (command === 'broadcast-skill') {
     const filePath = rest[0];
     const dest = relayBroadcastSkill(process.cwd(), filePath);
-    if (dest) {
-      const { GitSync } = await import('../lib/sync.mjs');
-      const sync = new GitSync();
-      let release = () => {};
-      try {
-        release = sync.lock(process.cwd());
-      } catch (e) {
-        if (e.message === 'LOCKED') {
-          console.error('relay: sync locked by another process');
-          process.exit(2);
-        }
-        throw e;
+    if (!dest) process.exit(1);
+    const { GitSync } = await import('../lib/sync.mjs');
+    const sync = new GitSync();
+    let release = () => {};
+    try {
+      release = sync.lock(process.cwd());
+    } catch (e) {
+      if (e.message === 'LOCKED') {
+        console.error('relay: sync locked by another process');
+        process.exit(2);
       }
-      try {
-        sync.push(process.cwd(), 'broadcast');
-        console.log('Pushed to remote.');
-      } catch (e) {
-        console.error(`relay: push failed: ${e.message}`);
-      } finally {
-        release();
-      }
+      throw e;
+    }
+    try {
+      sync.push(process.cwd(), 'broadcast');
+      console.log('Pushed to remote.');
+    } catch (e) {
+      console.error(`relay: push failed: ${e.message}`);
+    } finally {
+      release();
     }
   } else {
     console.error(
