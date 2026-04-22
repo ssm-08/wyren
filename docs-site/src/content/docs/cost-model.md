@@ -37,16 +37,17 @@ Remaining 30-40% of triggers go to Haiku 4.5:
 - Latency: ~2s P50 — background completes before next trigger.
 - Quality: sufficient for **incremental** updates. It's merging a small delta into a well-structured existing file, not generating from scratch.
 
-## Tier 2 — Claude Sonnet 4.6 (deep cleanup)
+## Tier 2 — Claude Sonnet 4.6 (deep cleanup, design only)
 
-Sonnet runs on a slower cadence:
+Sonnet was planned for a slower cadence to fix Haiku drift:
 
-- Once per hour, if any Tier 1 ran in that hour.
-- On session exit (force-flush via next-session-start fallback).
-- On `/relay-handoff` slash command.
-- When `memory.md` exceeds 60 lines — hygiene violation → force re-compression.
+- Once per hour after any Tier 1 runs
+- When `memory.md` exceeds 60 lines → forced re-compression
+- On explicit `/relay-handoff`
 
-Sonnet reads the full current memory and re-compresses aggressively — fixes Haiku drift, removes stale entries, unifies phrasing. **~1-2 Sonnet calls per hour per teammate.**
+**Not shipped in the 48h build.** The standalone `distiller.mjs` accepts a `--model <id>` argument, so you can invoke Sonnet manually with `node distiller.mjs --model claude-sonnet-4-6 ...` — but the Stop hook spawns it with Haiku every time. No timer, no line-count trigger. `/relay-handoff` runs the normal distiller (Haiku) with `--push`.
+
+The Tier 2 design stays in the plan because Haiku drift on long sessions is a real concern — but it's intentional follow-up work, not a current capability. See [Future](/future/).
 
 ## Prompt caching (SDK path only)
 
@@ -58,16 +59,16 @@ When using the Anthropic SDK (not `claude -p`):
 
 Effective cached per-call cost: **~$0.003 on Haiku, ~$0.008 on Sonnet**.
 
-## Revised total — tiered + cached
+## Revised total — what actually ships
+
+With only Tier 0 + Tier 1 shipped (no Tier 2 automation):
 
 - 144 raw triggers (3 teammates × 4 hrs × 12/hr).
-- Tier 0 kills 70% → 43 triggers reach API.
-- 90% go to Haiku (39 × $0.003) = **$0.12**.
-- 10% go to Sonnet (4 × $0.008) = **$0.03**.
-- Hourly deep re-compressions (12 × $0.01) = **$0.12**.
-- **Total: ~$0.30** for the full hackathon.
+- Tier 0 kills ~70% → ~43 triggers reach API.
+- All 43 go to Haiku — under `claude -p`, these draw from each teammate's Claude Code quota (no separate billing).
+- If the SDK path is used instead with prompt caching: 43 × $0.003 = **~$0.13** total for the whole 4-hour hackathon.
 
-**30× cheaper than naive.**
+**Compared to the naive baseline of $8.60 — roughly 65× cheaper, and $0 under the preferred `claude -p` path.**
 
 ## The zero-billing path
 
@@ -85,13 +86,13 @@ If a teammate has **no Claude Code auth AND no API key** (edge case), Tier 0 reg
 
 Documented, not demoed.
 
-## Which tiers ship in 48h?
+## Which tiers actually ship?
 
-| Chunk | What ships |
+| Tier | Status |
 |---|---|
-| Chunk 1 | Iterate prompt on single Sonnet calls. Cost irrelevant during dev. |
-| Chunk 3 | Tier 0 regex filter **(mandatory)**. Haiku default. |
-| Chunk 3 | Sonnet path as separate function, gated by timer + line-count. |
-| Chunk 5 | SDK prompt caching path — stretch. Cost-story for demo. |
+| Tier 0 (regex filter) | ✅ **Shipped** in `lib/filter.mjs`. Mandatory — runs before every API call. Kills ~70% of triggers. |
+| Tier 1 (Haiku 4.5) | ✅ **Shipped** as the default in `distiller.mjs`. Invoked via `claude -p --model claude-haiku-4-5-20251001`. |
+| Tier 2 (Sonnet 4.6 on timer / size threshold) | ❌ Not shipped. `distiller.mjs --model <id>` accepts Sonnet manually, but there is no automatic Tier 2 trigger. |
+| SDK prompt caching | ❌ Not shipped. Current path uses `claude -p` exclusively — no `@anthropic-ai/sdk` code path. |
 
-Fallback if time runs short: single-tier Haiku for everything. Still ~5× cheaper than naive Sonnet.
+What this means in practice: cost is **$0 on the preferred `claude -p` path**. If you're on the SDK fallback without caching, it's roughly Haiku pricing × 43 calls = **$0.86 for a 4-hour 3-person hackathon**. Still cheap, but notably higher than the cached design.

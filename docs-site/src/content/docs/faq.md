@@ -34,17 +34,15 @@ That said: if you say something secret in a session on a shared repo, the *concl
 
 ## How do I disable Relay temporarily?
 
-```bash
-RELAY_DISABLE=1 claude
+Use the Claude Code slash command:
+
+```
+/plugins disable relay
 ```
 
-Hooks silent-no-op when this env var is set to `1`. No distillation, no injection, no git push.
+Re-enable with `/plugins enable relay`. This is the only supported toggle — the `RELAY_DISABLE` env var mentioned in early drafts is not wired up.
 
-Or globally:
-
-```bash
-claude /plugins disable relay
-```
+If you want to skip git fetch on a specific session (e.g. offline demo), set `RELAY_SKIP_PULL=1` before launching Claude Code. Memory injection still works from whatever is already on disk; only the pre-session pull is skipped.
 
 ## How do I stop distillation on a specific turn?
 

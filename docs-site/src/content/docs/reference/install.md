@@ -35,13 +35,16 @@ cd <your-repo>
 relay init
 ```
 
+_`relay` is the CLI alias. After `/plugins add`, the binary is at `~/.claude/plugins/relay/bin/relay.mjs`. If that path isn't on your `$PATH`, use the full path — e.g. `node ~/.claude/plugins/relay/bin/relay.mjs init`. Or set up an alias (see [Dev install](#dev-install) below)._
+
 This creates:
 
 ```
 .relay/
-├── memory.md           # git-tracked, empty stub
-├── broadcast/          # git-tracked, empty
-└── state/              # NOT tracked — per-machine
+├── memory.md               # git-tracked, empty stub
+├── broadcast/              # git-tracked (.gitkeep)
+│   └── skills/             # git-tracked (.gitkeep)
+└── state/                  # NOT tracked — per-machine
 ```
 
 And appends to `.gitignore`:
@@ -76,40 +79,61 @@ relay status
 Example output:
 
 ```
-Relay v0.1.0
-─────────────────────────────────────
-Repo:         /path/to/repo
-Memory:       .relay/memory.md (23 lines, 1.2 KB)
-Broadcast:    3 files
-Last distill: 4 minutes ago (session 7a2e)
-Watermark:    at turn 47 of 52
-Git remote:   origin (push OK)
-Lock:         free
+Memory:     .relay/memory.md  (1.2 KB, 23 lines)
+Distilled:  2026-04-22T14:30:00.000Z (4 min ago)
+Last UUID:  7a2e-...
+Watermark:  turns_since_distill=2, distiller_running=false
+Transcript: /Users/alice/.claude/projects/.../7a2e.jsonl
+Remote:     origin → https://github.com/team/project.git
+Lock:       not held
+```
+
+## Dev install
+
+If you're iterating on the plugin locally (or just want `relay` on your `$PATH` for shell convenience), symlink the checkout into the plugins directory:
+
+```bash
+# Windows (PowerShell, run as Admin)
+New-Item -ItemType Junction `
+  -Path "$env:USERPROFILE\.claude\plugins\relay" `
+  -Target (Get-Location).Path
+
+# macOS / Linux
+ln -s "$(pwd)" ~/.claude/plugins/relay
+```
+
+Then add an alias (optional):
+
+```bash
+# bash/zsh
+alias relay='node ~/.claude/plugins/relay/bin/relay.mjs'
+
+# PowerShell
+Set-Alias relay "$env:USERPROFILE\.claude\plugins\relay\bin\relay.mjs"
 ```
 
 ## Uninstall
 
-```bash
-claude /plugins remove relay
-rm -rf ~/.claude/plugins/relay
+```
+/plugins remove relay
 ```
 
-In a repo:
+In a repo you want to stop tracking:
+
 ```bash
 rm -rf .relay
-# remove .relay entries from .gitignore
+# remove .relay/state/ and .relay/log lines from .gitignore
+git commit -am "remove Relay"
 ```
 
-## Environment variables (optional)
+## Environment variables
 
 | Var | Default | Purpose |
 |---|---|---|
-| `RELAY_MODEL` | `claude-haiku-4-5-20251001` | Tier 1 distillation model |
-| `RELAY_DEEP_MODEL` | `claude-sonnet-4-6` | Tier 2 deep re-compression |
-| `RELAY_TURN_THRESHOLD` | `5` | Turns between distillations |
-| `RELAY_IDLE_MS` | `120000` | Idle timeout in ms |
-| `RELAY_DISABLE` | `0` | Set to `1` to silently no-op all hooks |
-| `ANTHROPIC_API_KEY` | (unset) | SDK fallback if `claude -p` unavailable |
+| `RELAY_SKIP_PULL` | unset | If set, `GitSync.pull()` returns immediately. Use for offline/local-only demos or slow-network environments. |
+| `CLAUDE_PLUGIN_ROOT` | set by Claude Code | Where the hook dispatcher looks up `distiller.mjs`. Don't set this yourself. |
+
+Other env vars from early drafts (`RELAY_MODEL`, `RELAY_DISABLE`, `RELAY_TURN_THRESHOLD`, etc.) are not wired up — see [CLI reference → Not yet implemented](/reference/cli/#not-yet-implemented).
 
 ## Troubleshooting
 

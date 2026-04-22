@@ -70,7 +70,7 @@ JSON would require: (a) a schema, (b) a renderer for humans, (c) a validator for
 
 Safe. Relay distiller treats existing content as "the trusted starting state" and merges new signal into it — it won't nuke human edits unless they contradict transcript evidence.
 
-If you want an edit preserved permanently (e.g., hand-crafted team charter), put it in `.relay/broadcast/CLAUDE.md` instead — Relay broadcasts that separately and never distills it.
+If you want something preserved permanently (e.g. a hand-crafted team charter), put it in `.relay/broadcast/` instead. Files under `broadcast/` are injected as context at every SessionStart but are never read or rewritten by the distiller — they stay exactly as you wrote them. Skills specifically live in `.relay/broadcast/skills/` and trigger an acknowledgment instruction; regular files anywhere else under `broadcast/` inject without the acknowledgment.
 
 ## Size budget
 

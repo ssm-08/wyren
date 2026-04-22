@@ -1,119 +1,114 @@
 ---
 title: CLI reference
-description: Every bin/relay command, flag, and output shape.
+description: Every bin/relay command and flag — what actually ships.
 ---
 
-The `relay` CLI is installed as part of the plugin. It's pure Node, zero deps.
+The `relay` CLI is part of the plugin. Pure Node, zero runtime dependencies.
+
+On a plugin install, the binary is at `~/.claude/plugins/relay/bin/relay.mjs`. If that path isn't on your `$PATH`, either invoke it directly (`node ~/.claude/plugins/relay/bin/relay.mjs <command>`) or create an alias / symlink — see [Install](/reference/install/).
 
 ## `relay init`
 
 Bootstrap a repo for Relay.
 
 ```bash
-relay init [--force]
+relay init
 ```
 
 Creates:
-- `.relay/memory.md` (empty stub with header)
-- `.relay/broadcast/` (empty dir)
-- Appends `.relay/state/` and `.relay/log` to `.gitignore`
+- `.relay/memory.md` — empty stub with `# Relay Memory` header
+- `.relay/broadcast/` + `.gitkeep` so git tracks the empty dir
+- `.relay/broadcast/skills/` + `.gitkeep` so broadcast skills land in a pre-tracked dir
+- Appends `.relay/state/` and `.relay/log` to `.gitignore` (creates the file if absent)
 
-Verifies:
-- `git remote` is configured (warns if not — plugin will run local-only).
-
-`--force` overwrites existing `.relay/memory.md`.
+**Idempotent.** If `.relay/` already exists, prints `Relay already initialized.` and exits 0 without touching anything.
 
 ## `relay status`
 
-Print current state.
+Print current memory, watermark, sync, and lock state.
 
 ```bash
 relay status
 ```
 
-Example output:
+Example output (actual format):
 
 ```
-Relay v0.1.0
-─────────────────────────────────────
-Repo:         /Users/alice/todo-app
-Memory:       .relay/memory.md (23 lines, 1.2 KB)
-Broadcast:    3 files (frontend-conventions, CLAUDE.md, +1)
-Last distill: 4 min ago (session 7a2e-…)
-Watermark:    47 / 52 turns processed
-Git remote:   origin (push OK)
-Sync:         clean (no pending changes)
-Lock:         free
-Log tail:     .relay/log
+Memory:     .relay/memory.md  (1.2 KB, 23 lines)
+Distilled:  2026-04-22T14:30:00.000Z (4 min ago)
+Last UUID:  7a2e-...
+Watermark:  turns_since_distill=2, distiller_running=false
+Transcript: /Users/alice/.claude/projects/.../7a2e.jsonl
+Remote:     origin → https://github.com/team/project.git
+Lock:       not held
 ```
 
-Exits nonzero if anything is broken (no remote, lock stuck, memory unreadable).
+If the repo isn't initialized, prints `Relay not initialized in this repo. Run: relay init` and exits 0.
 
 ## `relay distill`
 
-Manually trigger a distillation, usually for debugging.
+Run the distiller manually — useful for debugging, forced updates, or explicit handoff.
 
 ```bash
-relay distill                     # run now if signals present
-relay distill --force             # skip Tier 0 filter, always call API
-relay distill --deep              # use Tier 2 (Sonnet) instead of Tier 1 (Haiku)
-relay distill --dry-run           # print what would happen, no writes
-relay distill --transcript <path> # override transcript source
+relay distill [--force] [--dry-run] [--push] [--transcript <path>]
 ```
 
-Writes to `.relay/memory.md` atomically. Pushes via GitSync unless `--no-push`.
+| Flag | Effect |
+|---|---|
+| `--force` | Bypass the Tier 0 regex filter — call the API even if no signal words are found. |
+| `--dry-run` | Print what would happen. No writes. |
+| `--push` | After a successful distill, `git add .relay/` + commit + push via `GitSync`. **Default is no push** — distiller writes `memory.md` locally only. |
+| `--transcript <path>` | Override the transcript source. Defaults to the last transcript recorded in the watermark. |
+
+Exit codes: `0` on success, `1` on distiller failure, `2` if `--push` was requested but the sync lock was held by another process.
 
 ## `relay broadcast-skill`
 
-Ship a local skill file to teammates.
+Copy a local skill file into `.relay/broadcast/skills/` and push to the team.
 
 ```bash
-relay broadcast-skill <path> [--name <name>]
+relay broadcast-skill <file>
 ```
 
-Examples:
+Example:
 
 ```bash
-relay broadcast-skill ./skills/frontend-conventions.md
-# ✔ Copied to .relay/broadcast/skills/frontend-conventions.md
-# ✔ Committed and pushed
-
-relay broadcast-skill ./team-CLAUDE.md --name CLAUDE.md
-# Special: a file named CLAUDE.md lands in .relay/broadcast/CLAUDE.md
-# and is treated as authoritative override.
+relay broadcast-skill ./team-style.md
+# Broadcast: .relay/broadcast/skills/team-style.md
+# Pushed to remote.
 ```
 
-## `relay log`
+The basename of the source file becomes the destination name. Existing files with the same name are overwritten.
 
-Tail the Relay log.
+Exit codes: `0` on success, `1` if relay isn't initialized / the source file is missing / push fails, `2` if the sync lock is held.
 
-```bash
-relay log              # last 50 lines
-relay log -f           # follow (like tail -f)
-relay log --since 1h   # lines from last hour
+## `/relay-handoff` (slash command)
+
+Not part of the CLI — invoked inside Claude Code:
+
+```
+/relay-handoff
 ```
 
-## `relay --version`
+Claude asks for a handoff note (press Enter to skip), prepends it under a `## Handoff notes` section of `.relay/memory.md`, and pushes. Bypasses the distiller — your text lands verbatim. The command definition lives at `commands/relay-handoff.toml`.
 
-```bash
-relay --version
-# relay 0.1.0 (plugin)
-```
+## Environment variables (runtime)
 
-## `relay --help`
+| Var | Default | Effect |
+|---|---|---|
+| `RELAY_SKIP_PULL` | unset | If set to any truthy value, `GitSync.pull()` returns immediately. Useful for offline / local-only demos or environments where `git fetch` is slow. |
+| `CLAUDE_PLUGIN_ROOT` | set by Claude Code | Where the hook dispatcher looks up `distiller.mjs`. Never set manually — Claude Code provides it. |
 
-```bash
-relay --help
-# Shows the full command list with brief descriptions.
-```
+To disable the plugin temporarily, use `/plugins disable relay` in Claude Code.
 
-## Non-zero exit codes
+## Not yet implemented
 
-| Code | Meaning |
-|---|---|
-| 0 | Success |
-| 1 | Generic failure (message on stderr) |
-| 2 | Not initialized (`.relay/` missing) |
-| 3 | Git not configured |
-| 4 | Distiller failed (check `.relay/log`) |
-| 5 | Lock stuck or held by another process |
+These were in early drafts but haven't been wired up. Listed so you know not to rely on them:
+
+- `relay log`, `relay --version`, `relay --help` subcommands
+- `RELAY_DISABLE` env var for silencing hooks
+- `RELAY_MODEL` / `RELAY_DEEP_MODEL` env vars — the model is hard-coded to Haiku 4.5 via the `--model` argument to `distiller.mjs`
+- `RELAY_TURN_THRESHOLD` / `RELAY_IDLE_MS` — thresholds are constants in `hooks/stop.mjs` (5 turns, 2 minutes)
+- Exit codes beyond `0`, `1`, `2`
+- `--deep` / `--no-push` / `--name` flags
+- Automatic Tier 2 Sonnet re-compression on a timer or on `memory.md` size

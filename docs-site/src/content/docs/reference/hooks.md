@@ -44,9 +44,10 @@ Fires once per Claude Code session (startup, resume, clear, or compact).
 
 ### Timing
 
-- Target: < 500ms.
-- Hard cap: 2s (fail-open — emit empty context on timeout).
-- Main cost: `git pull --rebase` on `.relay/`.
+- Target: under 500ms.
+- Main cost: the scoped `git fetch` + `checkout` of `.relay/memory.md` and `.relay/broadcast/` during `GitSync.pull()`. Internal timeouts cap fetch at 3s and each checkout at 2s.
+- No hook-level hard cap — individual git commands time out on their own, then fail-open.
+- On slow or offline networks, set `RELAY_SKIP_PULL=1` to short-circuit the pull entirely. Memory still injects from whatever is on disk.
 
 ### Failure mode
 
@@ -90,14 +91,11 @@ None required. Hook emits no JSON unless it wants to block the turn (Relay never
 
 `Stop` can emit `additionalContext` too, but that would inject into Claude's context **after** the user has already typed their first prompt. Too late — prompt has already been constructed. `SessionStart` is the only surface that injects **before** the first user prompt is constructed.
 
-## Why not SessionEnd?
+## What about SessionEnd?
 
-Claude Code has no `SessionEnd` hook. Relay fakes it by piggybacking on the **next** `SessionStart`:
+Claude Code has no `SessionEnd` hook, and Relay doesn't try to fake one. The tradeoff: if a session closes with pending turns that weren't distilled yet, those turns stay in the transcript but don't reach `memory.md` until the **next** session on that machine fires `Stop` and the distiller catches them via the watermark.
 
-1. Check watermark.
-2. If the transcript has turns past the watermark that weren't distilled (session closed with pending work), run the distiller **synchronously** (up to timeout) before emitting `additionalContext`.
-
-This ensures a departing teammate's final turns land in memory before the next reader starts.
+For explicit end-of-session handoffs, use `/relay-handoff` — a manual push that bypasses the distiller and lands a human-authored note in `memory.md` immediately.
 
 ## Full hook reference
 

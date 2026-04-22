@@ -74,9 +74,11 @@ import { Steps } from '@astrojs/starlight/components';
 
    Narrate the output: *"Pushed a new skill to the team. Next time anyone opens a session, they'll have it."*
 
-   Switch back to laptop A. Open a fresh Claude Code session. Claude's first message announces:
+   Switch back to laptop A. Open a fresh Claude Code session. Claude's first message announces something close to:
 
-   > *"Loaded 1 team skill from broadcast: `frontend-conventions`."*
+   > *"Loaded 1 team skill(s): `frontend-conventions`."*
+
+   The exact phrasing comes from the acknowledgment instruction Relay injects alongside the broadcast content — Claude follows it but may paraphrase.
 
    Narrate: *"One person writes a skill. Everyone inherits it. No chat messages, no 'hey did you see'."*
 

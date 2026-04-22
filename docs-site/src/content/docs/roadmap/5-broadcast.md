@@ -3,69 +3,73 @@ title: Chunk 5 — Broadcast + polish + demo
 description: Hours 32-44. Skills/CLAUDE.md broadcast, /relay-handoff, README, demo rehearsal.
 ---
 
-**Status: ✅ shipped.** `relay broadcast-skill` CLI live. Session-start broadcast injection with authoritative headers. 46 unit tests green.
+**Status: ✅ shipped.** `relay broadcast-skill` CLI live. Session-start appends an acknowledgment instruction when broadcast skills are present. `/relay-handoff` slash command ships. 46 unit tests green.
 
 ## Goal
 
-Ship the wow-moment demo feature (skills + CLAUDE.md broadcast), polish error surfaces, write README + scripted demo, rehearse.
+Ship the wow-moment demo feature (skill broadcast), add a manual handoff escape hatch, polish README + known issues, rehearse the demo.
 
-## Files
+## Files (as shipped)
 
 | File | Purpose |
 |---|---|
-| `hooks/session-start.mjs` | Enhance broadcast reading — explicit authoritative headers |
-| `commands/handoff.md` | `/relay-handoff` slash command (stretch) |
-| `bin/relay` | Add `relay broadcast-skill <name>` |
-| `README.md` | Installation + demo script |
-| `docs/known-issues.md` | Document the 3 gotchas |
+| `hooks/session-start.mjs` | Counts non-`.gitkeep` files in `.relay/broadcast/skills/` and appends an acknowledgment instruction when any exist |
+| `commands/relay-handoff.toml` | `/relay-handoff` slash command — writes a handoff note and pushes |
+| `bin/relay.mjs` | Added `relayBroadcastSkill(targetDir, filePath)` + `broadcast-skill` CLI subcommand |
+| `tests/broadcast-skill.test.mjs` | 6 unit tests for the copy logic (null guards, overwrite, dir creation) |
+| `tests/session-start.test.mjs` | +2 tests for the acknowledgment injection behavior |
+| `README.md` | Rewritten as project overview — comparison table, commands, known issues, docs links |
 
 ## Broadcast (the demo feature)
 
-The plumbing already shipped in Chunk 2 (session-start reads `.relay/broadcast/` and appends to `additionalContext`). Chunk 5 adds:
+The plumbing already shipped in Chunk 2 (session-start reads `.relay/broadcast/` and appends to `additionalContext`). Chunk 5 adds the CLI to put files there and the acknowledgment instruction so Claude reliably announces what loaded.
 
 ### `relay broadcast-skill <file>`
 
 ```bash
 relay broadcast-skill ./my-skills/frontend-conventions.md
-# ✔ Copied to .relay/broadcast/skills/frontend-conventions.md
-# ✔ Committed and pushed
-# Teammates will receive on their next SessionStart
+# Broadcast: .relay/broadcast/skills/frontend-conventions.md
+# Pushed to remote.
 ```
 
-Copies a local skill file to `.relay/broadcast/skills/` and commits via `GitSync`.
+Copies a local skill file to `.relay/broadcast/skills/<basename>` (basename-only — no `--name` flag) and pushes via `GitSync.push()` with the normal lock + retry-on-conflict pipeline.
 
-### Authoritative broadcast headers
+### Acknowledgment instruction
 
-Session-start wraps broadcast content with explicit markers so Claude treats broadcast `CLAUDE.md` as team override:
-
-```
-# Team Broadcast (authoritative — overrides local CLAUDE.md)
-
-<content of .relay/broadcast/CLAUDE.md>
-
----
-
-# Team Skills (loaded from broadcast)
-
-Acknowledge loaded skills in your first response:
-"Loaded N team skill(s) from broadcast: <list>."
-```
-
-Demo moment: Alice runs `relay broadcast-skill frontend-conventions`, Bob's next session prints *"Loaded 1 team skill: frontend-conventions."* in first message.
-
-## `/relay-handoff` slash command (stretch)
+When `session-start.mjs`'s `buildContext` detects non-`.gitkeep` files in `.relay/broadcast/skills/`, it appends this inside the `# Relay Broadcast` section:
 
 ```
----
-description: Leave a handoff note for teammates
----
-
-Ask the user for a brief handoff note. Then prepend it to
-.relay/memory.md under a ## Handoff notes section, commit, push.
-Bypass the distiller — preserve human authorship verbatim.
+_Relay: N team skill(s) loaded — `skill-a`, `skill-b`. Acknowledge in your
+first response with one line: "Loaded N team skill(s): `skill-a`, `skill-b`."_
 ```
 
-Human-authored notes beat distillation for explicit leave-behinds. Great for "stopping for dinner, here's what's next."
+Demo moment: Alice runs `relay broadcast-skill frontend-style`, Bob opens a fresh session, and Claude's first message says *"Loaded 1 team skill(s): `frontend-style`."* — unprompted, because the instruction is in the injected system context.
+
+The full "authoritative override" framing from early drafts (wrapping broadcast CLAUDE.md with team-override markers) was not implemented. Broadcast content is still injected, but Claude treats it as regular context, not a hard override.
+
+## `/relay-handoff` slash command
+
+`commands/relay-handoff.toml`:
+
+```toml
+description = "Write a handoff note to .relay/memory.md and push to teammates"
+prompt = """
+Help the user write a Relay handoff note so teammates pick up where they left off.
+
+Steps:
+1. Ask the user: "What should teammates know when they pick this up? ..."
+2. Read the current contents of .relay/memory.md.
+3. Get the current UTC time by running: node -e "console.log(new Date().toISOString())"
+4. Build the handoff entry (timestamp + user text, or "(no note)" if skipped).
+5. Prepend under "## Handoff notes" section (or create the section) — newest-first.
+6. Write atomically (.tmp + rename).
+7. Run: node bin/relay.mjs distill --push
+   Fallback: git add + commit + push.
+8. Confirm success.
+"""
+```
+
+Human-authored notes beat distillation for explicit leave-behinds — "stopping for dinner, here's what's next." The entry lives in `.relay/memory.md` under `## Handoff notes` and is preserved verbatim on future distills (the distiller treats it as trusted starting state).
 
 ## Error surfaces
 
