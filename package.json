@@ -1,7 +1,10 @@
 {
   "name": "relay",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
-  "description": "Shared team memory for Claude Code sessions",
+  "description": "Shared team memory across Claude Code sessions",
+  "bin": {
+    "relay": "./bin/relay.mjs"
+  },
   "license": "MIT"
 }
