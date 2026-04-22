@@ -1,49 +1,64 @@
-# Starlight Starter Kit: Basics
+# Relay docs site
 
-[![Built with Starlight](https://astro.badg.es/v2/built-with-starlight/tiny.svg)](https://starlight.astro.build)
+Astro Starlight site for the Relay project.
 
-```
-npm create astro@latest -- --template starlight
-```
+Source: `src/content/docs/`
+Live: `https://ssm-08.github.io/relay/` (deploys via `.github/workflows/docs.yml`)
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+## Local dev
 
-## 🚀 Project Structure
-
-Inside of your Astro + Starlight project, you'll see the following folders and files:
-
-```
-.
-├── public/
-├── src/
-│   ├── assets/
-│   ├── content/
-│   │   └── docs/
-│   └── content.config.ts
-├── astro.config.mjs
-├── package.json
-└── tsconfig.json
+```bash
+npm install
+npm run dev     # http://localhost:4321/relay/ — live reload
 ```
 
-Starlight looks for `.md` or `.mdx` files in the `src/content/docs/` directory. Each file is exposed as a route based on its file name.
+## Build
 
-Images can be added to `src/assets/` and embedded in Markdown with a relative link.
+```bash
+npm run build   # static HTML in dist/
+npm run preview # serve dist/ locally
+```
 
-Static assets, like favicons, can be placed in the `public/` directory.
+## Deploy
 
-## 🧞 Commands
+Push to `main` or `master` with changes under `docs-site/**` triggers the
+GitHub Actions workflow. Pages settings must be set to "GitHub Actions"
+as the deployment source (not "Deploy from a branch").
 
-All commands are run from the root of the project, from a terminal:
+Base path and site URL are auto-derived from the GitHub repo in CI:
+`RELAY_SITE=https://<owner>.github.io` and `RELAY_BASE=/<repo>`.
+Override locally or in CI by exporting either var.
 
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `npm install`             | Installs dependencies                            |
-| `npm run dev`             | Starts local dev server at `localhost:4321`      |
-| `npm run build`           | Build your production site to `./dist/`          |
-| `npm run preview`         | Preview your build locally, before deploying     |
-| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `npm run astro -- --help` | Get help using the Astro CLI                     |
+## Custom plugins
 
-## 👀 Want to learn more?
+- `src/plugins/rehype-mermaid-pre.mjs` — transforms \`\`\`mermaid fences into
+  `<pre class="mermaid">` for client-side rendering.
+- `src/plugins/rehype-base-href.mjs` — prepends the site base path to
+  root-relative links in markdown output.
+- `src/plugins/astro-base-href-fixup.mjs` — post-build HTML walker that
+  fixes root-relative hrefs in Starlight-generated layout (hero
+  buttons) that bypass the markdown pipeline.
 
-Check out [Starlight’s docs](https://starlight.astro.build/), read [the Astro documentation](https://docs.astro.build), or jump into the [Astro Discord server](https://astro.build/chat).
+## Content layout
+
+```
+src/content/docs/
+├── index.mdx                  # landing (splash)
+├── problem.md                 # shared-context pain
+├── how-it-works.md            # Alice/Bob walkthrough
+├── architecture.md            # diagrams + components
+├── tech-stack.md              # layer-by-layer choices
+├── cost-model.md              # tiered extraction pricing
+├── roadmap/
+│   ├── overview.md            # six chunks at a glance
+│   └── {1..5}-*.md            # per-chunk deep dives
+├── reference/
+│   ├── install.md
+│   ├── hooks.md
+│   ├── cli.md
+│   ├── memory-schema.md
+│   └── distiller-prompt.md
+├── demo.md
+├── faq.md
+└── future.md
+```
