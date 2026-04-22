@@ -2,11 +2,13 @@
 
 Shared brain for teams using Claude Code. One memory, every session warm.
 
-> Multiple humans. One brain. Zero workflow change.
+> **Git made code collaboration possible. Relay does the same for the AI working alongside your team.**
 
 ## The problem
 
 Every Claude Code session starts blank. On a team this breaks down fast: each person's Claude gives conflicting advice because it doesn't know what was decided yesterday, what approaches failed, or what shortcuts are still in the code. You spend the first 10 minutes of every session re-briefing an AI that should already know.
+
+The core insight: the problem isn't that Claude forgets — it's that Claude never knew in the first place.
 
 ## Why not CLAUDE.md?
 

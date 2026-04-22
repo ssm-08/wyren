@@ -9,6 +9,27 @@ import { Aside } from '@astrojs/starlight/components';
 Infrastructure is easy. Hygiene-respecting distillation is hard. This prompt is where the project succeeds or fails. Iterate aggressively during Chunk 1.
 </Aside>
 
+## What the distiller does
+
+The distiller answers one question on each run: **"What would I wish I knew before touching this codebase?"** Not what happened, not what was discussed — specifically: what would prevent a new Claude from wasting time, making contradictory decisions, or breaking something intentionally left in a certain state.
+
+**What it captures:**
+
+- Architectural decisions and the constraints that forced them
+- Approaches that were tried and explicitly rejected — and why
+- Workarounds currently in the code that look like bugs but are intentional
+- Scope that was cut and should not be re-introduced before the demo
+- Files or modules that are half-migrated and should not be touched
+
+**What it discards:**
+
+- Every message that doesn't change how a new engineer approaches the code
+- Debugging noise, trial and error, exploration without conclusion
+- Code snippets — these belong in the repo, not in memory
+- Anything already expressed in `CLAUDE.md` or the codebase itself
+
+**Memory hygiene:** the distiller updates and overwrites, it does not append. A workaround noted at hour 2 that gets fixed at hour 5 should not persist. Entries carry a `[session <id>, turn <n>]` tag for provenance, so stale context can be traced back to its source and pruned.
+
 ## Full prompt text (v0.1)
 
 Lives at `prompts/distill.md`. Sent as the system prompt to `claude -p`.

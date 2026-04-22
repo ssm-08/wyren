@@ -22,7 +22,11 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 
 ## What is Relay?
 
+> **Git made code collaboration possible. Relay does the same for the AI working alongside your team.**
+
 Relay is a Claude Code plugin that gives a team **one shared memory** across every teammate's sessions. No one has to change how they work.
+
+Right now, every teammate has a different Claude — blank, unconfigured, and unaware of what the rest of the team has built, decided, or deliberately left unfinished. Relay gives your whole team one shared brain.
 
 When anyone on the team runs Claude Code, Relay:
 
@@ -52,11 +56,30 @@ When anyone on the team runs Claude Code, Relay:
 
 | | What it does for teams |
 |---|---|
-| `CLAUDE.md` alone | Static; someone has to remember to write it. |
-| Claude Projects | Shared docs, but no live session memory. |
-| Agent Teams | Multi-agent coordination with one human — doesn't help N humans with N Claudes. |
 | Git | Syncs code, not comprehension. |
+| `CLAUDE.md` alone | Static; someone has to remember to write it — at the moment they have least time. |
+| Claude Projects | Shared docs, but no live session memory or cross-teammate sync. |
+| Agent Teams | Multi-agent coordination under one human. Doesn't help N humans with N Claudes. |
 | **Relay** | **Continuously distilled, git-synced, auto-injected team memory.** |
+
+See [the problem](/problem/) for the full comparison matrix.
+
+## Key selling points
+
+<CardGrid>
+	<Card title="Zero friction" icon="rocket">
+		Nobody changes how they work. Open Claude Code, get full team context. No commands, no syncing, no briefing.
+	</Card>
+	<Card title="Works on handoff" icon="random">
+		The most painful moment in a hackathon — when work changes hands — becomes instant. The new session already knows everything.
+	</Card>
+	<Card title="Captures the why" icon="information">
+		The only tool that preserves the reasoning behind the codebase, not just the output of it.
+	</Card>
+	<Card title="Consistent behavior" icon="puzzle">
+		Shared skills and settings mean every teammate's Claude behaves the same way on the same project.
+	</Card>
+</CardGrid>
 
 ## Built in 48 hours
 
