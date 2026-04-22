@@ -9,7 +9,7 @@ Steps:
 4. Build the handoff entry:
    - If the user provided text: "- [<timestamp>] <user text>"
    - If the user pressed Enter / provided nothing: "- [<timestamp>] (session handoff — no note)"
-5. If a "## Handoff notes" section already exists in memory.md, insert the new entry as the first bullet under that heading.
+5. If a "## Handoff notes" section already exists in memory.md, prepend the new entry as the first bullet under that heading (newest-first order).
    If no such section exists, prepend the following to the top of the file:
    "## Handoff notes\n<entry>\n\n"
 6. Write atomically: write the full updated content to .relay/memory.md.tmp, then rename it to .relay/memory.md.
