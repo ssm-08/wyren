@@ -1,0 +1,7 @@
+{
+  "name": "relay",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Shared team memory for Claude Code sessions",
+  "license": "MIT"
+}
