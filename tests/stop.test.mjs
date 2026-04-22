@@ -1,0 +1,70 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+
+import { updateWatermark } from '../hooks/stop.mjs';
+
+function makeTmpDir() {
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'relay-test-'));
+}
+
+test('updateWatermark creates state dir and watermark.json on first call', () => {
+  const dir = makeTmpDir();
+  const relayDir = path.join(dir, '.relay');
+  fs.mkdirSync(relayDir);
+  try {
+    updateWatermark(relayDir);
+    const watermarkPath = path.join(relayDir, 'state', 'watermark.json');
+    assert.ok(fs.existsSync(watermarkPath), 'watermark.json should exist');
+    const state = JSON.parse(fs.readFileSync(watermarkPath, 'utf8'));
+    assert.equal(state.turns_since_distill, 1, 'First call should set turns=1');
+    assert.ok(typeof state.last_turn_at === 'number', 'last_turn_at should be a number');
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
+
+test('updateWatermark increments turns_since_distill on each call', () => {
+  const dir = makeTmpDir();
+  const relayDir = path.join(dir, '.relay');
+  fs.mkdirSync(relayDir);
+  try {
+    updateWatermark(relayDir);
+    updateWatermark(relayDir);
+    const state = updateWatermark(relayDir);
+    assert.equal(state.turns_since_distill, 3, 'After 3 calls turns should be 3');
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
+
+test('updateWatermark returns the updated state object', () => {
+  const dir = makeTmpDir();
+  const relayDir = path.join(dir, '.relay');
+  fs.mkdirSync(relayDir);
+  try {
+    const state = updateWatermark(relayDir);
+    assert.ok(state && typeof state === 'object', 'Should return state object');
+    assert.equal(state.turns_since_distill, 1);
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
+
+test('updateWatermark persists last_uuid from previous state', () => {
+  const dir = makeTmpDir();
+  const relayDir = path.join(dir, '.relay');
+  const stateDir = path.join(relayDir, 'state');
+  fs.mkdirSync(stateDir, { recursive: true });
+  const existingState = { turns_since_distill: 2, last_uuid: 'abc-123', last_turn_at: 1000 };
+  fs.writeFileSync(path.join(stateDir, 'watermark.json'), JSON.stringify(existingState), 'utf8');
+  try {
+    const state = updateWatermark(relayDir);
+    assert.equal(state.last_uuid, 'abc-123', 'Should preserve existing last_uuid');
+    assert.equal(state.turns_since_distill, 3, 'Should increment from 2 to 3');
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
