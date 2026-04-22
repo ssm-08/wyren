@@ -10,7 +10,7 @@ Shared brain for teams using Claude Code. One memory, every session warm.
 /plugins add ssm-08/relay
 ```
 
-## Init (per repo)
+## Init (per repo, once)
 
 ```bash
 cd your-project
@@ -20,95 +20,99 @@ git commit -m "chore: init relay"
 git push
 ```
 
-## How memory updates
+Teammates just need the plugin installed — they don't run `init` again.
 
-Every 5 turns (or after 2min idle since last distillation), the `Stop` hook spawns `distiller.mjs` detached in the background. Distiller scans the transcript slice for signal words — decisions, rejections, workarounds, actual code changes. If none found (Tier 0 filter), the API call is skipped entirely. Otherwise it calls Haiku 4.5 to update `memory.md` atomically.
+## How it works
 
-Watch it live: `tail -f .relay/log`
+1. You chat with Claude. Every 5 turns (or 2 min idle), the `Stop` hook spawns `distiller.mjs` **in the background** — your turn is never blocked.
+2. Distiller scans the transcript for signal (decisions, rejections, workarounds, real code changes). If none found (Tier 0 filter), the API call is skipped entirely. Otherwise it calls Haiku 4.5 to rewrite `.relay/memory.md`.
+3. Distiller commits and pushes `.relay/memory.md` via git.
+4. At your teammate's next `SessionStart`, Relay pulls the latest memory and injects it as hidden context. Their Claude starts warm — naming decisions, rejected paths, live workarounds — without a word from the user.
 
-You can also seed memory manually by editing `.relay/memory.md` directly — useful for initial project context before any sessions run.
-
-## Dev install (local)
-
+Watch it live:
 ```bash
-# Windows (run as admin)
-mklink /J "C:\Users\<you>\.claude\plugins\relay" "C:\path\to\Vibejam"
-
-# Unix
-ln -s ~/path/to/Vibejam ~/.claude/plugins/relay
+tail -f .relay/log
 ```
 
-## What is this?
+## Commands
 
-A Claude Code plugin that:
-1. Watches every teammate's session transcript in the background.
-2. Distills the transcript into a compact `memory.md` (decisions, rejected paths, live workarounds).
-3. Syncs `memory.md` across teammates via git.
-4. Injects it as hidden context at every `SessionStart` — so any new Claude, on any laptop, starts warm.
+```bash
+# Check memory size, last distillation, git sync, lock state
+relay status
+
+# Trigger distillation manually (e.g. before handing off)
+relay distill [--transcript <path>] [--force] [--dry-run] [--push]
+
+# Broadcast a skill file to all teammates (injected at their next SessionStart)
+relay broadcast-skill <file>
+
+# Slash command (inside Claude Code)
+/relay-handoff    # write a manual handoff note and push immediately
+```
+
+## Demo (4 minutes)
+
+**Setup:** two laptops, same repo, git remote configured.
+
+**Laptop A:**
+```bash
+cd your-project
+node ~/.claude/plugins/relay/bin/relay.mjs init
+git add .relay && git commit -m "chore: init relay" && git push
+```
+Open Claude Code. Discuss the stack — pick SQLite, reject Postgres (too heavy), add a `user_id=1` workaround for fast iteration. After 5 turns:
+```bash
+cat .relay/memory.md    # SQLite decision, Postgres rejection, workaround noted
+```
+
+**Laptop B — fresh session:**
+Open Claude Code. Ask: *"What's the state of this project?"*
+
+Claude's **first message** names SQLite, mentions the rejected Postgres, flags `user_id=1` — without you saying a word.
+
+**Broadcast a skill:**
+```bash
+node ~/.claude/plugins/relay/bin/relay.mjs broadcast-skill ./my-style-guide.md
+```
+Open Laptop A in a new session. Claude says: *"Loaded 1 team skill: `my-style-guide`."*
+
+**The pitch:** Multiple humans, one brain, zero workflow change.
+
+## Dev install (local symlink)
+
+```bash
+# Windows (run as admin, PowerShell)
+New-Item -ItemType Junction -Path "$env:USERPROFILE\.claude\plugins\relay" -Target (Get-Location).Path
+
+# macOS / Linux
+ln -s "$(pwd)" ~/.claude/plugins/relay
+```
 
 ## Repo layout
 
 ```
-Vibejam/
-├── docs-site/                  # Astro Starlight documentation site
-├── .claude-plugin/
-│   └── plugin.json             # Claude Code plugin manifest
+├── .claude-plugin/plugin.json      # Claude Code plugin manifest
 ├── hooks/
-│   ├── hooks.json              # SessionStart + Stop hook definitions
-│   ├── run-hook.cmd            # Windows/Unix polyglot dispatcher
-│   ├── session-start.mjs       # injects .relay/memory.md as additionalContext
-│   └── stop.mjs                # watermark + detached distiller spawn
-├── bin/
-│   └── relay.mjs               # CLI: relay init | status | distill
-├── tests/                      # node:test unit tests
-├── distiller.mjs               # standalone distiller CLI (Chunk 1)
+│   ├── hooks.json                  # SessionStart + Stop registrations
+│   ├── session-start.mjs           # injects memory.md + broadcast as additionalContext
+│   └── stop.mjs                    # watermark + detached distiller spawn
+├── commands/
+│   └── relay-handoff.toml          # /relay-handoff slash command
+├── bin/relay.mjs                   # CLI: init | status | distill | broadcast-skill
 ├── lib/
-│   ├── transcript.mjs          # JSONL parse + slice + prose render
-│   ├── memory.mjs              # atomic memory.md read/write
-│   ├── filter.mjs              # Tier 0 regex signal filter
-│   └── sync.mjs                # GitSync — pull, push, lock (Chunk 4)
-├── prompts/
-│   └── distill.md              # distiller system prompt
-├── .github/workflows/docs.yml  # GitHub Pages deploy for docs-site
-└── README.md                   # (this file)
+│   ├── sync.mjs                    # GitSync — pull, push, lock
+│   ├── transcript.mjs              # JSONL parse + slice + render
+│   ├── memory.mjs                  # atomic memory.md read/write
+│   └── filter.mjs                  # Tier 0 regex signal filter
+├── distiller.mjs                   # standalone distiller (Haiku 4.5 default)
+├── prompts/distill.md              # distiller system prompt
+└── docs-site/                      # Astro Starlight documentation
 ```
 
-## Status
+## Known issues
 
-Built for a 48-hour hackathon. Six chunks:
+1. **Auth required.** The plugin uses `claude -p` headless mode, which requires the user to be authenticated with Claude Code (`claude auth login`). No separate API key needed, but unauthenticated machines skip distillation — memory injection still works, only writes are blocked.
 
-| Chunk | Status | What |
-|---|---|---|
-| 0 | ✅ Done | Documentation site (Astro Starlight) |
-| 1 | ✅ Done | Distiller quality gate — `distiller.mjs`, `lib/transcript.mjs`, `lib/memory.mjs`, `prompts/distill.md` |
-| 2 | ✅ Done | Plugin skeleton + injection — hooks, `relay init`, memory injection |
-| 3 | ✅ Done | Distiller wired to Stop hook — Tier 0 filter, Haiku default, detached spawn, 29 tests green |
-| 4 | ✅ Done | Git sync layer — `lib/sync.mjs`, `relay status`, `relay distill`, 38 tests green |
-| 5 | ⏳ | Broadcast + polish + demo (hours 32-44) |
+2. **Rare rebase conflict on simultaneous push.** If two teammates distill at the exact same time and both push, the second gets a rebase conflict. The plugin detects this, advances local HEAD to the remote version, and queues a fresh distillation on the next 5 turns. In practice this resolves within one session without data loss.
 
-See [docs-site](./docs-site/) for the full plan, architecture, and cost model.
-
-## Running the docs site locally
-
-```bash
-cd docs-site
-npm install
-npm run dev
-# → open http://localhost:4321/relay
-```
-
-Build:
-```bash
-npm run build
-# → static site in docs-site/dist
-```
-
-## Deploying docs
-
-Push to `main` / `master`. GitHub Actions builds and deploys to Pages automatically (see `.github/workflows/docs.yml`).
-
-## Full planning document
-
-The complete 48h implementation plan lives outside the repo at
-`~/.claude/plans/enter-plan-and-help-quiet-eagle.md`. The docs site is a
-polished, browsable version of that plan.
+3. **Transcript version pinning.** The distiller reads Claude Code's JSONL transcript format. If Claude Code changes its transcript schema, distillation may silently skip turns it can't parse. The plugin logs skipped turns to `.relay/log`. Verified against Claude Code ≥ 1.x (`"version":"2.1.117"` format).
