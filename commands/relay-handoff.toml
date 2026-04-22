@@ -5,7 +5,7 @@ Help the user write a Relay handoff note so teammates pick up where they left of
 Steps:
 1. Ask the user: "What should teammates know when they pick this up? (Press Enter to write a timestamp-only note.)"
 2. Read the current contents of .relay/memory.md.
-3. Determine the current UTC time in ISO 8601 format (e.g. 2026-04-22T14:30:00Z).
+3. Get the current UTC time by running: node -e "console.log(new Date().toISOString())" — use the output as the timestamp.
 4. Build the handoff entry:
    - If the user provided text: "- [<timestamp>] <user text>"
    - If the user pressed Enter / provided nothing: "- [<timestamp>] (session handoff — no note)"
@@ -15,6 +15,6 @@ Steps:
 6. Write atomically: write the full updated content to .relay/memory.md.tmp, then rename it to .relay/memory.md.
 7. Run: node bin/relay.mjs distill --push
    If that errors with "No transcript found", fall back to:
-   git add .relay/memory.md && git commit -m "[relay] handoff note" && git push origin HEAD
+   git add .relay/memory.md && git commit -m "[relay] handoff note" && git push
 8. Confirm to the user: "Handoff note written and pushed. Teammates will see it at their next SessionStart."
 """

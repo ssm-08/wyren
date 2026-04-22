@@ -251,6 +251,7 @@ if (isMain(import.meta.url)) {
       console.log('Pushed to remote.');
     } catch (e) {
       console.error(`relay: push failed: ${e.message}`);
+      process.exit(1);
     } finally {
       release();
     }
