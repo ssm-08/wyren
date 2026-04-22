@@ -3,6 +3,21 @@ title: FAQ
 description: Known issues, gotchas, and answers to the obvious questions.
 ---
 
+## Why not just use CLAUDE.md?
+
+`CLAUDE.md` is written by hand. It captures conclusions — the final answer to "what did we decide?" What it doesn't capture is the reasoning: why that decision was made, what was tried first, what broke, what's intentionally left in a broken state for now. That reasoning is exactly what a new Claude session needs to be useful from the first message.
+
+Relay is complementary to `CLAUDE.md`, not a replacement. Think of it this way:
+
+- **`CLAUDE.md`** — the project brief. You write it once (or occasionally update it). It covers stable facts: architecture, conventions, how to run the project.
+- **`.relay/memory.md`** — the session log. Relay writes it continuously. It covers the moving parts: what changed today, what was rejected, what's temporarily broken.
+
+Both get injected. Neither replaces the other.
+
+## Why not Claude Projects?
+
+Claude Projects let you upload documents as persistent context. That's useful for stable reference material. It has two limitations for team work: it doesn't update automatically as you work, and it's tied to one person's project — there's no shared sync across teammates.
+
 ## Will this work if we're not all on the same network?
 
 Yes. Sync is over git, so any git remote (GitHub, self-hosted) works the same over LAN or WAN. Tested in both.
