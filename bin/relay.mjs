@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isMain } from '../lib/util.mjs';
 
 export function relayInit(targetDir) {
   const relayDir = path.join(targetDir, '.relay');
@@ -41,12 +41,7 @@ export function relayInit(targetDir) {
   return true;
 }
 
-// CLI entry point — only runs when invoked directly
-const isMain =
-  process.argv[1] &&
-  path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
-
-if (isMain) {
+if (isMain(import.meta.url)) {
   const [, , command] = process.argv;
   if (command === 'init') {
     relayInit(process.cwd());
