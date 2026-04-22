@@ -13,7 +13,7 @@ import { Badge } from '@astrojs/starlight/components';
 | [1](/roadmap/1-distiller/) | 0-6 | Distiller quality gate | <Badge text="Shipped" variant="success" /> |
 | [2](/roadmap/2-skeleton/) | 6-14 | Plugin skeleton + injection | <Badge text="Shipped" variant="success" /> |
 | [3](/roadmap/3-distillation/) | 14-22 | Distiller wired to Stop hook | <Badge text="Shipped" variant="success" /> |
-| [4](/roadmap/4-git-sync/) | 22-32 | Git sync layer | <Badge text="Pending" variant="default" /> |
+| [4](/roadmap/4-git-sync/) | 22-32 | Git sync layer | <Badge text="Shipped" variant="success" /> |
 | [5](/roadmap/5-broadcast/) | 32-44 | Broadcast + polish + demo | <Badge text="Pending" variant="default" /> |
 | — | 44-48 | Buffer, demo rehearsal, fallback video | <Badge text="Pending" variant="default" /> |
 
@@ -58,11 +58,11 @@ Key detail: the Tier 0 regex matches the *rendered* transcript format (`[tool_us
 
 [Full Chunk 3 detail →](/roadmap/3-distillation/)
 
-## Chunk 4 — Git sync layer (Hours 22-32)
+## Chunk 4 — Git sync layer (Hours 22-32) ✅
 
-Cross-machine sync. `RelaySync` interface + `GitSync` impl. Retry-on-conflict, advisory lock.
+**Shipped.** `lib/sync.mjs` — `GitSync` with `pull()` (fetch + scoped checkout of `.relay/` files, 3s timeout, `RELAY_SKIP_PULL` escape), `push()` (commit + retry-on-conflict, `reset --mixed FETCH_HEAD` on conflict so local HEAD stays in sync — no infinite re-conflict loop), `lock()` (atomic `openSync('wx')`, 60s stale-steal). Session-start pulls before injecting context; distiller pushes after atomic write. `relay status` and `relay distill [--force|--push|--dry-run]` CLI commands. 38 unit tests green (including two-machine conflict scenario).
 
-**Exit criteria:** two laptops, warm-start each other reliably over 5 trials. Git log of `.relay/memory.md` stays clean-linear.
+Key implementation detail: conflict resolution uses `reset --mixed FETCH_HEAD` rather than `--theirs + rebase --continue`. Safer on Windows (no GIT_EDITOR needed), leaves working tree untouched outside `.relay/`, and correctly advances local HEAD to remote tip.
 
 [Full Chunk 4 detail →](/roadmap/4-git-sync/)
 

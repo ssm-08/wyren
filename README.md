@@ -59,13 +59,14 @@ Vibejam/
 │   ├── session-start.mjs       # injects .relay/memory.md as additionalContext
 │   └── stop.mjs                # watermark + detached distiller spawn
 ├── bin/
-│   └── relay.mjs               # CLI: relay init
+│   └── relay.mjs               # CLI: relay init | status | distill
 ├── tests/                      # node:test unit tests
 ├── distiller.mjs               # standalone distiller CLI (Chunk 1)
 ├── lib/
 │   ├── transcript.mjs          # JSONL parse + slice + prose render
 │   ├── memory.mjs              # atomic memory.md read/write
-│   └── filter.mjs              # Tier 0 regex signal filter
+│   ├── filter.mjs              # Tier 0 regex signal filter
+│   └── sync.mjs                # GitSync — pull, push, lock (Chunk 4)
 ├── prompts/
 │   └── distill.md              # distiller system prompt
 ├── .github/workflows/docs.yml  # GitHub Pages deploy for docs-site
@@ -82,7 +83,7 @@ Built for a 48-hour hackathon. Six chunks:
 | 1 | ✅ Done | Distiller quality gate — `distiller.mjs`, `lib/transcript.mjs`, `lib/memory.mjs`, `prompts/distill.md` |
 | 2 | ✅ Done | Plugin skeleton + injection — hooks, `relay init`, memory injection |
 | 3 | ✅ Done | Distiller wired to Stop hook — Tier 0 filter, Haiku default, detached spawn, 29 tests green |
-| 4 | ⏳ | Git sync layer (hours 22-32) |
+| 4 | ✅ Done | Git sync layer — `lib/sync.mjs`, `relay status`, `relay distill`, 38 tests green |
 | 5 | ⏳ | Broadcast + polish + demo (hours 32-44) |
 
 See [docs-site](./docs-site/) for the full plan, architecture, and cost model.

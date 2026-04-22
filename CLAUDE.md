@@ -16,8 +16,8 @@ Relay is a Claude Code plugin that gives a team shared memory across every teamm
 - **Chunk 1 (distiller quality gate):** ✅ shipped. `distiller.mjs` + `lib/transcript.mjs` + `lib/memory.mjs` + `prompts/distill.md`. Gate passed first iteration: 34-line memory from 828-line transcript, hygiene test passed, blind A/B test 3/3. Uses `claude -p --bare` — `--bare` flag critical to strip global plugins/hooks from subprocess.
 - **Chunk 2 (plugin skeleton + injection):** ✅ shipped. `.claude-plugin/plugin.json` + `hooks/hooks.json` + `hooks/run-hook.cmd` + `hooks/session-start.mjs` + `hooks/stop.mjs` (stub) + `bin/relay.mjs` + `lib/util.mjs`. 17 unit tests green. E2E verified via hook pipe test.
 - **Chunk 3 (distiller wired into Stop hook):** ✅ shipped. `stop.mjs` spawns distiller detached after 5 turns (or 2min idle). Tier 0 regex filter in `lib/filter.mjs` — matches rendered transcript format `[tool_use Edit]`, not raw JSONL. Default model Haiku 4.5. `distiller_running` lock prevents concurrent runs. 29 unit tests green.
-- **Chunk 4 (git sync layer):** ⏳ next. `lib/sync.mjs` — `RelaySync` interface + `GitSync` impl. Push after distillation, pull on SessionStart. Cross-machine warm-start.
-- Chunk 5 follows. Total budget 48h.
+- **Chunk 4 (git sync layer):** ✅ shipped. `lib/sync.mjs` — `GitSync` with `pull()` (fetch + checkout `.relay/` from remote, 3s cap, `RELAY_SKIP_PULL` escape), `push()` (commit + retry-on-conflict, `reset --mixed FETCH_HEAD` keeps HEAD in sync), `lock()` (atomic `openSync('wx')`, 60s stale-steal). `relay status` + `relay distill [--force|--push|--dry-run]` CLI. 38 unit tests green.
+- **Chunk 5 (broadcast + polish + demo):** ⏳ next. Skills/CLAUDE.md broadcast, `relay broadcast-skill`, `/relay-handoff` slash command, README demo script. Total budget 48h.
 
 ## Repo layout
 
@@ -44,9 +44,11 @@ Vibejam/
 │   ├── session-start.mjs       # injects memory + broadcast as additionalContext
 │   └── stop.mjs                # watermark + detached distiller spawn (5 turns / 2min idle)
 ├── bin/
-│   └── relay.mjs               # CLI: relay init
-├── tests/                      # 29 unit tests (node:test)
-└── (Chunk 4 adds lib/sync.mjs)
+│   └── relay.mjs               # CLI: relay init | status | distill
+├── lib/
+│   └── sync.mjs                # Chunk 4: GitSync — pull, push, lock
+└── tests/                      # 38 unit tests (node:test)
+    └── sync.test.mjs           # GitSync tests (bare-repo fixture)
 ```
 
 ## Non-obvious conventions

@@ -1,7 +1,11 @@
 ---
 title: Chunk 4 — Git sync layer
-description: Hours 22-32. Cross-machine sync. Alice's decisions reach Bob's laptop.
+description: Hours 22-32. Cross-machine sync. Alice's decisions reach Bob's laptop. ✅ Shipped.
 ---
+
+## Status: ✅ Shipped
+
+38 unit tests green. Two-machine warm-start verified locally. Conflict scenario tested: remote wins, local HEAD advances, second push succeeds.
 
 ## Goal
 
@@ -36,38 +40,44 @@ Later a `CloudSync extends RelaySync` slots in — zero hook changes.
 ## GitSync.pull()
 
 ```js
-async pull() {
-  // git fetch --quiet
-  // git checkout -- .relay/  (discard any local scratch in .relay)
-  // git pull --rebase --quiet -- .relay/
-  // Timeout 3s. On failure: log + continue (best-effort).
+pull(cwd) {
+  if (process.env.RELAY_SKIP_PULL) return;   // escape hatch for local/demo
+  // short-circuit if no remote configured
+  // git fetch --quiet  (3s timeout, fail-open)
+  // git checkout origin/<branch> -- .relay/memory.md
+  // git checkout origin/<branch> -- .relay/broadcast
 }
 ```
 
-Scoped to `.relay/` so we never trigger merges in the user's working code.
+Scoped checkout — never rebases or touches the user's working code. `.relay/state/` is gitignored and machine-local; never pulled.
 
 ## GitSync.push()
 
 ```js
-async push() {
-  // git add .relay/memory.md .relay/broadcast/
+push(cwd, sessionId) {
+  // git add .relay/memory.md .relay/broadcast
   // if nothing staged → return
   // git commit -m "[relay] memory update (session <short-id>)"
   // for attempt in 0..2:
-  //   if git push origin HEAD:<branch> succeeds → return
-  //   git pull --rebase     (if conflict → re-distill against new base)
-  // On final failure: log, leave commit local.
+  //   git push origin HEAD → success: return
+  //   on fail: git fetch + git rebase FETCH_HEAD
+  //     on conflict: rebase --abort + reset --mixed FETCH_HEAD
+  //                  git checkout FETCH_HEAD -- .relay/memory.md
+  //                  reset turns → re-distill next cycle; return
+  // on 3 failures: log + leave commit local
 }
 ```
+
+Conflict strategy: `reset --mixed FETCH_HEAD` advances local HEAD to remote tip without touching the working tree outside `.relay/`. Safer than `--theirs + rebase --continue` on Windows (no GIT_EDITOR needed). Local session changes re-distill on next trigger.
 
 ## GitSync.lock()
 
 ```js
-async lock() {
-  // atomic create .relay/state/.lock
-  // if exists AND mtime < 60s ago → wait-then-retry
-  // if exists AND mtime > 60s → stale, steal
-  // return () => fs.unlinkSync(lockPath)
+lock(cwd) {
+  // openSync(lockPath, 'wx')  ← atomic; EEXIST if held
+  // if EEXIST + mtime < 60s → throw LOCKED
+  // if EEXIST + mtime > 60s → steal (stale)
+  // return release fn → rmSync
 }
 ```
 
@@ -77,32 +87,28 @@ session-start.mjs:
 
 ```js
 import { GitSync } from '../lib/sync.mjs';
-const sync = new GitSync(cwd);
-await sync.pull();    // timeboxed, non-throwing
-// ... rest of session-start (read memory, emit context)
+if (fs.existsSync(relayDir)) {
+  try { new GitSync().pull(cwd); } catch {}
+}
+// ... buildContext, emit additionalContext
 ```
 
 distiller.mjs:
 
 ```js
-// after writing memory.md atomically
-const release = await sync.lock();
-try {
-  await sync.push();
-} finally {
-  release();
-}
+// after writeMemoryAtomic + watermark update
+const sync = new GitSync();
+const release = sync.lock(cwd);   // throws LOCKED if concurrent distiller
+try { sync.push(cwd, sessionId); } finally { release(); }
 ```
 
 ## Race handling
 
-Two teammates distill within the same second. Strategy:
+1. **Path-scoped push** — only `.relay/*` staged/committed. Main code untouched.
+2. **Retry-on-conflict** — fetch + rebase FETCH_HEAD; on conflict abort + reset --mixed.
+3. **Advisory lock** — `openSync('wx')` atomic; 60s stale-steal. Cross-machine via git.
 
-1. **Path-scoped push** — only `.relay/*` touched. Main code never pushed by the hook.
-2. **Retry-on-conflict** — if push fails non-fast-forward, pull-rebase. If memory.md conflicts on same lines, `git checkout --theirs .relay/memory.md` and re-distill locally. Ship the later one.
-3. **Advisory lock** — per-machine. Cross-machine coordination via git rebase.
-
-For 2-10 person teams: sufficient. Beyond that → CloudSync.
+For 2-10 person teams: sufficient. Beyond that → `CloudSync extends RelaySync`.
 
 ## CLI additions
 
