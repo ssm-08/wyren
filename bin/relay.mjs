@@ -53,15 +53,18 @@ export function relayStatus(targetDir) {
     return;
   }
 
+  // M6: fixed-width labels for readable demo output (11 chars + space)
+  const label = (s) => s.padEnd(11);
+
   // Memory stats
   const memPath = path.join(relayDir, 'memory.md');
   if (fs.existsSync(memPath)) {
     const content = fs.readFileSync(memPath, 'utf8');
     const lines = content.split(/\r?\n/).length;
     const bytes = fs.statSync(memPath).size;
-    console.log(`Memory:    .relay/memory.md  (${(bytes / 1024).toFixed(1)} KB, ${lines} lines)`);
+    console.log(`${label('Memory:')} .relay/memory.md  (${(bytes / 1024).toFixed(1)} KB, ${lines} lines)`);
   } else {
-    console.log('Memory:    .relay/memory.md  (not found)');
+    console.log(`${label('Memory:')} .relay/memory.md  (not found)`);
   }
 
   // Watermark / distiller state
@@ -72,22 +75,22 @@ export function relayStatus(targetDir) {
 
     if (state.last_distilled_at) {
       const ago = Math.round((Date.now() - state.last_distilled_at) / 60_000);
-      console.log(`Distilled: ${new Date(state.last_distilled_at).toISOString()} (${ago} min ago)`);
+      console.log(`${label('Distilled:')} ${new Date(state.last_distilled_at).toISOString()} (${ago} min ago)`);
     } else {
-      console.log('Distilled: never');
+      console.log(`${label('Distilled:')} never`);
     }
 
-    console.log(`Last UUID: ${state.last_uuid || '(none)'}`);
+    console.log(`${label('Last UUID:')} ${state.last_uuid || '(none)'}`);
     console.log(
-      `Watermark: turns_since_distill=${state.turns_since_distill ?? 0}` +
+      `${label('Watermark:')} turns_since_distill=${state.turns_since_distill ?? 0}` +
       `, distiller_running=${!!state.distiller_running}`
     );
 
     if (state.last_transcript) {
-      console.log(`Transcript: ${state.last_transcript}`);
+      console.log(`${label('Transcript:')} ${state.last_transcript}`);
     }
   } else {
-    console.log('Watermark: (no state yet)');
+    console.log(`${label('Watermark:')} (no state yet)`);
   }
 
   // Git remote
@@ -97,9 +100,9 @@ export function relayStatus(targetDir) {
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe'],
     }).trim();
-    console.log(`Remote:    origin → ${remote}`);
+    console.log(`${label('Remote:')} origin → ${remote}`);
   } catch {
-    console.log('Remote:    (none configured)');
+    console.log(`${label('Remote:')} (none configured)`);
   }
 
   // Lock
@@ -107,12 +110,12 @@ export function relayStatus(targetDir) {
   if (fs.existsSync(lockPath)) {
     try {
       const age = Math.round((Date.now() - fs.statSync(lockPath).mtimeMs) / 1000);
-      console.log(`Lock:      held (${age}s old)`);
+      console.log(`${label('Lock:')} held (${age}s old)`);
     } catch {
-      console.log('Lock:      (unknown)');
+      console.log(`${label('Lock:')} (unknown)`);
     }
   } else {
-    console.log('Lock:      not held');
+    console.log(`${label('Lock:')} not held`);
   }
 }
 
@@ -171,7 +174,8 @@ export async function relayDistill(targetDir, argv) {
     try { release = sync.lock(targetDir); } catch (e) {
       if (e.message !== 'LOCKED') console.error(`relay distill: lock error: ${e.message}`);
       else console.error('relay distill: sync locked by another process');
-      process.exit(result.status ?? 0);
+      // M1: exit 2 so callers can detect that push was skipped (not conflated with success)
+      process.exit(2);
     }
     try {
       sync.push(targetDir, 'manual');

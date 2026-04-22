@@ -36,14 +36,9 @@ function makeGitFixture() {
   g('commit -m "init"', local);
   g('push origin HEAD', local);
 
-  // Set upstream tracking
-  let branch;
-  try {
-    branch = g('rev-parse --abbrev-ref HEAD', local).trim();
-    try { g(`branch --set-upstream-to=origin/${branch} ${branch}`, local); } catch {}
-  } catch {
-    branch = 'master';
-  }
+  // Set upstream tracking — fail loudly if git can't determine branch (no silent fallback)
+  const branch = g('rev-parse --abbrev-ref HEAD', local).trim();
+  try { g(`branch --set-upstream-to=origin/${branch} ${branch}`, local); } catch {}
 
   return { tmp, bare, local, branch };
 }
@@ -134,12 +129,12 @@ test('push() commits and pushes new memory.md to remote', (t) => {
   assert.ok(remoteLog.includes('[relay] memory update'), `remote not updated: ${remoteLog}`);
 });
 
-test('push() handles non-fast-forward by rebasing and retrying', (t) => {
+test('push() handles non-fast-forward conflict: remote wins, HEAD advances, second push succeeds', (t) => {
   const { tmp, local } = makeGitFixture();
   t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
   const g = (args, cwd) =>
-    execSync(`git ${args}`, { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+    execSync(`git ${args}`, { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
 
   // Second machine: push a commit that local doesn't have
   const clone = cloneFixture(path.join(tmp, 'remote.git'), tmp);
@@ -151,32 +146,38 @@ test('push() handles non-fast-forward by rebasing and retrying', (t) => {
   g('commit -m "second machine"', clone);
   g('push origin HEAD', clone);
 
-  // Local: modify memory.md (different content → potential conflict)
+  // Local: modify memory.md with conflicting content
   fs.writeFileSync(
     path.join(local, '.relay', 'memory.md'),
     '# Local Memory\nFrom first machine\n'
   );
 
   const sync = new GitSync();
-  // Should not throw regardless of outcome (push or abort-on-conflict)
   assert.doesNotThrow(() => sync.push(local, 'abc12345'));
 
-  // Watermark state should exist (either turns reset or unchanged)
-  // Main check: repo is not left in a bad state (no rebase in progress)
-  let rebaseInProgress = false;
-  try {
-    g('rebase --show-current-patch', local);
-    rebaseInProgress = true;
-  } catch {
-    // expected — no rebase in progress
-  }
-  // Also check via .git/rebase-merge or .git/rebase-apply
+  // C2: repo must not be left mid-rebase
   const rebaseMerge = path.join(local, '.git', 'rebase-merge');
   const rebaseApply = path.join(local, '.git', 'rebase-apply');
   assert.ok(
     !fs.existsSync(rebaseMerge) && !fs.existsSync(rebaseApply),
-    'repo should not be left in a rebase-in-progress state'
+    'repo must not be left in rebase-in-progress state'
   );
+
+  // C2: remote (FETCH_HEAD) wins — local memory.md must have remote content
+  const content = fs.readFileSync(path.join(local, '.relay', 'memory.md'), 'utf8');
+  assert.ok(content.includes('Remote Memory'), 'remote memory should win on conflict');
+
+  // C2: local HEAD must match FETCH_HEAD — no longer stuck behind remote
+  const headSHA = g('rev-parse HEAD', local);
+  const fetchSHA = g('rev-parse FETCH_HEAD', local);
+  assert.equal(headSHA, fetchSHA, 'local HEAD must equal FETCH_HEAD after conflict resolution');
+
+  // C2: a subsequent push from local must succeed (no infinite re-conflict loop)
+  fs.writeFileSync(path.join(local, '.relay', 'memory.md'), '# re-distilled after conflict\n');
+  const sync2 = new GitSync();
+  assert.doesNotThrow(() => sync2.push(local, 'nextcycle'));
+  const bareLog = g('log --oneline -1', path.join(tmp, 'remote.git'));
+  assert.ok(bareLog.includes('[relay] memory update'), `second push must reach remote, got: ${bareLog}`);
 });
 
 test('push() does not throw when remote is not configured', (t) => {

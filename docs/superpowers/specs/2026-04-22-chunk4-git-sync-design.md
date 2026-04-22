@@ -48,12 +48,13 @@ git commit -m "[relay] memory update (session <id>)"
 retry up to 3:
   git push origin HEAD
   on push fail:
-    git pull --rebase
-    on rebase conflict in memory.md:
-      git checkout --theirs .relay/memory.md
-      git add .relay/memory.md
-      git rebase --continue (or --skip if empty commit)
+    git fetch + git rebase FETCH_HEAD
+    on rebase conflict:
+      git rebase --abort
+      git reset --mixed FETCH_HEAD     (advance HEAD to remote; no working tree changes outside .relay/)
+      git checkout FETCH_HEAD -- .relay/memory.md
       reset watermark: turns_since_distill=0 → next Stop hook re-triggers distiller
+      return (stop retrying — repo is clean, next distillation merges local transcript into remote memory)
     retry push
 on all retries exhausted: log "push failed, leaving commit local", return
 ```
