@@ -14,7 +14,7 @@ import { Badge } from '@astrojs/starlight/components';
 | [2](/roadmap/2-skeleton/) | 6-14 | Plugin skeleton + injection | <Badge text="Shipped" variant="success" /> |
 | [3](/roadmap/3-distillation/) | 14-22 | Distiller wired to Stop hook | <Badge text="Shipped" variant="success" /> |
 | [4](/roadmap/4-git-sync/) | 22-32 | Git sync layer | <Badge text="Shipped" variant="success" /> |
-| [5](/roadmap/5-broadcast/) | 32-44 | Broadcast + polish + demo | <Badge text="Pending" variant="default" /> |
+| [5](/roadmap/5-broadcast/) | 32-44 | Broadcast + polish + demo | <Badge text="Shipped" variant="success" /> |
 | — | 44-48 | Buffer, demo rehearsal, fallback video | <Badge text="Pending" variant="default" /> |
 
 ## Sequencing rules
@@ -66,9 +66,9 @@ Key implementation detail: conflict resolution uses `reset --mixed FETCH_HEAD` r
 
 [Full Chunk 4 detail →](/roadmap/4-git-sync/)
 
-## Chunk 5 — Broadcast + polish + demo (Hours 32-44)
+## Chunk 5 — Broadcast + polish + demo (Hours 32-44) ✅
 
-Skills/CLAUDE.md broadcast via `.relay/broadcast/`. `relay broadcast-skill <name>` CLI. `/relay-handoff` slash command (stretch). README + demo script.
+**Shipped.** Skills/CLAUDE.md broadcast via `.relay/broadcast/`. `relay broadcast-skill <name>` CLI copies a local skill file to `.relay/broadcast/skills/` for teammates to receive on their next `SessionStart`. Session-start wraps broadcast content with explicit authoritative headers so Claude treats it as team override. 46 unit tests green (6 broadcast-skill + 9 session-start + rest from prior chunks).
 
 **Exit criteria:** full scripted demo runs end-to-end in under 4 minutes without intervention.
 

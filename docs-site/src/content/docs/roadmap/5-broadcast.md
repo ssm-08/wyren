@@ -3,6 +3,8 @@ title: Chunk 5 — Broadcast + polish + demo
 description: Hours 32-44. Skills/CLAUDE.md broadcast, /relay-handoff, README, demo rehearsal.
 ---
 
+**Status: ✅ shipped.** `relay broadcast-skill` CLI live. Session-start broadcast injection with authoritative headers. 46 unit tests green.
+
 ## Goal
 
 Ship the wow-moment demo feature (skills + CLAUDE.md broadcast), polish error surfaces, write README + scripted demo, rehearse.
