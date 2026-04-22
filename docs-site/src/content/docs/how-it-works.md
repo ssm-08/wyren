@@ -3,7 +3,29 @@ title: How it works
 description: End-to-end walkthrough — Alice and Bob share one brain.
 ---
 
-Imagine Alice and Bob hacking on a repo together.
+## The short version
+
+Claude Code starts every session with no memory. For solo work, that's fine — you re-brief Claude at the start. For a team it breaks down: two people's Claudes give conflicting advice because neither knows what the other worked on.
+
+Relay's fix is a shared file in your git repo: `.relay/memory.md`. It holds what matters — decisions made, approaches that didn't work, temporary hacks still in the code. Claude reads it silently at every startup. No briefing needed, no special prompts, no change to how you work.
+
+Here's the data flow:
+
+```
+Your conversation
+       ↓  (background, every ~5 turns)
+ distiller.mjs  →  .relay/memory.md  →  git push
+                         ↓  (at every new session start)
+               teammate's Claude Code
+```
+
+The file is plain markdown — you can open it, read it, and edit it directly. Everything else in Relay is engineering to keep that file accurate and in sync.
+
+---
+
+The rest of this page walks through the full sequence step by step.
+
+---
 
 ## T=0 — Install once
 

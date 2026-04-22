@@ -26,12 +26,20 @@ Teammates just need the plugin installed — they don't run `init` again.
 
 ## How it works
 
-1. You chat with Claude. Every 5 turns (or 2 min idle), the `Stop` hook spawns `distiller.mjs` **in the background** — your turn is never blocked.
-2. Distiller scans the transcript for signal (decisions, rejections, workarounds, real code changes). If none found (Tier 0 filter), the API call is skipped entirely. Otherwise it calls Haiku 4.5 to rewrite `.relay/memory.md`.
-3. Distiller commits and pushes `.relay/memory.md` via git.
-4. At your teammate's next `SessionStart`, Relay pulls the latest memory and injects it as hidden context. Their Claude starts warm — naming decisions, rejected paths, live workarounds — without a word from the user.
+Claude Code starts every session fresh — no memory of what came before. For a team, this breaks down fast: two people's Claudes give conflicting advice because neither knows what the other decided, what failed, or what shortcuts are still in the code.
 
-Watch it live:
+Relay keeps a shared notepad in your git repo: a file called `.relay/memory.md`. Every session reads from it at startup. Every session writes to it while you work.
+
+**Reading** — at the start of every session, Relay pulls the latest `.relay/memory.md` from git and quietly feeds it to Claude before you type anything. Claude already knows the context.
+
+**Writing** — while you work, Relay watches your conversation in the background. After every few turns it pulls out what matters — decisions made, approaches that didn't pan out, temporary hacks — rewrites the file, and pushes it to git. You never notice it happening.
+
+The file is plain text. Read or edit it any time:
+```bash
+cat .relay/memory.md
+```
+
+Watch the writing happen live:
 ```bash
 tail -f .relay/log
 ```
