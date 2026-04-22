@@ -1,0 +1,63 @@
+---
+title: Relay
+description: Shared brain for teams using Claude Code. One memory, every session warm.
+template: splash
+hero:
+  tagline: Multiple humans. One brain. Zero workflow change.
+  actions:
+    - text: The problem
+      link: /problem/
+      icon: right-arrow
+      variant: primary
+    - text: How it works
+      link: /how-it-works/
+      icon: rocket
+    - text: Source
+      link: https://github.com/ssm-08/relay
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## What is Relay?
+
+Relay is a Claude Code plugin that gives a team **one shared memory** across every teammate's sessions. No one has to change how they work.
+
+When anyone on the team runs Claude Code, Relay:
+
+1. **Watches** the session transcript in the background.
+2. **Distills** decisions, rejected paths, and live workarounds into a compact `memory.md`.
+3. **Syncs** that memory to every teammate via git.
+4. **Injects** it as hidden context at every new `SessionStart` — so any Claude, on any laptop, starts warm.
+
+## The 10-second pitch
+
+<CardGrid stagger>
+	<Card title="The pain" icon="warning">
+		In team hackathons, the bottleneck isn't skill — it's context. Every new Claude session starts blank. Decisions, rejected paths, and workarounds vaporize when the session closes.
+	</Card>
+	<Card title="The insight" icon="star">
+		Markdown captures conclusions. Relay captures the **reasoning** — the rejected ideas, live hacks, and deliberate shortcuts that look like bugs.
+	</Card>
+	<Card title="The result" icon="approve-check">
+		Open Claude Code on a 4-hour-old project. Without Relay: clueless. With Relay: names the known workarounds and rejected approaches in the first assistant message, unprompted.
+	</Card>
+	<Card title="The footprint" icon="seti:config">
+		One Claude Code plugin. Zero infra. Ships in 48 hours.
+	</Card>
+</CardGrid>
+
+## How Relay is different
+
+| | What it does for teams |
+|---|---|
+| `CLAUDE.md` alone | Static; someone has to remember to write it. |
+| Claude Projects | Shared docs, but no live session memory. |
+| Agent Teams | Multi-agent coordination with one human — doesn't help N humans with N Claudes. |
+| Git | Syncs code, not comprehension. |
+| **Relay** | **Continuously distilled, git-synced, auto-injected team memory.** |
+
+## Built in 48 hours
+
+Start with [the problem](/problem/), walk through [how it works](/how-it-works/), then follow the [roadmap](/roadmap/overview/) chunk by chunk.

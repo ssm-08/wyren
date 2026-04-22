@@ -1,0 +1,54 @@
+:root {
+	--sl-color-accent-low: #0f1f3a;
+	--sl-color-accent: #3b82f6;
+	--sl-color-accent-high: #bfdbfe;
+	--sl-font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+:root[data-theme='light'] {
+	--sl-color-accent-low: #dbeafe;
+	--sl-color-accent: #1e40af;
+	--sl-color-accent-high: #1e3a8a;
+}
+
+.hero-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+	gap: 1rem;
+	margin-top: 2rem;
+}
+
+.timeline {
+	display: grid;
+	grid-template-columns: repeat(6, 1fr);
+	gap: 4px;
+	margin: 1.5rem 0;
+	font-size: 0.85rem;
+}
+
+.timeline-cell {
+	padding: 0.75rem 0.5rem;
+	border-radius: 4px;
+	background: var(--sl-color-gray-6);
+	text-align: center;
+	border: 2px solid transparent;
+}
+
+.timeline-cell.done {
+	background: var(--sl-color-accent-low);
+	border-color: var(--sl-color-accent);
+}
+
+.timeline-cell.current {
+	background: var(--sl-color-accent);
+	color: white;
+	border-color: var(--sl-color-accent-high);
+}
+
+.callout {
+	padding: 1rem;
+	border-radius: 6px;
+	background: var(--sl-color-gray-6);
+	border-left: 4px solid var(--sl-color-accent);
+	margin: 1rem 0;
+}

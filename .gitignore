@@ -1,0 +1,26 @@
+# Relay plugin build
+node_modules/
+dist/
+.astro/
+*.log
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Relay runtime state (per-machine)
+.relay/state/
+.relay/log
+
+# Local Claude Code state (per-machine, may contain permissions/secrets)
+.claude/
