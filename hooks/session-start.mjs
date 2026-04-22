@@ -21,6 +21,7 @@ export function readBroadcastDir(broadcastDir) {
     }
   }
   walk(broadcastDir);
+  files.sort();
   if (files.length === 0) return '';
   return files
     .map((f) => {

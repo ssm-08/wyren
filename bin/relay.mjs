@@ -19,8 +19,9 @@ export function relayInit(targetDir) {
     'utf8'
   );
 
-  // Create .relay/broadcast/
+  // Create .relay/broadcast/ with .gitkeep so git tracks the empty dir
   fs.mkdirSync(path.join(relayDir, 'broadcast'), { recursive: true });
+  fs.writeFileSync(path.join(relayDir, 'broadcast', '.gitkeep'), '', 'utf8');
 
   // Update .gitignore — idempotent
   const gitignorePath = path.join(targetDir, '.gitignore');
