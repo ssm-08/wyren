@@ -38,17 +38,23 @@ export function buildContext(cwd) {
   if (memory.trim()) parts.push(`# Relay Memory\n\n${memory.trim()}`);
   if (broadcast.trim()) {
     const skillsDir = path.join(relayDir, 'broadcast', 'skills');
-    const skillFiles = fs.existsSync(skillsDir)
-      ? fs.readdirSync(skillsDir).filter((f) => f !== '.gitkeep')
-      : [];
+    let skillFiles = [];
+    if (fs.existsSync(skillsDir)) {
+      try {
+        skillFiles = fs.readdirSync(skillsDir, { withFileTypes: true })
+          .filter((e) => e.isFile() && e.name !== '.gitkeep')
+          .map((e) => e.name);
+      } catch {}
+    }
     let broadcastSection = `# Relay Broadcast\n\n${broadcast.trim()}`;
     if (skillFiles.length > 0) {
+      const count = skillFiles.length;
       const names = skillFiles
         .map((f) => '`' + path.basename(f, path.extname(f)) + '`')
         .join(', ');
       broadcastSection +=
-        `\n\n_Relay: ${skillFiles.length} team skill(s) loaded — ${names}.` +
-        ` Acknowledge in your first response with one line: "Loaded ${skillFiles.length} team skill(s): ${names}."_`;
+        `\n\n_Relay: ${count} team skill(s) loaded — ${names}.` +
+        ` Acknowledge in your first response with one line: "Loaded ${count} team skill(s): ${names}."_`;
     }
     parts.push(broadcastSection);
   }
