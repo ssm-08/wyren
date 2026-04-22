@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { readMemory } from '../lib/memory.mjs';
 import { readStdin, isMain } from '../lib/util.mjs';
+import { GitSync } from '../lib/sync.mjs';
 
 export function readBroadcastDir(broadcastDir) {
   if (!fs.existsSync(broadcastDir)) return '';
@@ -45,6 +46,12 @@ async function main() {
     const raw = await readStdin();
     const input = JSON.parse(raw);
     const { cwd } = input;
+
+    // Pull latest .relay/ from remote before reading memory (fail-open, 3s cap inside pull)
+    if (fs.existsSync(path.join(cwd, '.relay'))) {
+      try { new GitSync().pull(cwd); } catch {}
+    }
+
     const context = buildContext(cwd);
     if (!context) process.exit(0);
     process.stdout.write(

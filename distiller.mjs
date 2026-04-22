@@ -11,6 +11,7 @@ import {
 } from './lib/transcript.mjs';
 import { readMemory, writeMemoryAtomic } from './lib/memory.mjs';
 import { hasTier0Signal } from './lib/filter.mjs';
+import { GitSync } from './lib/sync.mjs';
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 const CLAUDE_TIMEOUT_MS = 120_000;
@@ -101,7 +102,7 @@ function runClaude(prompt, model) {
   });
 }
 
-function writeWatermark(cwd, uuid, { clearRunning = false } = {}) {
+function writeWatermark(cwd, uuid, { clearRunning = false, transcript = '' } = {}) {
   if (!cwd) return;
   const statePath = path.join(cwd, '.relay', 'state', 'watermark.json');
   fs.mkdirSync(path.dirname(statePath), { recursive: true });
@@ -111,6 +112,7 @@ function writeWatermark(cwd, uuid, { clearRunning = false } = {}) {
     state.last_uuid = uuid;
     state.last_distilled_at = Date.now();
   }
+  if (transcript) state.last_transcript = transcript;
   if (clearRunning) delete state.distiller_running;
   fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
 }
@@ -126,6 +128,7 @@ async function main() {
   const cwd = args.cwd && args.cwd !== 'true' ? args.cwd : '';
   const model = args.model && args.model !== 'true' ? args.model : 'claude-haiku-4-5-20251001';
   const dryRun = !!args['dry-run'];
+  const force = !!args['force'];
 
   // --limit applies to raw lines before --since slice; useful for A/B testing only.
   // Chunk 3 wiring uses --since and omits --limit.
@@ -172,8 +175,8 @@ async function main() {
     return;
   }
 
-  // Tier 0: skip API call if slice has no actionable signal
-  if (!hasTier0Signal(transcriptSlice)) {
+  // Tier 0: skip API call if slice has no actionable signal (bypass with --force)
+  if (!force && !hasTier0Signal(transcriptSlice)) {
     console.error('distiller: Tier 0 filter — no signal words; skipping API call');
     const endUuid = lastUuid(sliced) || lastUuid(limited) || lastUuid(lines);
     writeWatermark(cwd, endUuid, { clearRunning: true });
@@ -191,11 +194,37 @@ async function main() {
     writeMemoryAtomic(outPath, cleaned);
 
     const newLastUuid = lastUuid(sliced) || lastUuid(limited) || lastUuid(lines);
-    writeWatermark(cwd, newLastUuid, { clearRunning: true });
+    writeWatermark(cwd, newLastUuid, { clearRunning: true, transcript: transcriptPath });
 
     console.error(
       `distiller: wrote ${outPath} (${cleaned.length} chars). last_uuid=${newLastUuid}`
     );
+
+    // Sync push (best-effort — failure is logged but never throws)
+    if (cwd) {
+      const sync = new GitSync();
+      let release = () => {};
+      let locked = false;
+      try {
+        release = sync.lock(cwd);
+      } catch (e) {
+        if (e.message === 'LOCKED') {
+          locked = true;
+          console.error('distiller: sync locked by another process, skipping push');
+        } else {
+          console.error(`distiller: lock error: ${e.message}`);
+        }
+      }
+      if (!locked) {
+        try {
+          sync.push(cwd, sessionId);
+        } catch (e) {
+          console.error(`distiller: sync.push error: ${e.message}`);
+        } finally {
+          release();
+        }
+      }
+    }
   } catch (e) {
     try { writeWatermark(cwd, null, { clearRunning: true }); } catch {}
     throw e;
