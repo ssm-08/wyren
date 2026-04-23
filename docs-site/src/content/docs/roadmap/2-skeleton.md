@@ -9,7 +9,7 @@ import { Badge } from '@astrojs/starlight/components';
 
 ## Goal
 
-Plugin installable via `/plugins add ssm-08/relay`. `SessionStart` hook reads `.relay/memory.md` and emits it as `additionalContext`. No distiller wired yet, no git sync yet — just the injection pipe.
+Plugin hooks wired in `~/.claude/settings.json`. `SessionStart` hook reads `.relay/memory.md` and emits it as `additionalContext`. No distiller wired yet, no git sync yet — just the injection pipe.
 
 ## Files shipped
 
@@ -38,15 +38,21 @@ Claude Code fires SessionStart
 
 ## Install
 
-```
-/plugins add ssm-08/relay
+Plugin hooks are wired via `install.sh` / `install.ps1` (see [Install guide](/reference/install/)).
+
+```bash
+# macOS / Linux
+curl -fsSL https://raw.githubusercontent.com/ssm-08/relay/master/install.sh | sh
+
+# Windows
+iwr -useb https://raw.githubusercontent.com/ssm-08/relay/master/install.ps1 | iex
 ```
 
 ## Init (per repo)
 
 ```bash
-node ~/.claude/plugins/relay/bin/relay.mjs init
-git add .relay/memory.md
+relay init
+git add .relay/memory.md .gitignore
 git commit -m "chore: init relay"
 git push
 ```

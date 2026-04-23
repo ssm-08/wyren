@@ -15,7 +15,8 @@ import { Badge } from '@astrojs/starlight/components';
 | [3](/roadmap/3-distillation/) | 14-22 | Distiller wired to Stop hook | <Badge text="Shipped" variant="success" /> |
 | [4](/roadmap/4-git-sync/) | 22-32 | Git sync layer | <Badge text="Shipped" variant="success" /> |
 | [5](/roadmap/5-broadcast/) | 32-44 | Broadcast + polish + demo | <Badge text="Shipped" variant="success" /> |
-| — | 44-48 | Buffer, demo rehearsal, fallback video | <Badge text="Pending" variant="default" /> |
+| — | 44-48 | Buffer, demo rehearsal, fallback video | <Badge text="Shipped" variant="success" /> |
+| [Post-ship](/roadmap/overview/#post-ship--deployability-v1) | 2026-04-23 | Cross-platform installer | <Badge text="Shipped" variant="success" /> |
 
 ## Sequencing rules
 
@@ -44,7 +45,7 @@ Key detail: subprocess runs with `claude -p --bare` — strips global plugins/ho
 
 ## Chunk 2 — Plugin skeleton + injection (Hours 6-14) ✅
 
-**Shipped.** Plugin installs via `/plugins add ssm-08/relay`. `SessionStart` hook reads `.relay/memory.md` + broadcast files, injects as `additionalContext`. `relay init` sets up `.relay/` structure. 17 unit tests green. E2E verified via hook pipe test.
+**Shipped.** Plugin hooks wired via `~/.claude/settings.json`. `SessionStart` hook reads `.relay/memory.md` + broadcast files, injects as `additionalContext`. `relay init` sets up `.relay/` structure. 17 unit tests green. E2E verified via hook pipe test.
 
 New files: `.claude-plugin/plugin.json`, `hooks/hooks.json`, `hooks/run-hook.cmd`, `hooks/session-start.mjs`, `hooks/stop.mjs` (stub), `bin/relay.mjs`, `lib/util.mjs`.
 
@@ -77,3 +78,15 @@ Key implementation detail: conflict resolution uses `reset --mixed FETCH_HEAD` r
 ## Buffer (Hours 44-48)
 
 Fix whatever broke during rehearsal. Record fallback demo video. Short design-doc writeup for judges.
+
+## Post-ship — Deployability v1 (2026-04-23) ✅
+
+**Shipped.** Cross-platform installer closes the biggest adoption blocker — teammates on macOS had no automated install path.
+
+New files: `install.sh` (macOS/Linux one-liner), `install.ps1` (Windows one-liner), `scripts/installer.mjs` (shared Node logic — preflight, symlink/junction, settings.json JSONC-tolerant patch, atomic write, verify, update, uninstall, doctor).
+
+New CLI subcommands: `relay install`, `relay update`, `relay uninstall`, `relay doctor`. `setup.ps1` shrunk to deprecation stub. CI matrix added: ubuntu unit tests + macOS + Windows e2e. Heavy code review caught 3 Important bugs before merge.
+
+Test totals after this work: **79 unit tests + 27 e2e tests = 106 total.**
+
+[Install guide →](/reference/install/)

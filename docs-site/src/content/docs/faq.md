@@ -46,7 +46,13 @@ If you want to skip git fetch on a specific session (e.g. offline demo), set `RE
 
 ## How do I stop distillation on a specific turn?
 
-You can't, and you don't need to. The Tier 0 regex filter already kills ~70% of triggers. For fully private turns, set `RELAY_DISABLE=1` for that session.
+You can't, and you don't need to. The Tier 0 regex filter already kills ~70% of triggers. For fully private turns, disable the plugin for that session:
+
+```
+/plugins disable relay
+```
+
+Re-enable with `/plugins enable relay` when done.
 
 ## Memory is wrong / stale / contradictory — what do I do?
 
