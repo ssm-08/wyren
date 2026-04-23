@@ -72,6 +72,7 @@ export function spawnDistiller({ relayDir, transcriptPath, since, cwd }) {
 
   const proc = spawn('node', args, {
     detached: true,
+    windowsHide: true,
     stdio: ['ignore', logFd, logFd],
   });
   proc.on('error', (e) => {

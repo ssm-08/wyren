@@ -66,6 +66,7 @@ function runClaude(prompt, model) {
     try {
       proc = spawn('claude', args, {
         shell: process.platform === 'win32',
+        windowsHide: true,
         stdio: ['pipe', 'pipe', 'pipe'],
       });
     } catch (e) {
