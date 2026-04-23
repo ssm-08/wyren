@@ -17,7 +17,9 @@ Relay is a Claude Code plugin that gives a team shared memory across every teamm
 - **Chunk 2 (plugin skeleton + injection):** ✅ shipped. `.claude-plugin/plugin.json` + `hooks/hooks.json` + `hooks/run-hook.cmd` + `hooks/session-start.mjs` + `hooks/stop.mjs` (stub) + `bin/relay.mjs` + `lib/util.mjs`. 17 unit tests green. E2E verified via hook pipe test.
 - **Chunk 3 (distiller wired into Stop hook):** ✅ shipped. `stop.mjs` spawns distiller detached after 5 turns (or 2min idle). Tier 0 regex filter in `lib/filter.mjs` — matches rendered transcript format `[tool_use Edit]`, not raw JSONL. Default model Haiku 4.5. `distiller_running` lock prevents concurrent runs. 29 unit tests green.
 - **Chunk 4 (git sync layer):** ✅ shipped. `lib/sync.mjs` — `GitSync` with `pull()` (fetch + checkout `.relay/` from remote, 3s cap, `RELAY_SKIP_PULL` escape), `push()` (commit + retry-on-conflict, `reset --mixed FETCH_HEAD` keeps HEAD in sync), `lock()` (atomic `openSync('wx')`, 60s stale-steal). `relay status` + `relay distill [--force|--push|--dry-run]` CLI. 38 unit tests green.
-- **Chunk 5 (broadcast + polish + demo):** ✅ shipped. `relay broadcast-skill` CLI, `/relay-handoff` slash command (`commands/relay-handoff.toml`), acknowledgment instruction in SessionStart, polished README + docs. 46 unit tests green. All 6 chunks complete — plugin is feature-complete.
+- **Chunk 5 (broadcast + polish + demo):** ✅ shipped. `relay broadcast-skill` CLI, `/relay-handoff` slash command (`commands/relay-handoff.toml`), acknowledgment instruction in SessionStart, polished README + docs. All 6 chunks complete — plugin is feature-complete.
+- **Post-ship (2026-04-22):** ✅ code review + 7 bug fixes (fd leak, double-distiller race, atomic watermark writes, handoff conflict retry, execSync→spawnSync, JSONL error logging, plugin.json hooks pointer). Two Windows/junction bugs fixed: `isMain()` now uses `realpathSync`, `run-hook.cmd` self-locates `CLAUDE_PLUGIN_ROOT`. 48 unit tests green. Docs: 22 pages + guides/two-system-test.md.
+- **Next:** `scripts/setup.ps1` (one-shot machine setup) + `scripts/test-e2e.mjs` (hook verification without real Claude session). See memory for full spec.
 
 ## Repo layout
 
@@ -50,6 +52,19 @@ Vibejam/
 └── tests/                      # 38 unit tests (node:test)
     └── sync.test.mjs           # GitSync tests (bare-repo fixture)
 ```
+
+## Plugin registration (non-obvious — read before touching hooks)
+
+Junction into `~/.claude/plugins/relay` is NOT sufficient. Claude Code only fires hooks for plugins listed in `installed_plugins.json`. For local dev, wire hooks directly in `~/.claude/settings.json`:
+
+```json
+"hooks": {
+  "SessionStart": [{"matcher": "", "hooks": [{"type": "command", "command": "\"<relay-root>\\hooks\\run-hook.cmd\" session-start", "timeout": 2, "statusMessage": "Loading relay memory..."}]}],
+  "Stop": [{"matcher": "", "hooks": [{"type": "command", "command": "\"<relay-root>\\hooks\\run-hook.cmd\" stop", "timeout": 5}]}]
+}
+```
+
+`scripts/setup.ps1` (TODO) will automate this. Until then, patch settings.json manually per machine.
 
 ## Non-obvious conventions
 
