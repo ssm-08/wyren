@@ -30,6 +30,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Run unit tests (macOS — catches POSIX symlink regressions)
+        run: node --test tests/*.test.mjs
       - name: Run e2e tests
         run: node scripts/test-e2e.mjs
         env:
@@ -50,6 +52,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Run unit tests (Windows — catches junction regressions)
+        run: node --test tests/*.test.mjs
       - name: Run e2e tests
         run: node scripts/test-e2e.mjs
         env:

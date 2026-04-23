@@ -29,11 +29,13 @@ CLONE="$CLAUDE_HOME/relay"
 
 # If --from-local is provided, skip clone
 FROM_LOCAL=""
-ARGS="$*"
-for arg in "$@"; do
-  case "$arg" in
-    --from-local) FROM_LOCAL="$2"; break ;;
-  esac
+_prev=""
+for _arg in "$@"; do
+  if [ "$_prev" = "--from-local" ]; then
+    FROM_LOCAL="$_arg"
+    break
+  fi
+  _prev="$_arg"
 done
 
 if [ -z "$FROM_LOCAL" ] && [ ! -d "$CLONE" ]; then

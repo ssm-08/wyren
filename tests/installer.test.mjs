@@ -93,6 +93,30 @@ test('readSettings parses JSONC with trailing comma', () => {
   }
 });
 
+test('readSettings parses JSONC with block comments', () => {
+  const dir = makeTmpDir();
+  try {
+    const p = path.join(dir, 'settings.json');
+    fs.writeFileSync(p, '{\n  /* block comment */\n  "theme": "dark"\n}\n', 'utf8');
+    const result = readSettings(p);
+    assert.equal(result.theme, 'dark');
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
+
+test('readSettings does not strip // inside string values (URL safety)', () => {
+  const dir = makeTmpDir();
+  try {
+    const p = path.join(dir, 'settings.json');
+    fs.writeFileSync(p, '{\n  "url": "https://example.com/path"\n}\n', 'utf8');
+    const result = readSettings(p);
+    assert.equal(result.url, 'https://example.com/path');
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
+
 test('readSettings throws on unparseable content', () => {
   const dir = makeTmpDir();
   try {
@@ -271,6 +295,62 @@ test('removeLink is a no-op when path missing', () => {
     assert.doesNotThrow(() => removeLink(path.join(dir, 'nonexistent')));
   } finally {
     fs.rmSync(dir, { recursive: true });
+  }
+});
+
+test('createLink creates a junction on Windows and inspectLink detects it', () => {
+  if (process.platform !== 'win32') return; // Windows-only
+  const dir = makeTmpDir();
+  try {
+    const src = path.join(dir, 'source');
+    const dst = path.join(dir, 'links', 'relay');
+    fs.mkdirSync(src);
+
+    createLink(src, dst);
+
+    const info = inspectLink(dst);
+    assert.ok(info.kind === 'junction' || info.kind === 'symlink', `Expected junction, got: ${info.kind}`);
+    const normalSrc = src.replace(/\\/g, '/').toLowerCase();
+    const normalTarget = (info.target || '').replace(/\\/g, '/').replace(/^\\\\\?\\/, '').toLowerCase();
+    assert.ok(normalTarget.includes(normalSrc.split('/').pop()), `Target ${normalTarget} should include ${normalSrc}`);
+  } finally {
+    try { fs.rmdirSync(path.join(dir, 'links', 'relay')); } catch {}
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('createLink is idempotent on Windows (junction)', () => {
+  if (process.platform !== 'win32') return; // Windows-only
+  const dir = makeTmpDir();
+  try {
+    const src = path.join(dir, 'source');
+    const dst = path.join(dir, 'relay');
+    fs.mkdirSync(src);
+
+    createLink(src, dst);
+    assert.doesNotThrow(() => createLink(src, dst), 'Second createLink should not throw');
+  } finally {
+    try { fs.rmdirSync(path.join(dir, 'relay')); } catch {}
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('removeLink removes a Windows junction', () => {
+  if (process.platform !== 'win32') return; // Windows-only
+  const dir = makeTmpDir();
+  try {
+    const src = path.join(dir, 'source');
+    const dst = path.join(dir, 'relay');
+    fs.mkdirSync(src);
+
+    createLink(src, dst);
+    const before = inspectLink(dst);
+    assert.ok(before.kind === 'junction' || before.kind === 'symlink', `Expected junction before remove`);
+    removeLink(dst);
+    assert.equal(inspectLink(dst).kind, 'missing');
+  } finally {
+    try { fs.rmdirSync(path.join(dir, 'relay')); } catch {}
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 });
 

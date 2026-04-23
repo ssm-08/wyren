@@ -147,13 +147,16 @@ export function cloneOrUpdate(dest, { ref = 'master', force = false } = {}) {
   }
 
   r.ok(`Updating ${dest}`);
+  // Separate fetch from reset: if fetch fails (network), warn + proceed with existing.
+  // If fetch succeeds but reset fails, that's unexpected — throw so caller knows update failed.
   try {
     git(['fetch', '--depth=1', 'origin', ref], dest, { timeout: 15_000 });
-    git(['reset', '--hard', 'FETCH_HEAD'], dest, { timeout: 5_000 });
-    r.ok(`Updated to latest ${ref}`);
   } catch (e) {
-    r.warn(`Update failed: ${e.message} — proceeding with existing clone`);
+    r.warn(`Fetch failed: ${e.message} — proceeding with existing clone`);
+    return;
   }
+  git(['reset', '--hard', 'FETCH_HEAD'], dest, { timeout: 5_000 });
+  r.ok(`Updated to latest ${ref}`);
 }
 
 export function resolveRepoDir({ fromLocal, clone, force }) {
@@ -426,9 +429,10 @@ export function verifyInstall(paths) {
     issues.push(`settings.json unreadable: ${e.message}`);
   }
 
-  // POSIX: hook dispatcher is executable
+  // POSIX: hook dispatcher must be executable. run-hook.cmd is a polyglot bash+cmd file.
+  // Use linkedDir (the actual install source) not paths.clone, which may differ with --from-local.
   if (process.platform !== 'win32') {
-    const dispatcher = path.join(paths.clone, 'hooks', 'run-hook.cmd');
+    const dispatcher = path.join(linkedDir, 'hooks', 'run-hook.cmd');
     if (fs.existsSync(dispatcher)) {
       try {
         fs.accessSync(dispatcher, fs.constants.X_OK);
