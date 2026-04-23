@@ -63,7 +63,7 @@ export function preflight() {
   r.ok(`Node v${process.versions.node}`);
 
   // git
-  const gitResult = spawnSync('git', ['--version'], { encoding: 'utf8' });
+  const gitResult = spawnSync('git', ['--version'], { encoding: 'utf8', windowsHide: true });
   if (gitResult.error || gitResult.status !== 0) {
     throw new PreflightError(
       'git not found on PATH. Install from https://git-scm.com/'
@@ -72,8 +72,9 @@ export function preflight() {
   r.ok((gitResult.stdout || '').trim());
 
   // claude CLI — warn only. Use cmd /c on Windows to avoid DEP0190 (shell+args deprecation).
+  // windowsHide: true prevents cmd window flash on Windows.
   const claudeResult = process.platform === 'win32'
-    ? spawnSync('cmd', ['/c', 'claude', '--version'], { encoding: 'utf8' })
+    ? spawnSync('cmd', ['/c', 'claude', '--version'], { encoding: 'utf8', windowsHide: true })
     : spawnSync('claude', ['--version'], { encoding: 'utf8' });
   if (claudeResult.error || claudeResult.status !== 0) {
     r.warn('claude CLI not found — distiller will fail at runtime. Install Claude Code first.');
@@ -91,6 +92,7 @@ function git(args, cwd, { timeout = 10_000 } = {}) {
     cwd,
     encoding: 'utf8',
     timeout,
+    windowsHide: true,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
   if (r.error) throw r.error;
@@ -403,6 +405,7 @@ export function verifyInstall(paths) {
     const r = spawnSync('node', [relayBin, 'status'], {
       encoding: 'utf8',
       timeout: 5_000,
+      windowsHide: true,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     if (r.status !== 0) {

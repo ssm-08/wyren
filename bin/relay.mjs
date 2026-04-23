@@ -102,6 +102,7 @@ export function relayStatus(targetDir) {
     const r = spawnSync('git', ['remote', 'get-url', 'origin'], {
       cwd: targetDir,
       encoding: 'utf8',
+      windowsHide: true,
     });
     const remote = (r.stdout || '').trim();
     if (r.status === 0 && remote) {
