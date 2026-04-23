@@ -5,6 +5,7 @@
 - Two-system end-to-end verified: System A distilled + pushed; System B pulled + injected at SessionStart [session c02d8414, turn 320]
 - Installer architecture: Approach A (two shell shims + shared Node helper in scripts/installer.mjs). Shell scripts thin; all logic in Node. macOS/Linux symlink, Windows junction, no admin required. `${CLAUDE_PLUGIN_ROOT}` form for hook command; auto-migrates old absolute-path entries [session 12e443d5, turn 193]
 - setup.ps1 is a deprecation stub — real install via install.sh (macOS) or install.ps1 (Windows) [session 12e443d5, turn 265]
+- Relay sync only at SessionStart boundaries, never mid-session. For urgent handoffs, `relay distill --push --force` immediately pushes, but receiving teammate must restart Claude Code for the next SessionStart to see updates. [session 12e443d5, turn 2]
 
 ## Rejected paths
 - Approach B (pure bash + pure PowerShell): Already hit PS 5.1 gotchas; bash equivalents (readlink -f diff BSD/GNU, sed-based JSON) compound. Drift between parallel scripts guaranteed. [session 12e443d5, turn 75]
