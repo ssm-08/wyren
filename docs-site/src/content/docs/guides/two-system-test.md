@@ -30,12 +30,12 @@ git push -u origin master
 
 ## Phase 2 — Install plugin on System A
 
-Register the relay plugin via junction (no admin rights needed on Windows):
+Register the relay plugin via junction (no admin rights needed on Windows). Replace `C:\path\to\relay` with wherever you cloned/downloaded the relay source:
 
 ```powershell
 New-Item -ItemType Junction `
   -Path "$env:USERPROFILE\.claude\plugins\relay" `
-  -Target "C:\path\to\relay"
+  -Target "C:\path\to\relay"   # e.g. C:\Users\YourName\Documents\Vibejam
 ```
 
 On macOS/Linux:
