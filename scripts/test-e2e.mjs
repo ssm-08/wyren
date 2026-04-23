@@ -778,6 +778,126 @@ test('H6: --from-local with non-relay directory bails with actionable error', as
 });
 
 // ---------------------------------------------------------------------------
+// Group I — UserPromptSubmit live sync hook
+// ---------------------------------------------------------------------------
+
+function hookUPSInput(cwd) {
+  return JSON.stringify({
+    session_id: 'test-ups-session',
+    transcript_path: path.join(cwd, 'fake-transcript.jsonl'),
+    cwd,
+    hook_event_name: 'UserPromptSubmit',
+  });
+}
+
+test('I1: UPS hook fires, memory.md unchanged mtime → empty stdout, watermark preserved', async (dir) => {
+  initGit(dir);
+  seedRelay(dir, { memory: '## Decisions\n- Use SQLite [session a, turn 1]\n' });
+
+  // Write watermark with matching mtime
+  const memPath = path.join(dir, '.relay', 'memory.md');
+  const mtime = fs.statSync(memPath).mtimeMs;
+  writeWatermark(dir, {
+    last_injected_mtime: mtime,
+    last_injected_hash: 'abc123def456',
+    turns_since_distill: 2,
+  });
+
+  const r = runNode([path.join(RELAY_ROOT, 'hooks', 'user-prompt-submit.mjs')], {
+    cwd: dir, stdin: hookUPSInput(dir), env: { RELAY_SKIP_PULL: '1' },
+  });
+
+  assert(r.status === 0, `exit ${r.status}: ${r.stderr}`);
+  assert(r.stdout.trim() === '', 'stdout should be empty when nothing changed');
+
+  const wm = readWatermark(dir);
+  assert(wm.turns_since_distill === 2, 'unrelated watermark key preserved');
+});
+
+test('I2: first UPS run (no watermark) → seeded, no additionalContext in stdout', async (dir) => {
+  initGit(dir);
+  seedRelay(dir, { memory: '## Decisions\n- Use SQLite [session a, turn 1]\n' });
+
+  const r = runNode([path.join(RELAY_ROOT, 'hooks', 'user-prompt-submit.mjs')], {
+    cwd: dir, stdin: hookUPSInput(dir), env: { RELAY_SKIP_PULL: '1' },
+  });
+
+  assert(r.status === 0, `exit ${r.status}: ${r.stderr}`);
+  assert(r.stdout.trim() === '', 'no injection on first run');
+
+  const wm = readWatermark(dir);
+  assert(wm.last_injected_hash, 'hash seeded');
+  assert(wm.last_injected_mtime, 'mtime seeded');
+});
+
+test('I3: memory.md mtime changed but hash same → mtime updated, no injection', async (dir) => {
+  initGit(dir);
+  const memory = '## Decisions\n- Use SQLite [session a, turn 1]\n';
+  seedRelay(dir, { memory });
+
+  // Compute hash of memory content
+  const { hashMemory } = await import('../lib/diff-memory.mjs');
+  const hash = hashMemory(memory);
+
+  // Seed watermark with stale mtime but correct hash
+  writeWatermark(dir, { last_injected_mtime: 1, last_injected_hash: hash });
+
+  const r = runNode([path.join(RELAY_ROOT, 'hooks', 'user-prompt-submit.mjs')], {
+    cwd: dir, stdin: hookUPSInput(dir), env: { RELAY_SKIP_PULL: '1' },
+  });
+
+  assert(r.status === 0, `exit ${r.status}: ${r.stderr}`);
+  assert(r.stdout.trim() === '', 'no injection when hash unchanged');
+
+  const wm = readWatermark(dir);
+  assert(wm.last_injected_mtime > 1, 'mtime updated');
+});
+
+test('I4: real content delta → stdout contains additionalContext with new bullet', async (dir) => {
+  initGit(dir);
+  const oldMem = '## Decisions\n- Use SQLite [session a, turn 1]\n';
+  const newMem = oldMem + '- Add rate limiting [session b, turn 2]\n';
+  seedRelay(dir, { memory: newMem });
+
+  const stateDir = path.join(dir, '.relay', 'state');
+  fs.mkdirSync(stateDir, { recursive: true });
+  // Write snapshot with old content
+  fs.writeFileSync(path.join(stateDir, 'last-injected-memory.md'), oldMem, 'utf8');
+
+  const { hashMemory } = await import('../lib/diff-memory.mjs');
+  writeWatermark(dir, { last_injected_mtime: 1, last_injected_hash: hashMemory(oldMem) });
+
+  const r = runNode([path.join(RELAY_ROOT, 'hooks', 'user-prompt-submit.mjs')], {
+    cwd: dir, stdin: hookUPSInput(dir), env: { RELAY_SKIP_PULL: '1' },
+  });
+
+  assert(r.status === 0, `exit ${r.status}: ${r.stderr}`);
+  assert(r.stdout.trim() !== '', 'stdout should contain JSON output');
+
+  const output = JSON.parse(r.stdout.trim());
+  const ctx = output.hookSpecificOutput.additionalContext;
+  assert(ctx.includes('Add rate limiting'), 'additionalContext has new bullet');
+  assert(ctx.includes('Relay live update'), 'additionalContext has header');
+});
+
+test('I5: corrupt snapshot → hook exits 0, no crash', async (dir) => {
+  initGit(dir);
+  seedRelay(dir, { memory: '## Decisions\n- Use SQLite [session a, turn 1]\n' });
+
+  const stateDir = path.join(dir, '.relay', 'state');
+  fs.mkdirSync(stateDir, { recursive: true });
+  // Write corrupt binary snapshot
+  fs.writeFileSync(path.join(stateDir, 'last-injected-memory.md'), Buffer.from([0xff, 0xfe, 0x00]));
+  writeWatermark(dir, { last_injected_mtime: 1, last_injected_hash: 'stale000aaaa' });
+
+  const r = runNode([path.join(RELAY_ROOT, 'hooks', 'user-prompt-submit.mjs')], {
+    cwd: dir, stdin: hookUPSInput(dir), env: { RELAY_SKIP_PULL: '1' },
+  });
+
+  assert(r.status === 0, 'hook should exit 0 even with corrupt snapshot');
+});
+
+// ---------------------------------------------------------------------------
 // Run
 // ---------------------------------------------------------------------------
 run();
