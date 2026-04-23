@@ -30,69 +30,56 @@ git push -u origin master
 
 ## Phase 2 — Install plugin on System A
 
-**Windows — one command (recommended):**
+**macOS / Linux:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ssm-08/relay/master/install.sh | sh
+```
+
+**Windows (PowerShell):**
 
 ```powershell
-# From inside the relay source dir (e.g. C:\Users\YourName\Documents\Vibejam)
-powershell -ExecutionPolicy Bypass -File scripts/setup.ps1 -RunTests
+iwr -useb https://raw.githubusercontent.com/ssm-08/relay/master/install.ps1 | iex
 ```
 
-This creates the junction, patches `~/.claude/settings.json` with the hook entries, and runs the e2e smoke test. Use `-WhatIf` to preview first.
+**Dev / local clone (any OS):**
 
-**Manual (Windows):**
-
-```powershell
-New-Item -ItemType Junction `
-  -Path "$env:USERPROFILE\.claude\plugins\relay" `
-  -Target "C:\path\to\relay"   # e.g. C:\Users\YourName\Documents\Vibejam
-```
-
-Then add hooks to `~/.claude/settings.json` — see [Plugin registration](/faq/) for the exact JSON block.
-
-**macOS/Linux:**
 ```bash
-ln -s /path/to/relay ~/.claude/plugins/relay
+# From inside your relay checkout
+node scripts/installer.mjs install --from-local .
 ```
 
-Then manually patch `~/.claude/settings.json` with the SessionStart and Stop hook entries (see FAQ).
-
-Verify hooks are wired:
+Verify install is healthy:
 ```bash
-node scripts/test-e2e.mjs   # 21 tests, ~5s, no Claude session needed
+relay doctor
+# [relay] doctor: all checks passed
+
+node scripts/test-e2e.mjs   # 27 tests, ~25s, no Claude session needed
 ```
 
 ---
 
 ## Phase 3 — Install plugin on System B
 
-Clone the relay source on the second machine:
+Same one-liner as Phase 2 — run it on the second machine:
+
+**macOS / Linux:**
 
 ```bash
-git clone https://github.com/ssm-08/relay ~/relay-plugin
+curl -fsSL https://raw.githubusercontent.com/ssm-08/relay/master/install.sh | sh
 ```
 
-**Windows — automated:**
+**Windows:**
 
 ```powershell
-cd ~/relay-plugin
-powershell -ExecutionPolicy Bypass -File scripts/setup.ps1 -RunTests
+iwr -useb https://raw.githubusercontent.com/ssm-08/relay/master/install.ps1 | iex
 ```
 
-**Manual:**
-
-```powershell
-# Windows
-New-Item -ItemType Junction `
-  -Path "$env:USERPROFILE\.claude\plugins\relay" `
-  -Target "$env:USERPROFILE\relay-plugin"
-```
+Verify:
 
 ```bash
-# macOS / Linux
-ln -s ~/relay-plugin ~/.claude/plugins/relay
+relay doctor
 ```
-
-Patch `~/.claude/settings.json` manually on macOS/Linux (same JSON as Phase 2).
 
 ---
 
@@ -101,7 +88,7 @@ Patch `~/.claude/settings.json` manually on macOS/Linux (same JSON as Phase 2).
 ```bash
 cd relay-test-repo
 
-node ~/.claude/plugins/relay/bin/relay.mjs init
+relay init
 # Output: "Relay initialized. Run: git add .relay/memory.md && git commit"
 
 git add .relay/memory.md .gitignore
@@ -134,7 +121,7 @@ After the fifth turn, end the session (`/exit` or Ctrl+C). The Stop hook spawns 
 # Wait ~30s, then:
 cat .relay/log               # shows "wrote memory.md (N chars)" on success
 cat .relay/memory.md         # bullet-point memory entries
-node ~/.claude/plugins/relay/bin/relay.mjs status
+relay status
 ```
 
 Expected `relay status` output:
@@ -164,7 +151,7 @@ git log --oneline -3
 If the auto-push didn't fire (no remote configured at distill time):
 
 ```bash
-node ~/.claude/plugins/relay/bin/relay.mjs distill --push --force
+relay distill --push --force
 ```
 
 ---
@@ -185,7 +172,7 @@ Open Claude Code in the same repo:
 claude
 ```
 
-The `Loading relay memory…` status message appears at startup — the Stop hook injected memory as hidden `additionalContext`. Verify by asking Claude:
+The `Loading relay memory…` status message appears at startup — the SessionStart hook injected memory as hidden `additionalContext`. Verify by asking Claude:
 
 > "What do you know about this project from previous sessions?"
 
@@ -201,7 +188,7 @@ Pipe a real transcript directly into the Stop hook to trigger distillation immed
 TRANSCRIPT=$(ls ~/.claude/projects/*/transcripts/*.jsonl 2>/dev/null | tail -1)
 
 echo "{\"cwd\": \"$(pwd)\", \"transcript_path\": \"$TRANSCRIPT\"}" \
-  | node ~/.claude/plugins/relay/hooks/stop.mjs
+  | node ~/.claude/relay/hooks/stop.mjs
 
 sleep 30 && cat .relay/memory.md
 ```
@@ -216,7 +203,7 @@ sleep 30 && cat .relay/memory.md
 | Distiller never ran | `relay status` — `turns_since_distill` stuck at 5+? Stop hook not firing |
 | `distiller_running` stuck | Distiller crashed. Check `.relay/log`, then run `relay distill --force` to reset |
 | Push rejected | `git remote -v` — is remote configured? Does auth work? |
-| Plugin hooks not firing | `ls ~/.claude/plugins/relay/hooks/hooks.json` — junction intact? |
+| Plugin hooks not firing | `relay doctor` — check if plugin link exists and settings.json is wired |
 | `claude -p` fails | Run `claude -p --bare "hello"` manually to check auth |
 | Memory not on System B after distill | Distiller's auto-push may have been interrupted — run `git push` manually on System A, then `git pull` on System B |
 | Random cmd window flashing during distillation | Pull latest relay source — fixed in `distiller.mjs` with `windowsHide: true` |
