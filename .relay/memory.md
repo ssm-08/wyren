@@ -1,3 +1,4 @@
+```
 ## Decisions
 - Relay project: all 6 chunks + installer v1 shipped and live on master [session c02d8414, turn 30]
 - 106 tests passing (79 unit + 27 e2e): full pipeline tested including installer install/update/uninstall/doctor [session 12e443d5, turn 315]
@@ -12,3 +13,4 @@
 ## Scope changes
 - Deployability v1 shipped 2026-04-23: install.sh, install.ps1, scripts/installer.mjs, relay install/update/uninstall/doctor CLI subcommands, CI matrix (ubuntu unit tests + macos/windows e2e), 26 new installer unit tests, Group H (6 e2e tests) [session 12e443d5, turn 425]
 - Old plan docs (docs/superpowers/plans/*.md + specs/*.md for chunks 2,4,5) deleted — shipped, no longer load-bearing [session 12e443d5, turn 475]
+```
