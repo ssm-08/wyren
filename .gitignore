@@ -24,3 +24,6 @@ Thumbs.db
 
 # Local Claude Code state (per-machine, may contain permissions/secrets)
 .claude/
+
+# Git worktrees
+.worktrees/
