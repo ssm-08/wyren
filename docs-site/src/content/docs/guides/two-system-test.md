@@ -30,7 +30,16 @@ git push -u origin master
 
 ## Phase 2 — Install plugin on System A
 
-Register the relay plugin via junction (no admin rights needed on Windows). Replace `C:\path\to\relay` with wherever you cloned/downloaded the relay source:
+**Windows — one command (recommended):**
+
+```powershell
+# From inside the relay source dir (e.g. C:\Users\YourName\Documents\Vibejam)
+powershell -ExecutionPolicy Bypass -File scripts/setup.ps1 -RunTests
+```
+
+This creates the junction, patches `~/.claude/settings.json` with the hook entries, and runs the e2e smoke test. Use `-WhatIf` to preview first.
+
+**Manual (Windows):**
 
 ```powershell
 New-Item -ItemType Junction `
@@ -38,15 +47,18 @@ New-Item -ItemType Junction `
   -Target "C:\path\to\relay"   # e.g. C:\Users\YourName\Documents\Vibejam
 ```
 
-On macOS/Linux:
+Then add hooks to `~/.claude/settings.json` — see [Plugin registration](/faq/) for the exact JSON block.
+
+**macOS/Linux:**
 ```bash
 ln -s /path/to/relay ~/.claude/plugins/relay
 ```
 
-Verify:
+Then manually patch `~/.claude/settings.json` with the SessionStart and Stop hook entries (see FAQ).
+
+Verify hooks are wired:
 ```bash
-ls ~/.claude/plugins/relay/hooks/hooks.json
-# should print the path, not an error
+node scripts/test-e2e.mjs   # 21 tests, ~5s, no Claude session needed
 ```
 
 ---
@@ -59,7 +71,14 @@ Clone the relay source on the second machine:
 git clone https://github.com/ssm-08/relay ~/relay-plugin
 ```
 
-Then register:
+**Windows — automated:**
+
+```powershell
+cd ~/relay-plugin
+powershell -ExecutionPolicy Bypass -File scripts/setup.ps1 -RunTests
+```
+
+**Manual:**
 
 ```powershell
 # Windows
@@ -72,6 +91,8 @@ New-Item -ItemType Junction `
 # macOS / Linux
 ln -s ~/relay-plugin ~/.claude/plugins/relay
 ```
+
+Patch `~/.claude/settings.json` manually on macOS/Linux (same JSON as Phase 2).
 
 ---
 

@@ -19,7 +19,7 @@ Relay is a Claude Code plugin that gives a team shared memory across every teamm
 - **Chunk 4 (git sync layer):** ✅ shipped. `lib/sync.mjs` — `GitSync` with `pull()` (fetch + checkout `.relay/` from remote, 3s cap, `RELAY_SKIP_PULL` escape), `push()` (commit + retry-on-conflict, `reset --mixed FETCH_HEAD` keeps HEAD in sync), `lock()` (atomic `openSync('wx')`, 60s stale-steal). `relay status` + `relay distill [--force|--push|--dry-run]` CLI. 38 unit tests green.
 - **Chunk 5 (broadcast + polish + demo):** ✅ shipped. `relay broadcast-skill` CLI, `/relay-handoff` slash command (`commands/relay-handoff.toml`), acknowledgment instruction in SessionStart, polished README + docs. All 6 chunks complete — plugin is feature-complete.
 - **Post-ship (2026-04-22):** ✅ code review + 7 bug fixes (fd leak, double-distiller race, atomic watermark writes, handoff conflict retry, execSync→spawnSync, JSONL error logging, plugin.json hooks pointer). Two Windows/junction bugs fixed: `isMain()` now uses `realpathSync`, `run-hook.cmd` self-locates `CLAUDE_PLUGIN_ROOT`. 48 unit tests green. Docs: 22 pages + guides/two-system-test.md.
-- **Next:** `scripts/setup.ps1` (one-shot machine setup) + `scripts/test-e2e.mjs` (hook verification without real Claude session). See memory for full spec.
+- **Scripts (2026-04-22):** ✅ `scripts/setup.ps1` + `scripts/test-e2e.mjs` shipped. 21 e2e tests across 7 groups (init, SessionStart, Stop, distiller, CLI, dispatcher, stress/concurrency). Stress tests found 2 PS 5.1 bugs: `Get-Item .Target` returns `String[]` not `String`; `Remove-Item -Force` throws on junctions — fixed with `[System.Array]` unwrap + `cmd /c rmdir`. Full lifecycle verified: install → idempotent → uninstall → reinstall. Everything complete.
 
 ## Repo layout
 
@@ -37,20 +37,26 @@ Vibejam/
 ├── lib/
 │   ├── transcript.mjs          # JSONL parse + slicer + prose renderer
 │   ├── memory.mjs              # atomic read/write for memory.md
-│   └── filter.mjs              # Tier 0 signal filter (hasTier0Signal)
+│   ├── filter.mjs              # Tier 0 signal filter (hasTier0Signal)
+│   └── sync.mjs                # Chunk 4: GitSync — pull, push, lock
 ├── prompts/
 │   └── distill.md              # distiller system prompt (core IP)
 ├── hooks/                      # Chunk 2+3: plugin hooks
 │   ├── hooks.json              # hook manifest
-│   ├── run-hook.cmd            # Windows/Unix dispatcher
+│   ├── run-hook.cmd            # Windows/Unix dispatcher (self-locates CLAUDE_PLUGIN_ROOT)
 │   ├── session-start.mjs       # injects memory + broadcast as additionalContext
 │   └── stop.mjs                # watermark + detached distiller spawn (5 turns / 2min idle)
 ├── bin/
-│   └── relay.mjs               # CLI: relay init | status | distill
-├── lib/
-│   └── sync.mjs                # Chunk 4: GitSync — pull, push, lock
-└── tests/                      # 38 unit tests (node:test)
-    └── sync.test.mjs           # GitSync tests (bare-repo fixture)
+│   └── relay.mjs               # CLI: relay init | status | distill | broadcast-skill
+├── scripts/
+│   ├── setup.ps1               # one-shot per-machine install/uninstall (Windows)
+│   └── test-e2e.mjs            # 21 e2e tests — hook pipeline without real Claude session
+├── tests/                      # 48 unit tests (node:test)
+│   ├── stop.test.mjs           # watermark, shouldDistill, trigger-lock
+│   ├── sync.test.mjs           # GitSync — pull, push, lock (bare-repo fixture)
+│   └── ...                     # session-start, distiller, relay-init, broadcast-skill
+└── commands/
+    └── relay-handoff.toml      # /relay-handoff slash command
 ```
 
 ## Plugin registration (non-obvious — read before touching hooks)
@@ -64,7 +70,20 @@ Junction into `~/.claude/plugins/relay` is NOT sufficient. Claude Code only fire
 }
 ```
 
-`scripts/setup.ps1` (TODO) will automate this. Until then, patch settings.json manually per machine.
+**`scripts/setup.ps1` automates this.** Run from the relay repo root:
+
+```powershell
+# Install (creates junction + patches settings.json + inits target repo)
+powershell -ExecutionPolicy Bypass -File scripts/setup.ps1 -TargetRepo "C:\path\to\your-project" -RunTests
+
+# Uninstall
+powershell -ExecutionPolicy Bypass -File scripts/setup.ps1 -Uninstall
+
+# Preview without changes
+powershell -ExecutionPolicy Bypass -File scripts/setup.ps1 -WhatIf
+```
+
+PS 5.1 gotchas found during testing: `Get-Item .Target` on junctions returns `String[]` not `String`; `Remove-Item -Force` throws on junctions — fixed in setup.ps1 with `[System.Array]` unwrap and `cmd /c rmdir`.
 
 ## Non-obvious conventions
 
@@ -120,11 +139,18 @@ Plugin dev (when Chunks 1+ land): will be installed via `claude /plugins add` or
 
 See plan Section 12. Briefly: cloud sync backend, dashboard UI, MCP RAG server, permissions/auth, Cursor/Windsurf support, real-time per-turn sync, CRDT merge strategies. All designed-for (`RelaySync` interface is pluggable) but not for the 48h build.
 
-## If Chunk 1 (distiller) fails its exit criteria
+## Running tests
 
-In priority order:
-1. Iterate the prompt — most failures are fixable here.
-2. Switch model to Opus 4.7 if Sonnet 4.6 is weak on hygiene.
-3. Pivot to handoff-only mode — ship without auto-distiller; `/relay-handoff` becomes the only write path. Less magic, still shippable, still demoable.
+```bash
+# Unit tests (48 tests, ~8s)
+node --test tests/*.test.mjs
 
-Do NOT start Chunk 2 until one of these passes.
+# E2E smoke tests (21 tests, ~5s, no Claude API needed)
+node scripts/test-e2e.mjs
+
+# Filter to one group
+node scripts/test-e2e.mjs --only stop
+
+# Verbose output on failure
+node scripts/test-e2e.mjs --verbose
+```

@@ -70,15 +70,28 @@ relay broadcast-skill <file>          # share a skill file with all teammates
 /relay-handoff                        # slash command: write a handoff note and push
 ```
 
-## Dev install (local symlink)
+## Dev install (local)
+
+**Windows — automated (recommended):**
+
+```powershell
+# From the relay repo root
+powershell -ExecutionPolicy Bypass -File scripts/setup.ps1 -TargetRepo "C:\path\to\your-project" -RunTests
+```
+
+Creates the junction, patches `~/.claude/settings.json`, runs `relay init` in your target repo, and verifies with the e2e smoke test. Idempotent. Run again on a new machine; use `-Uninstall` to remove.
+
+**Manual (Windows / macOS / Linux):**
 
 ```bash
-# Windows (run as admin, PowerShell)
+# Windows (PowerShell)
 New-Item -ItemType Junction -Path "$env:USERPROFILE\.claude\plugins\relay" -Target (Get-Location).Path
 
 # macOS / Linux
 ln -s "$(pwd)" ~/.claude/plugins/relay
 ```
+
+Then add hooks to `~/.claude/settings.json` — see [Plugin registration](https://ssm-08.github.io/relay/) in the docs.
 
 ## Repo layout
 
@@ -97,6 +110,9 @@ ln -s "$(pwd)" ~/.claude/plugins/relay
 │   └── filter.mjs                  # pre-filters transcripts before calling AI
 ├── distiller.mjs                   # background process that rewrites memory.md
 ├── prompts/distill.md              # the prompt that drives distillation
+├── scripts/
+│   ├── setup.ps1                   # one-shot Windows install/uninstall
+│   └── test-e2e.mjs                # 21 e2e tests — no live Claude session needed
 └── docs-site/                      # full documentation (Astro Starlight)
 ```
 
