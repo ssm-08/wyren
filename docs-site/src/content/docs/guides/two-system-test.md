@@ -218,3 +218,5 @@ sleep 30 && cat .relay/memory.md
 | Push rejected | `git remote -v` — is remote configured? Does auth work? |
 | Plugin hooks not firing | `ls ~/.claude/plugins/relay/hooks/hooks.json` — junction intact? |
 | `claude -p` fails | Run `claude -p --bare "hello"` manually to check auth |
+| Memory not on System B after distill | Distiller's auto-push may have been interrupted — run `git push` manually on System A, then `git pull` on System B |
+| Random cmd window flashing during distillation | Pull latest relay source — fixed in `distiller.mjs` with `windowsHide: true` |

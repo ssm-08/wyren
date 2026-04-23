@@ -301,8 +301,10 @@ function Invoke-TargetInit {
     if ($WhatIf) { Write-Skip "[WhatIf] Would run: node bin/relay.mjs init in $abs"; return }
 
     $relayMjs = Join-Path $RelayRoot 'bin\relay.mjs'
+    Push-Location $abs
     $r = & node $relayMjs init 2>&1
     $exitCode = $LASTEXITCODE
+    Pop-Location
     Write-Host "  $r"
     if ($exitCode -ne 0) { Write-Warn "relay init exited $exitCode" }
     else { Write-Ok "relay init complete." }
