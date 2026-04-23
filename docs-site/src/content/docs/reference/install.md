@@ -1,29 +1,61 @@
 ---
 title: Install
-description: Five commands. Two minutes. One shared brain.
+description: One-liner install. Two minutes. One shared brain.
 ---
 
 ## Prerequisites
 
 - Claude Code installed on every teammate's machine.
 - Git remote for the target repo (GitHub, GitLab, or self-hosted — any works).
-- Node.js 20+ (bundled with recent Claude Code installs).
+- Node.js 20+ and Git on PATH (bundled with recent Claude Code installs).
 
 ## Step 1 — Install the plugin
 
-Every teammate runs once:
+Every teammate runs once on their machine:
+
+**macOS / Linux:**
 
 ```bash
-claude /plugins add https://github.com/ssm-08/relay
+curl -fsSL https://raw.githubusercontent.com/ssm-08/relay/master/install.sh | sh
 ```
 
-This installs `~/.claude/plugins/relay/` and registers the `SessionStart` + `Stop` hooks automatically.
+**Windows (PowerShell):**
 
-Verify:
+```powershell
+iwr -useb https://raw.githubusercontent.com/ssm-08/relay/master/install.ps1 | iex
+```
+
+This clones Relay to `~/.claude/relay/`, creates a plugin link, and patches `~/.claude/settings.json` with the `SessionStart` and `Stop` hooks.
+
+:::note
+The installer preserves any existing entries in `settings.json`. It backs up your file before writing.
+:::
+
+### Developer / local install
+
+If you already have the repo cloned (e.g. you're contributing to Relay), pass `--from-local`:
 
 ```bash
-claude /plugins list
-# should show: relay v0.1.0
+# macOS / Linux — from the relay repo root
+./install.sh --from-local .
+
+# Windows
+.\install.ps1 --from-local .
+
+# Or directly via Node (any OS):
+node scripts/installer.mjs install --from-local .
+```
+
+### Testing without touching your real `~/.claude/`
+
+```bash
+# macOS / Linux
+node scripts/installer.mjs install --from-local . --home /tmp/fake-home
+node scripts/installer.mjs doctor --home /tmp/fake-home
+node scripts/installer.mjs uninstall --home /tmp/fake-home
+
+# Windows
+node scripts/installer.mjs install --from-local . --home "$env:TEMP\fake-home"
 ```
 
 ## Step 2 — Initialize the repo
@@ -34,8 +66,6 @@ One teammate, once per repo:
 cd <your-repo>
 relay init
 ```
-
-_`relay` is the CLI alias. After `/plugins add`, the binary is at `~/.claude/plugins/relay/bin/relay.mjs`. If that path isn't on your `$PATH`, use the full path — e.g. `node ~/.claude/plugins/relay/bin/relay.mjs init`. Or set up an alias (see [Dev install](#dev-install) below)._
 
 This creates:
 
@@ -68,57 +98,49 @@ git push
 git pull
 ```
 
-That's it. Next time anyone opens Claude Code in this repo, `SessionStart` hook kicks in automatically. Memory injects, background distillation begins, git syncs the results.
+That's it. Next time anyone opens Claude Code in this repo, the `SessionStart` hook kicks in automatically. Memory injects, background distillation begins, and git syncs the results.
 
 ## Verifying the install
+
+```bash
+relay doctor
+```
+
+Expected output when everything is wired correctly:
+
+```
+[relay] doctor: all checks passed
+```
+
+Or check full state:
 
 ```bash
 relay status
 ```
 
-Example output:
-
-```
-Memory:     .relay/memory.md  (1.2 KB, 23 lines)
-Distilled:  2026-04-22T14:30:00.000Z (4 min ago)
-Last UUID:  7a2e-...
-Watermark:  turns_since_distill=2, distiller_running=false
-Transcript: /Users/alice/.claude/projects/.../7a2e.jsonl
-Remote:     origin → https://github.com/team/project.git
-Lock:       not held
-```
-
-## Dev install
-
-If you're iterating on the plugin locally (or just want `relay` on your `$PATH` for shell convenience), symlink the checkout into the plugins directory:
+## Updating
 
 ```bash
-# Windows (PowerShell, run as Admin)
-New-Item -ItemType Junction `
-  -Path "$env:USERPROFILE\.claude\plugins\relay" `
-  -Target (Get-Location).Path
-
-# macOS / Linux
-ln -s "$(pwd)" ~/.claude/plugins/relay
+relay update
 ```
 
-Then add an alias (optional):
+Pulls the latest Relay from GitHub, re-patches `settings.json` if the hook shape changed, and verifies the install.
+
+## Uninstalling
+
+From the machine:
 
 ```bash
-# bash/zsh
-alias relay='node ~/.claude/plugins/relay/bin/relay.mjs'
-
-# PowerShell
-Set-Alias relay "$env:USERPROFILE\.claude\plugins\relay\bin\relay.mjs"
+relay uninstall
 ```
 
-## Uninstall
+This removes the plugin link and strips Relay's entries from `settings.json`. Your `~/.claude/relay/` clone is preserved (faster reinstall). To also delete the clone:
 
-```
-/plugins remove relay
+```bash
+relay uninstall && rm -rf ~/.claude/relay
 ```
 
-In a repo you want to stop tracking:
+From a repo you want to stop tracking:
 
 ```bash
 rm -rf .relay
@@ -132,9 +154,29 @@ git commit -am "remove Relay"
 |---|---|---|
 | `RELAY_SKIP_PULL` | unset | If set, `GitSync.pull()` returns immediately. Use for offline/local-only demos or slow-network environments. |
 | `CLAUDE_PLUGIN_ROOT` | set by Claude Code | Where the hook dispatcher looks up `distiller.mjs`. Don't set this yourself. |
-
-Other env vars from early drafts (`RELAY_MODEL`, `RELAY_DISABLE`, `RELAY_TURN_THRESHOLD`, etc.) are not wired up — see [CLI reference → Not yet implemented](/reference/cli/#not-yet-implemented).
+| `RELAY_HOME` | `~/.claude/` | Override the Relay home directory (useful for testing). Takes precedence over `CLAUDE_HOME`. |
+| `CLAUDE_HOME` | `~/.claude/` | Alternative home override. Used when `RELAY_HOME` is not set. |
 
 ## Troubleshooting
 
 See [FAQ](/faq/) for common issues.
+
+### `relay` command not found
+
+Add an alias:
+
+```bash
+# bash/zsh
+alias relay='node ~/.claude/relay/bin/relay.mjs'
+
+# PowerShell
+Set-Alias relay "$env:USERPROFILE\.claude\relay\bin\relay.mjs"
+```
+
+### settings.json comments were removed
+
+The installer writes clean JSON. If you had hand-written comments in `settings.json`, they were stripped on install. A timestamped backup was created at `~/.claude/settings.json.relay-backup-<timestamp>`.
+
+### macOS: "Command Line Tools" dialog on first install
+
+Click "Install" and re-run `install.sh` — this only happens once.

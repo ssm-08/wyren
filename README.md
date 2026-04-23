@@ -42,21 +42,29 @@ tail -f .relay/log
 
 ## Install
 
+**macOS / Linux:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ssm-08/relay/master/install.sh | sh
 ```
-/plugins add ssm-08/relay
+
+**Windows (PowerShell):**
+
+```powershell
+iwr -useb https://raw.githubusercontent.com/ssm-08/relay/master/install.ps1 | iex
 ```
+
+Clones Relay to `~/.claude/relay/`, wires the hooks. Idempotent — safe to re-run.
 
 ## Init (per repo, once)
 
 ```bash
 cd your-project
 relay init
-git add .relay/memory.md
+git add .relay .gitignore
 git commit -m "chore: init relay"
 git push
 ```
-
-_`relay` is the CLI alias — set it up via Dev install below._
 
 Teammates just need the plugin installed. They don't run `init` again.
 
@@ -66,32 +74,30 @@ Teammates just need the plugin installed. They don't run `init` again.
 relay status                          # memory size, last distillation, sync state
 relay distill [--force] [--push]      # run distillation manually
 relay broadcast-skill <file>          # share a skill file with all teammates
+relay update                          # pull latest Relay from GitHub
+relay uninstall                       # remove hooks from this machine
+relay doctor                          # verify install is working
 
 /relay-handoff                        # slash command: write a handoff note and push
 ```
 
-## Dev install (local)
-
-**Windows — automated (recommended):**
-
-```powershell
-# From the relay repo root
-powershell -ExecutionPolicy Bypass -File scripts/setup.ps1 -TargetRepo "C:\path\to\your-project" -RunTests
-```
-
-Creates the junction, patches `~/.claude/settings.json`, runs `relay init` in your target repo, and verifies with the e2e smoke test. Idempotent. Run again on a new machine; use `-Uninstall` to remove.
-
-**Manual (Windows / macOS / Linux):**
+## Dev install (from local clone)
 
 ```bash
-# Windows (PowerShell)
-New-Item -ItemType Junction -Path "$env:USERPROFILE\.claude\plugins\relay" -Target (Get-Location).Path
+# macOS / Linux — from the relay repo root
+./install.sh --from-local .
 
-# macOS / Linux
-ln -s "$(pwd)" ~/.claude/plugins/relay
+# Windows
+.\install.ps1 --from-local .
 ```
 
-Then add hooks to `~/.claude/settings.json` — see [Plugin registration](https://ssm-08.github.io/relay/) in the docs.
+Test without touching your real `~/.claude/`:
+
+```bash
+node scripts/installer.mjs install --from-local . --home /tmp/fake-home
+node scripts/installer.mjs doctor --home /tmp/fake-home
+node scripts/installer.mjs uninstall --home /tmp/fake-home
+```
 
 ## Repo layout
 
@@ -102,7 +108,9 @@ Then add hooks to `~/.claude/settings.json` — see [Plugin registration](https:
 │   └── stop.mjs                    # triggers distiller after N turns
 ├── commands/
 │   └── relay-handoff.toml          # /relay-handoff slash command
-├── bin/relay.mjs                   # CLI: init | status | distill | broadcast-skill
+├── bin/relay.mjs                   # CLI: init | status | distill | install | update | ...
+├── install.sh                      # macOS/Linux one-liner installer
+├── install.ps1                     # Windows one-liner installer
 ├── lib/
 │   ├── sync.mjs                    # git pull / push / lock
 │   ├── transcript.mjs              # reads and slices session transcripts
@@ -111,8 +119,9 @@ Then add hooks to `~/.claude/settings.json` — see [Plugin registration](https:
 ├── distiller.mjs                   # background process that rewrites memory.md
 ├── prompts/distill.md              # the prompt that drives distillation
 ├── scripts/
-│   ├── setup.ps1                   # one-shot Windows install/uninstall
-│   └── test-e2e.mjs                # 21 e2e tests — no live Claude session needed
+│   ├── installer.mjs               # cross-platform install/update/uninstall/doctor logic
+│   ├── setup.ps1                   # deprecated stub — forwards to install.ps1
+│   └── test-e2e.mjs                # e2e tests — no live Claude session needed
 └── docs-site/                      # full documentation (Astro Starlight)
 ```
 
