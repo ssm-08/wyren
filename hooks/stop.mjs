@@ -10,7 +10,7 @@ const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 const TURNS_THRESHOLD = 5;
 const IDLE_MS = 2 * 60 * 1000;
 
-function writeWatermarkAtomic(watermarkPath, state) {
+export function writeWatermarkAtomic(watermarkPath, state) {
   const tmp = `${watermarkPath}.${process.pid}.${Date.now()}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(state, null, 2));
   fs.renameSync(tmp, watermarkPath);

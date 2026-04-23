@@ -101,7 +101,7 @@ You can still use `CLAUDE.md` alongside Relay. They compose cleanly. Relay's bro
 
 1. **Distiller needs signal to work.** Pure research sessions (read, read, read) produce almost nothing in memory. That's intentional — noise is worse than nothing.
 2. **Resolved-but-unmentioned workarounds linger.** Fix: say it's fixed, or hand-edit.
-3. **Real-time sync is session-boundary, not per-turn.** Two teammates working simultaneously won't see each other's decisions until the next SessionStart cycle.
+3. **Mid-session sync has one-prompt lag.** The `UserPromptSubmit` hook pulls A's latest memory and injects the delta at the start of each of B's turns. B doesn't need to restart — the update arrives on B's next message after A's distiller pushes. Typical lag: a few seconds to one full turn.
 4. **`claude -p` required for zero-billing path.** Otherwise set `ANTHROPIC_API_KEY`.
 
 ## Where do I report bugs?
