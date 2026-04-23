@@ -259,13 +259,20 @@ if (isMain(import.meta.url)) {
     } finally {
       release();
     }
+  } else if (command === 'install' || command === 'update' || command === 'uninstall' || command === 'doctor') {
+    const { main: installerMain } = await import('../scripts/installer.mjs');
+    await installerMain([command, ...rest]);
   } else {
     console.error(
       `Usage: relay <command>\n\nCommands:\n` +
       `  init              Initialize relay in current repository\n` +
       `  status            Show memory, watermark, and sync state\n` +
       `  distill           Run distiller manually [--transcript <path>] [--force] [--dry-run] [--push]\n` +
-      `  broadcast-skill   Broadcast a skill file to all teammates [<file>]`
+      `  broadcast-skill   Broadcast a skill file to all teammates [<file>]\n` +
+      `  install           Install relay hooks on this machine [--from-local <path>] [--home <path>]\n` +
+      `  update            Update relay to latest version\n` +
+      `  uninstall         Remove relay hooks from this machine [--yes]\n` +
+      `  doctor            Verify relay install is working correctly`
     );
     process.exit(1);
   }

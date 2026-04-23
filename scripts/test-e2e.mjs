@@ -604,6 +604,180 @@ test('G21: large transcript — distiller --dry-run handles 200 turns without OO
 });
 
 // ---------------------------------------------------------------------------
+// Group H — Installer
+// ---------------------------------------------------------------------------
+
+function makeHomeDirs(base) {
+  // Create a fake ~/.claude structure under base
+  fs.mkdirSync(path.join(base, 'plugins'), { recursive: true });
+  return base;
+}
+
+function readInstallerSettings(fakeHome) {
+  const p = path.join(fakeHome, 'settings.json');
+  if (!fs.existsSync(p)) return {};
+  return JSON.parse(fs.readFileSync(p, 'utf8'));
+}
+
+function countRelayHooks(settings, event) {
+  const entries = (settings.hooks || {})[event];
+  if (!Array.isArray(entries)) return 0;
+  return entries.filter((e) =>
+    e && e.hooks && e.hooks.some((h) => h.command && h.command.includes('run-hook.cmd'))
+  ).length;
+}
+
+test('H1: fresh install into fake HOME creates link + settings', async (dir) => {
+  const fakeHome = makeHomeDirs(path.join(dir, 'fake-home'));
+  const r = runNode([
+    path.join(RELAY_ROOT, 'scripts', 'installer.mjs'),
+    'install',
+    '--from-local', RELAY_ROOT,
+    '--home', fakeHome,
+  ]);
+  assert(r.status === 0, `exit ${r.status}: ${r.stderr.slice(0, 400)}`);
+
+  // Plugin link exists
+  const pluginPath = path.join(fakeHome, 'plugins', 'relay');
+  const stat = fs.lstatSync(pluginPath);
+  assert(stat.isDirectory() || stat.isSymbolicLink(), 'plugin link/junction should exist');
+
+  // settings.json has exactly one Relay entry per event
+  const settings = readInstallerSettings(fakeHome);
+  assert(countRelayHooks(settings, 'SessionStart') === 1, 'Should have 1 SessionStart hook');
+  assert(countRelayHooks(settings, 'Stop') === 1, 'Should have 1 Stop hook');
+
+  // Command uses ${CLAUDE_PLUGIN_ROOT}
+  const cmd = settings.hooks.SessionStart[0].hooks[0].command;
+  assert(cmd.includes('${CLAUDE_PLUGIN_ROOT}'), `Command should use CLAUDE_PLUGIN_ROOT: ${cmd}`);
+});
+
+test('H2: idempotent re-install — no duplicate entries', async (dir) => {
+  const fakeHome = makeHomeDirs(path.join(dir, 'fake-home'));
+  const args = [
+    path.join(RELAY_ROOT, 'scripts', 'installer.mjs'),
+    'install',
+    '--from-local', RELAY_ROOT,
+    '--home', fakeHome,
+  ];
+  const r1 = runNode(args);
+  assert(r1.status === 0, `first install: exit ${r1.status}: ${r1.stderr.slice(0, 400)}`);
+
+  const r2 = runNode(args);
+  assert(r2.status === 0, `second install: exit ${r2.status}: ${r2.stderr.slice(0, 400)}`);
+
+  const settings = readInstallerSettings(fakeHome);
+  assert(countRelayHooks(settings, 'SessionStart') === 1, 'Still exactly 1 SessionStart hook');
+  assert(countRelayHooks(settings, 'Stop') === 1, 'Still exactly 1 Stop hook');
+});
+
+test('H3: uninstall removes link + relay settings entries, foreign entries kept', async (dir) => {
+  const fakeHome = makeHomeDirs(path.join(dir, 'fake-home'));
+
+  // Seed a foreign hook entry
+  const foreignEntry = { matcher: 'src/**', hooks: [{ type: 'command', command: 'echo foreign' }] };
+  const initialSettings = { hooks: { SessionStart: [foreignEntry] } };
+  fs.writeFileSync(path.join(fakeHome, 'settings.json'), JSON.stringify(initialSettings, null, 2), 'utf8');
+
+  // Install
+  runNode([
+    path.join(RELAY_ROOT, 'scripts', 'installer.mjs'),
+    'install', '--from-local', RELAY_ROOT, '--home', fakeHome,
+  ]);
+
+  // Uninstall
+  const r = runNode([
+    path.join(RELAY_ROOT, 'scripts', 'installer.mjs'),
+    'uninstall', '--home', fakeHome,
+  ]);
+  assert(r.status === 0, `uninstall exit ${r.status}: ${r.stderr.slice(0, 400)}`);
+
+  // Plugin link removed
+  const pluginPath = path.join(fakeHome, 'plugins', 'relay');
+  assert(!fs.existsSync(pluginPath), 'Plugin link should be removed');
+
+  // Foreign entry preserved, relay entries gone
+  const settings = readInstallerSettings(fakeHome);
+  assert(countRelayHooks(settings, 'SessionStart') === 0, 'Relay SessionStart should be removed');
+  const sessionEntries = (settings.hooks || {}).SessionStart || [];
+  assert(sessionEntries.some((e) => e.hooks && e.hooks[0].command === 'echo foreign'),
+    'Foreign entry should be preserved');
+});
+
+test('H4: migrate-from-setup.ps1 — old absolute-path hook replaced with canonical form', async (dir) => {
+  const fakeHome = makeHomeDirs(path.join(dir, 'fake-home'));
+
+  // Seed settings.json with setup.ps1-style absolute-path hook
+  const oldWindowsHook = {
+    matcher: '',
+    hooks: [{
+      type: 'command',
+      command: `"C:\\Users\\shree\\Documents\\Vibejam\\hooks\\run-hook.cmd" session-start`,
+      timeout: 2,
+      statusMessage: 'Loading relay memory...',
+    }],
+  };
+  const oldSettings = { hooks: { SessionStart: [oldWindowsHook], Stop: [] } };
+  fs.writeFileSync(path.join(fakeHome, 'settings.json'), JSON.stringify(oldSettings, null, 2), 'utf8');
+
+  // Install
+  const r = runNode([
+    path.join(RELAY_ROOT, 'scripts', 'installer.mjs'),
+    'install', '--from-local', RELAY_ROOT, '--home', fakeHome,
+  ]);
+  assert(r.status === 0, `exit ${r.status}: ${r.stderr.slice(0, 400)}`);
+
+  // Should have exactly 1 canonical entry (no duplicate)
+  const settings = readInstallerSettings(fakeHome);
+  assert(countRelayHooks(settings, 'SessionStart') === 1, 'Exactly 1 SessionStart hook after migration');
+  const cmd = settings.hooks.SessionStart[0].hooks[0].command;
+  assert(cmd.includes('${CLAUDE_PLUGIN_ROOT}'), `Should use canonical form: ${cmd}`);
+  assert(!cmd.includes('C:\\\\Users'), 'Should not have old absolute path');
+});
+
+test('H5: relay doctor on broken install exits non-zero and names the issue', async (dir) => {
+  const fakeHome = makeHomeDirs(path.join(dir, 'fake-home'));
+
+  // Install first
+  runNode([
+    path.join(RELAY_ROOT, 'scripts', 'installer.mjs'),
+    'install', '--from-local', RELAY_ROOT, '--home', fakeHome,
+  ]);
+
+  // Manually break the install by removing the plugin link
+  const pluginPath = path.join(fakeHome, 'plugins', 'relay');
+  try {
+    if (process.platform === 'win32') {
+      // Junction removal
+      const { spawnSync } = await import('node:child_process');
+      spawnSync('cmd', ['/c', 'rmdir', '/q', pluginPath], { shell: false });
+    } else {
+      fs.unlinkSync(pluginPath);
+    }
+  } catch {}
+
+  const r = runNode([
+    path.join(RELAY_ROOT, 'scripts', 'installer.mjs'),
+    'doctor', '--home', fakeHome,
+  ]);
+  assert(r.status !== 0, 'Doctor should exit non-zero on broken install');
+  assertIncludes(r.stdout, 'issue', 'Should report issues in stdout');
+});
+
+test('H6: --from-local with non-relay directory bails with actionable error', async (dir) => {
+  const fakeHome = makeHomeDirs(path.join(dir, 'fake-home'));
+  const notRelay = path.join(dir, 'not-a-relay-dir');
+  fs.mkdirSync(notRelay);
+
+  const r = runNode([
+    path.join(RELAY_ROOT, 'scripts', 'installer.mjs'),
+    'install', '--from-local', notRelay, '--home', fakeHome,
+  ]);
+  assert(r.status !== 0, 'Should fail for invalid relay checkout');
+  assertIncludes(r.stderr, 'Not a valid Relay checkout', 'Should name the problem');
+});
+
+// ---------------------------------------------------------------------------
 // Run
 // ---------------------------------------------------------------------------
 run();
