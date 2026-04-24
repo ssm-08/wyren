@@ -175,13 +175,19 @@ export function resolveRepoDir({ fromLocal, clone, force }) {
 // Symlink / junction
 // --------------------------------------------------------------------------
 
+// Strip Windows path prefixes from readlinkSync output:
+// \\?\ = Win32 extended path prefix
+// \??\ = NT namespace prefix (returned on Windows Server / older Node builds)
+function stripWinPathPrefix(target) {
+  return target.replace(/^(?:\\\\[?]|\\[?][?])\\/, '');
+}
+
 export function inspectLink(p) {
   try {
     const stat = fs.lstatSync(p);
     if (stat.isSymbolicLink()) {
       let target = fs.readlinkSync(p);
-      // Strip Windows extended-path prefix \\?\
-      target = target.replace(/^\\\\\?\\/, '');
+      target = stripWinPathPrefix(target);
       return { kind: 'symlink', target };
     }
     if (stat.isDirectory()) {
@@ -189,7 +195,7 @@ export function inspectLink(p) {
       // Try readlink; if it succeeds it's a reparse point
       try {
         let target = fs.readlinkSync(p);
-        target = target.replace(/^\\\\\?\\/, '');
+        target = stripWinPathPrefix(target);
         return { kind: 'junction', target };
       } catch {
         return { kind: 'dir', target: null };
