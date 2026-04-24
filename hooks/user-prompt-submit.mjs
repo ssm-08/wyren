@@ -116,7 +116,7 @@ async function main() {
 
     // Pull latest memory from remote with tight timeout (stay within 2s hook budget)
     try {
-      new GitSync().pull(cwd, { fetchTimeoutMs: 1000, checkoutTimeoutMs: 500 });
+      new GitSync().pull(cwd, { fetchTimeoutMs: 1500, checkoutTimeoutMs: 500 });
     } catch (e) {
       appendLog(cwd, `pull failed: ${e.message}`);
       // Fail-open: proceed with whatever is on disk

@@ -275,7 +275,7 @@ function buildHookEntries(repoDir) {
     },
     UserPromptSubmit: {
       matcher: '',
-      hooks: [{ type: 'command', command: `${q} user-prompt-submit`, timeout: 2 }],
+      hooks: [{ type: 'command', command: `${q} user-prompt-submit`, timeout: 3 }],
     },
   };
 }
