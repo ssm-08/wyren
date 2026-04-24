@@ -534,8 +534,19 @@ export function uninstall(opts) {
       writeSettingsAtomic(paths.settings, patched);
       r.ok(`Removed relay entries from settings.json`);
     }
+
+    // Deregister global CLI — fail-open, relay may not have been globally installed
+    const [npmExe, npmArgs] = process.platform === 'win32'
+      ? ['cmd', ['/c', 'npm', 'uninstall', '-g', 'relay']]
+      : ['npm', ['uninstall', '-g', 'relay']];
+    const npmResult = spawnSync(npmExe, npmArgs, { encoding: 'utf8', windowsHide: true, timeout: 15_000 });
+    if (!npmResult.error && npmResult.status === 0) {
+      r.ok('relay CLI deregistered from global PATH');
+    } else {
+      r.warn('Could not deregister relay CLI globally — remove manually: npm uninstall -g relay');
+    }
   } else {
-    r.ok('[dry-run] would remove link + strip settings entries');
+    r.ok('[dry-run] would remove link + strip settings entries + npm uninstall -g relay');
   }
 }
 
