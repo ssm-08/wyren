@@ -3,7 +3,7 @@ title: Hook contracts
 description: SessionStart and Stop hook payloads, responses, and expected behavior.
 ---
 
-Relay uses two Claude Code hooks. Contracts are pinned here so they can be mocked for tests and understood independently from the implementation.
+Relay uses three Claude Code hooks. Contracts are pinned here so they can be mocked for tests and understood independently from the implementation.
 
 ## SessionStart
 
@@ -86,6 +86,61 @@ None required. Hook emits no JSON unless it wants to block the turn (Relay never
 ### Failure mode
 
 `process.exit(0)`. Next Stop will try again.
+
+## UserPromptSubmit
+
+Fires before each user message is sent to the model — the live sync hook.
+
+### Input (stdin JSON)
+
+```json
+{
+  "session_id": "7a2e-…",
+  "transcript_path": "...",
+  "cwd": "...",
+  "hook_event_name": "UserPromptSubmit"
+}
+```
+
+### Output (stdout JSON)
+
+```json
+{
+  "hookSpecificOutput": {
+    "hookEventName": "UserPromptSubmit",
+    "additionalContext": "# Relay live update\n\n## New section from teammate\n..."
+  }
+}
+```
+
+Only emitted when the diff detects new content. If nothing changed, the hook exits silently with no output.
+
+### Behavior
+
+1. Pull `.relay/memory.md` from the remote (1s fetch cap). Skipped when `RELAY_SKIP_PULL=1`; diff still runs from disk.
+2. Compare the current file against the stored snapshot hash in `.relay/state/ups-state.json`.
+3. If content has changed, compute a section-aware delta (new or modified sections only).
+4. Inject the delta as `additionalContext` so the model receives it before processing the user's prompt.
+5. Update the snapshot and pull timestamp in `ups-state.json`.
+
+### State files
+
+| File | Owner | Purpose |
+|---|---|---|
+| `.relay/state/ups-state.json` | UserPromptSubmit hook (exclusively) | Snapshot hash + last-pull timestamp |
+| `.relay/state/last-injected-memory.md` | UserPromptSubmit hook | Full text of the last memory snapshot used for diffing |
+
+`ups-state.json` is owned exclusively by this hook — the Stop hook does not touch it. This avoids the watermark race that was found and fixed during fault injection testing.
+
+### Timing
+
+- Target: under 200ms on cache hits (local disk diff only).
+- Pull adds ~300–800ms on a fast network; capped at 1s to stay well within Claude Code's hook timeout.
+- Set `RELAY_SKIP_PULL=1` to skip the network call entirely (e.g., when working offline or in a flaky-network environment).
+
+### Failure mode
+
+`process.exit(0)` on any error. Hook is fail-open — a pull timeout or missing state file never blocks the user's prompt.
 
 ## Why not Stop for injection?
 

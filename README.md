@@ -30,6 +30,8 @@ Relay keeps a shared file in your git repo: `.relay/memory.md`. Every session re
 
 **Writing** — while you work, Relay watches your conversation in the background. After every few turns it pulls out what matters — decisions made, approaches that didn't pan out, temporary hacks — rewrites the file, and pushes it to git. You never notice it happening.
 
+**Live sync** — if a teammate pushes new memory while your session is already open, Relay picks it up automatically. Before each prompt you send, it checks for updates and injects only the new sections into Claude's context. No restart needed.
+
 The file is plain text. Read or edit it any time:
 ```bash
 cat .relay/memory.md
@@ -105,7 +107,8 @@ node scripts/installer.mjs uninstall --home /tmp/fake-home
 ├── .claude-plugin/plugin.json      # plugin manifest
 ├── hooks/
 │   ├── session-start.mjs           # reads memory + broadcast, injects as context
-│   └── stop.mjs                    # triggers distiller after N turns
+│   ├── stop.mjs                    # triggers distiller after N turns
+│   └── user-prompt-submit.mjs      # live sync: pulls memory, diffs, injects delta per prompt
 ├── commands/
 │   └── relay-handoff.toml          # /relay-handoff slash command
 ├── bin/relay.mjs                   # CLI: init | status | distill | install | update | ...
@@ -115,7 +118,8 @@ node scripts/installer.mjs uninstall --home /tmp/fake-home
 │   ├── sync.mjs                    # git pull / push / lock
 │   ├── transcript.mjs              # reads and slices session transcripts
 │   ├── memory.mjs                  # reads and writes memory.md
-│   └── filter.mjs                  # pre-filters transcripts before calling AI
+│   ├── filter.mjs                  # pre-filters transcripts before calling AI
+│   └── diff-memory.mjs             # section-aware diff + hash for live sync
 ├── distiller.mjs                   # background process that rewrites memory.md
 ├── prompts/distill.md              # the prompt that drives distillation
 ├── scripts/

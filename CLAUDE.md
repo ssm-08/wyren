@@ -21,7 +21,8 @@ Relay is a Claude Code plugin that gives a team shared memory across every teamm
 - **Scripts (2026-04-22):** ✅ `scripts/setup.ps1` + `scripts/test-e2e.mjs` shipped. 21 e2e tests across 7 groups (init, SessionStart, Stop, distiller, CLI, dispatcher, stress/concurrency). Full lifecycle verified.
 - **Live two-system test (2026-04-22):** ✅ verified end-to-end across two machines. Fixed: setup.ps1 cwd bug, windowsHide: true for distiller spawn.
 - **Deployability v1 (2026-04-23):** ✅ `install.sh` (macOS/Linux) + `install.ps1` (Windows) one-liner installers. `scripts/installer.mjs` — shared Node logic for install/update/uninstall/doctor (zero deps, JSONC-tolerant settings.json patch, atomic write, symlink/junction, verify). `relay install|update|uninstall|doctor` CLI subcommands. `setup.ps1` shrunk to deprecation stub. CI matrix: ubuntu unit + macos/windows e2e. Code review: 3 Important bugs caught + fixed.
-- **Live sync (2026-04-23):** ✅ `hooks/user-prompt-submit.mjs` — `UserPromptSubmit` hook pulls latest `.relay/memory.md` on each user turn (1.5s tight cap), computes section-aware delta against stored snapshot, injects only new content as `additionalContext`. B's running session auto-receives A's updates without restart. `lib/diff-memory.mjs` — pure diff/hash utilities. `writeWatermarkAtomic` exported from `stop.mjs`. `GitSync.pull` extended with configurable timeouts. **95 unit tests + 32 e2e = 127 total.**
+- **Live sync (2026-04-23):** ✅ `hooks/user-prompt-submit.mjs` — `UserPromptSubmit` hook pulls latest `.relay/memory.md` on each user turn (1s tight cap), computes section-aware delta against stored snapshot, injects only new content as `additionalContext`. B's running session auto-receives A's updates without restart. `lib/diff-memory.mjs` — pure diff/hash utilities. `writeWatermarkAtomic` exported from `stop.mjs`. `GitSync.pull` extended with configurable timeouts. UPS owns `.relay/state/ups-state.json` (snapshot + pull timestamp).
+- **Fault injection testing (2026-04-23):** ✅ `tests/fault-network.test.mjs`, `tests/fault-corruption.test.mjs`, `tests/fault-concurrency.test.mjs`, `tests/fault-e2e-livesync.test.mjs` — 53 fault tests covering network failure, corrupted state files, concurrent distiller races, and live-sync edge cases. Two bugs found and fixed: (1) EISDIR crash when `.relay/state/` exists as directory but `ups-state.json` missing; (2) watermark race — UPS now exclusively owns `ups-state.json` rather than sharing with Stop hook. `windowsHide: true` added to remaining `spawnSync` calls. **131 unit tests + 32 e2e = 163 total.**
 
 ## Repo layout
 
@@ -37,7 +38,7 @@ Vibejam/
 ├── install.sh                  # macOS/Linux one-liner installer shim
 ├── install.ps1                 # Windows one-liner installer shim
 ├── README.md
-├── .gitignore                  # excludes node_modules/, .claude/, .relay/state/, .relay/log, .worktrees/
+├── .gitignore                  # excludes node_modules/, .claude/, .relay/state/ (incl. ups-state.json), .relay/log, .worktrees/
 ├── CLAUDE.md                   # this file
 ├── package.json                # name/version/bin/scripts/engines (zero deps)
 ├── distiller.mjs               # Chunks 1+3: distiller CLI (Haiku 4.5 default, Tier 0 filter)
@@ -63,10 +64,14 @@ Vibejam/
 │   ├── installer.mjs           # cross-platform install/update/uninstall/doctor logic (Node, zero deps)
 │   ├── setup.ps1               # DEPRECATED stub — forwards to install.ps1
 │   └── test-e2e.mjs            # 27 e2e tests across 8 groups (A–H)
-├── tests/                      # 95 unit tests (node:test)
+├── tests/                      # 131 unit tests (node:test)
 │   ├── installer.test.mjs      # installer pure-function tests (26)
 │   ├── diff-memory.test.mjs    # diff-memory pure-function tests (10)
 │   ├── user-prompt-submit.test.mjs  # UPS hook logic tests (6)
+│   ├── fault-network.test.mjs  # fault injection: network failures
+│   ├── fault-corruption.test.mjs   # fault injection: corrupted state files
+│   ├── fault-concurrency.test.mjs  # fault injection: concurrent distiller races
+│   ├── fault-e2e-livesync.test.mjs # fault injection: live-sync edge cases
 │   ├── stop.test.mjs           # watermark, shouldDistill, trigger-lock
 │   ├── sync.test.mjs           # GitSync — pull, push, lock (bare-repo fixture)
 │   └── ...                     # session-start, distiller, relay-init, broadcast-skill
@@ -145,7 +150,7 @@ npm run build        # static HTML in dist/
 
 Plugin tests:
 ```bash
-npm test             # 95 unit tests (~15s)
+npm test             # 131 unit tests (~15s)
 npm run test:e2e     # 32 e2e tests (~25s, no Claude API needed)
 node scripts/test-e2e.mjs --only stop   # filter to one group
 node scripts/test-e2e.mjs --verbose     # dump stdout/stderr on failure

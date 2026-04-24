@@ -17,6 +17,7 @@ import { Badge } from '@astrojs/starlight/components';
 | [5](/roadmap/5-broadcast/) | 32-44 | Broadcast + polish + demo | <Badge text="Shipped" variant="success" /> |
 | — | 44-48 | Buffer, demo rehearsal, fallback video | <Badge text="Shipped" variant="success" /> |
 | [Post-ship](/roadmap/overview/#post-ship--deployability-v1) | 2026-04-23 | Cross-platform installer | <Badge text="Shipped" variant="success" /> |
+| [Post-ship](/roadmap/overview/#post-ship--live-sync--fault-hardening) | 2026-04-23 | Live sync + fault hardening | <Badge text="Shipped" variant="success" /> |
 
 ## Sequencing rules
 
@@ -90,3 +91,17 @@ New CLI subcommands: `relay install`, `relay update`, `relay uninstall`, `relay 
 Test totals after this work: **79 unit tests + 27 e2e tests = 106 total.**
 
 [Install guide →](/reference/install/)
+
+## Post-ship — Live sync + fault hardening (2026-04-23) ✅
+
+**Shipped.** B's running session now receives A's new memory automatically — no restart required.
+
+New files: `hooks/user-prompt-submit.mjs` (`UserPromptSubmit` hook — pulls `.relay/memory.md` on each user turn with a 1s fetch cap, diffs against a stored snapshot, injects only the delta as `additionalContext`), `lib/diff-memory.mjs` (pure section-aware diff + hash utilities, no deps).
+
+State file: `.relay/state/ups-state.json` — owned exclusively by the UPS hook (stores snapshot hash + last-pull timestamp). `RELAY_SKIP_PULL=1` skips the pull; diff still runs from disk.
+
+**Fault injection testing** caught two bugs before they reached users: (1) EISDIR crash when `.relay/state/` directory exists but `ups-state.json` is absent; (2) watermark race between Stop hook and UPS — resolved by giving each hook exclusive ownership of its own state file. `windowsHide: true` added to remaining `spawnSync` calls.
+
+New test files: `tests/fault-network.test.mjs`, `tests/fault-corruption.test.mjs`, `tests/fault-concurrency.test.mjs`, `tests/fault-e2e-livesync.test.mjs` (53 fault tests).
+
+Test totals after this work: **131 unit tests + 32 e2e tests = 163 total.**

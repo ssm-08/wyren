@@ -156,6 +156,12 @@ relay distill --push --force
 
 ---
 
+## Phase 5b — Live sync: A's updates reach B without restart
+
+Once both systems have active Claude Code sessions open in the shared repo, live sync kicks in automatically. After System A finishes a turn and the distiller pushes updated memory to git, System B's **next user prompt** triggers the `UserPromptSubmit` hook: it pulls the latest `.relay/memory.md` (1s cap), diffs it against the last-seen snapshot, and injects only the new sections as hidden `additionalContext`. System B should see a `Relay live update` block in its session context containing just the delta — no restart needed. To disable the pull while keeping the diff-based injection, set `RELAY_SKIP_PULL=1` in System B's environment.
+
+---
+
 ## Phase 7 — Receive memory on System B
 
 Pull the shared repo:
