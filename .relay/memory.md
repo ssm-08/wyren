@@ -10,6 +10,7 @@
 - Fault injection testing shipped: 4 new suites (fault-network, fault-corruption, fault-concurrency, fault-e2e-livesync), 53 new tests. Found and fixed 2 bugs: EISDIR crash in buildInjection (corrupted memory path), watermark race condition (UPS + Stop shared state file). [session 12e443d5, turn 36]
 - windowsHide:true on all spawnSync calls — prevents random cmd windows on Windows across distiller.mjs, hooks/stop.mjs, and all new hooks. [session 12e443d5, turn 36]
 - hooks/stop.mjs: shouldDistill validates distiller_running flag via PID liveness check (process.kill(pid, 0)) to prevent stuck state from OS kill; distiller_pid stored in watermark [session ee77f650, turn 8]
+- hooks/stop.mjs: TURNS_THRESHOLD (default 5) and IDLE_MS (default 120s) overridable via RELAY_TURNS_THRESHOLD and RELAY_IDLE_MS env vars — set before IDE launch for faster test cycles [session ee77f650, turn 5]
 
 ## Rejected paths
 - Approach B (pure bash + pure PowerShell): Already hit PS 5.1 gotchas; bash equivalents (readlink -f diff BSD/GNU, sed-based JSON) compound. Drift between parallel scripts guaranteed. [session 12e443d5, turn 75]
