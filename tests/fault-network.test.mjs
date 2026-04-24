@@ -303,8 +303,9 @@ test('empty git repo (no commits) — hook exits 0, pull failure handled gracefu
     spawnSync('git', ['init', '-q'], { cwd: dir, encoding: 'utf8' });
     spawnSync('git', ['config', 'user.email', 'test@relay'], { cwd: dir, encoding: 'utf8' });
     spawnSync('git', ['config', 'user.name', 'relay-test'], { cwd: dir, encoding: 'utf8' });
-    // Add a fake remote to force the fetch path (which will fail because there's no remote server)
-    spawnSync('git', ['remote', 'add', 'origin', 'git://localhost:9/nonexistent.git'], { cwd: dir, encoding: 'utf8' });
+    // Use file:// URL to force fetch path — fails immediately without spawning network helpers.
+    // git:// URLs on Windows spawn helper processes that may hold handles and cause EBUSY on cleanup.
+    spawnSync('git', ['remote', 'add', 'origin', 'file:///nonexistent-relay-test-remote'], { cwd: dir, encoding: 'utf8' });
 
     const memory = '## Decisions\n- Use SQLite [session a, turn 1]\n';
     seedRelay(dir, { memory });
