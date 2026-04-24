@@ -7,6 +7,8 @@
 - setup.ps1 is a deprecation stub — real install via install.sh (macOS) or install.ps1 (Windows) [session 12e443d5, turn 265]
 - UserPromptSubmit hook: B's session receives A's memory changes on every user turn via tight-cap pull (1.5s: 1s fetch + 500ms checkout, fail-open) + section-aware diffing. Same prompt injection if pull completes; else next UPS retries. Replaces session-boundary-only sync. [session 12e443d5, turn 6]
 - UPS owns `.relay/state/ups-state.json`, Stop owns `watermark.json` — separate state files eliminate read-modify-write race where concurrent UPS + Stop hooks clobbered watermark keys. [session 12e443d5, turn 36]
+- Fault injection testing shipped: 4 new suites (fault-network, fault-corruption, fault-concurrency, fault-e2e-livesync), 53 new tests. Found and fixed 2 bugs: EISDIR crash in buildInjection (corrupted memory path), watermark race condition (UPS + Stop shared state file). [session 12e443d5, turn 36]
+- windowsHide:true on all spawnSync calls — prevents random cmd windows on Windows across distiller.mjs, hooks/stop.mjs, and all new hooks. [session 12e443d5, turn 36]
 
 ## Rejected paths
 - Approach B (pure bash + pure PowerShell): Already hit PS 5.1 gotchas; bash equivalents (readlink -f diff BSD/GNU, sed-based JSON) compound. Drift between parallel scripts guaranteed. [session 12e443d5, turn 75]
@@ -14,6 +16,7 @@
 
 ## Scope changes
 - Deployability v1 shipped 2026-04-23: install.sh, install.ps1, scripts/installer.mjs, relay install/update/uninstall/doctor CLI subcommands, CI matrix (ubuntu unit tests + macos/windows e2e), 26 new installer unit tests, Group H (6 e2e tests) [session 12e443d5, turn 425]
-- Live sync v1 shipped 2026-04-23: UserPromptSubmit hook, lib/diff-memory.mjs, Group I (5 new e2e tests), hooks.json wired for UserPromptSubmit, plugin version 0.4.0 [session 12e443d5, turn 209]
+- Live sync v1 shipped 2026-04-23: UserPromptSubmit hook (hooks/user-prompt-submit.mjs), lib/diff-memory.mjs, Group I (5 new e2e tests), hooks.json wired for UserPromptSubmit, plugin version 0.4.0 [session 12e443d5, turn 209]
+- Fault injection testing shipped 2026-04-23: 4 new test suites, 53 tests, 2 bugs found + fixed (EISDIR, watermark race). Test total now 163 (131 unit + 32 e2e). [session 12e443d5, turn 36]
 - Old plan docs (docs/superpowers/plans/*.md + specs/*.md for chunks 2,4,5) deleted — shipped, no longer load-bearing [session 12e443d5, turn 475]
 ```
