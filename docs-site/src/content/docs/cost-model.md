@@ -15,19 +15,28 @@ Without tiering, every `Stop` hook triggers a Sonnet 4.6 call:
 
 Cheap in absolute terms, but **most turns contribute nothing** to memory (tool-use loops, file reads, small tweaks). The fix is tiering.
 
-## Tier 0 — Local regex filter (FREE)
+## Tier 0 — Local scoring filter (FREE)
 
-Before any API call, the distiller scans the transcript slice for "signal words":
+Before any API call, `lib/filter.mjs` scores the transcript slice. Scoring runs entirely in Node — no API call, no cost.
 
-```regex
-/\b(decide|decided|won'?t|doesn'?t work|workaround|hack|TODO|FIXME|rejected|tried|instead|actually|broken|skip|stub|hardcod|mock|placeholder|out of scope|for now|revisit|later)\b/i
-```
+**Text signals** (weighted):
 
-Plus structural signals:
-- Any assistant turn with `stop_reason: "tool_use"` calling `Edit` or `Write` — real code changes.
-- `parentUuid` gaps suggesting branch abandonment.
+| Category | Weight | Examples |
+|---|---|---|
+| Decision language | 3 | `decided`, `we're going with`, `chose`, `agreed` |
+| Rejection / failure | 3 | `rejected`, `doesn't work`, `tried X but`, `abandoned` |
+| Deliberate hacks | 3 | `workaround`, `hack`, `hardcoded`, `stub`, `mock` |
+| Scope signals | 2 | `out of scope`, `deferred`, `descoped`, `dropping` |
+| Open questions | 2 | `open question`, `still deciding`, `TBD`, `revisit` |
+| Maintenance flags | 2 | `TODO`, `FIXME`, `before launch` |
+| Weak signals | 1 | `actually`, `instead`, `broken`, `for now` |
 
-**Rule:** if the slice scores 0 signals → skip the API call entirely. Update watermark, return. **~60-70% of triggers die here for free.**
+**Structural signals** (scored on raw JSONL lines):
+- Session length ≥ 10 turns: +2; ≥ 20 turns: +4 total
+- Average user message length > 200 chars: +2 (explains context or decisions)
+- File edits (`Edit` / `Write` / `MultiEdit` tool calls) ≥ 3: +2; ≥ 8: +4 total
+
+**Rule:** score must reach the threshold (default **3**, overridable via `RELAY_TIER0_THRESHOLD`) to proceed. A single high-value signal word triggers; a single edit triggers; weak words alone need company. **~60-70% of triggers die here for free.**
 
 ## Tier 1 — Claude Haiku 4.5 (routine)
 
@@ -90,7 +99,7 @@ Documented, not demoed.
 
 | Tier | Status |
 |---|---|
-| Tier 0 (regex filter) | ✅ **Shipped** in `lib/filter.mjs`. Mandatory — runs before every API call. Kills ~70% of triggers. |
+| Tier 0 (weighted scoring filter) | ✅ **Shipped** in `lib/filter.mjs`. Mandatory — runs before every API call. Kills ~70% of triggers. |
 | Tier 1 (Haiku 4.5) | ✅ **Shipped** as the default in `distiller.mjs`. Invoked via `claude -p --model claude-haiku-4-5-20251001`. |
 | Tier 2 (Sonnet 4.6 on timer / size threshold) | ❌ Not shipped. `distiller.mjs --model <id>` accepts Sonnet manually, but there is no automatic Tier 2 trigger. |
 | SDK prompt caching | ❌ Not shipped. Current path uses `claude -p` exclusively — no `@anthropic-ai/sdk` code path. |

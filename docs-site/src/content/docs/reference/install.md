@@ -134,11 +134,7 @@ From the machine:
 relay uninstall
 ```
 
-This removes the plugin link and strips Relay's entries from `settings.json`. Your `~/.claude/relay/` clone is preserved (faster reinstall). To also delete the clone:
-
-```bash
-relay uninstall && rm -rf ~/.claude/relay
-```
+Removes: plugin link, Relay entries from `settings.json`, global `relay` CLI registration, and the `~/.claude/relay/` clone.
 
 From a repo you want to stop tracking:
 
@@ -153,6 +149,9 @@ git commit -am "remove Relay"
 | Var | Default | Purpose |
 |---|---|---|
 | `RELAY_SKIP_PULL` | unset | If set, `GitSync.pull()` returns immediately. Use for offline/local-only demos or slow-network environments. |
+| `RELAY_TURNS_THRESHOLD` | `5` | Turn count that triggers automatic distillation. Set to `1` for faster test cycles. |
+| `RELAY_IDLE_MS` | `120000` | Idle-time distillation trigger in ms (default 2 min). |
+| `RELAY_TIER0_THRESHOLD` | `3` | Minimum score to pass the Tier 0 filter. Lower = more API calls; higher = fewer. |
 | `CLAUDE_PLUGIN_ROOT` | set by Claude Code | Where the hook dispatcher looks up `distiller.mjs`. Don't set this yourself. |
 | `RELAY_HOME` | `~/.claude/` | Override the Relay home directory (useful for testing). Takes precedence over `CLAUDE_HOME`. |
 | `CLAUDE_HOME` | `~/.claude/` | Alternative home override. Used when `RELAY_HOME` is not set. |

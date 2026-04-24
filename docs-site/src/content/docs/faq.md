@@ -100,7 +100,7 @@ You can still use `CLAUDE.md` alongside Relay. They compose cleanly. Relay's bro
 ## Known limitations
 
 1. **Distiller needs signal to work.** Pure research sessions (read, read, read) produce almost nothing in memory. That's intentional — noise is worse than nothing.
-2. **Tier 0 filter misses everyday decisions.** The regex looks for words like `decide`, `workaround`, `rejected`, `TODO`, `broken`. Conversational design choices ("let's go with dark mode", "using a toggle") don't use those words and get filtered. Fix: use explicit signal language ("we decided to use dark mode", "going with a toggle for now"), or run `relay distill --force --push` manually after such sessions.
+2. **Tier 0 filter may miss purely conversational decisions.** The filter uses weighted scoring across decision/rejection/hack/scope/maintenance categories plus structural signals (session length, edit count). Most real work sessions pass automatically. Edge case: pure design discussions with no signal words ("let's go with dark mode") may not trigger. Fix: use explicit language ("we decided to use dark mode") or run `relay distill --force --push` manually.
 3. **Resolved-but-unmentioned workarounds linger.** Fix: say it's fixed, or hand-edit.
 4. **Mid-session sync has one-prompt lag.** The `UserPromptSubmit` hook pulls A's latest memory and injects the delta at the start of each of B's turns. B doesn't need to restart — the update arrives on B's next message after A's distiller pushes. Typical lag: a few seconds to one full turn. UPS pull is capped at 1.5s; visible as a short pause before Claude responds.
 5. **`claude -p` required for zero-billing path.** Otherwise set `ANTHROPIC_API_KEY`.

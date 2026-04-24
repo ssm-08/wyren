@@ -19,6 +19,7 @@ import { Badge } from '@astrojs/starlight/components';
 | [Post-ship](/roadmap/overview/#post-ship--deployability-v1) | 2026-04-23 | Cross-platform installer | <Badge text="Shipped" variant="success" /> |
 | [Post-ship](/roadmap/overview/#post-ship--live-sync--fault-hardening) | 2026-04-23 | Live sync + fault hardening | <Badge text="Shipped" variant="success" /> |
 | [Post-ship](/roadmap/overview/#post-ship--code-review--live-testing-polish) | 2026-04-23 | Code review + live testing polish | <Badge text="Shipped" variant="success" /> |
+| [Post-ship](/roadmap/overview/#post-ship--filter-upgrade--install-polish) | 2026-04-24 | Weighted Tier 0 + install polish | <Badge text="Shipped" variant="success" /> |
 
 ## Sequencing rules
 
@@ -119,3 +120,16 @@ Key fixes:
 - **Tests**: `RELAY_ROOT` in three fault test files used raw URL pathname (spaces → `%20` → ENOENT); `fault-concurrency` had a hardcoded machine path. All fixed with `fileURLToPath`.
 
 Test totals unchanged: **131 unit + 32 e2e = 163 total** (all passing).
+
+## Post-ship — Filter upgrade + install polish (2026-04-24) ✅
+
+**Shipped.** Tier 0 filter overhauled from a simple presence-check regex to a weighted scoring system. Parallel agent session delivered the changes; reviewer session caught and fixed 4 bugs before merge; installer files polished.
+
+Key changes:
+- **`lib/filter.mjs`**: `scoreTier0()` — categorized signal weights (1–3), structural scoring on raw JSONL lines (session length, avg user message length, edit count), `RELAY_TIER0_THRESHOLD` env var (default 3), `MultiEdit` tool detection. `hasTier0Signal()` is backwards-compatible, logs score + breakdown to `.relay/log`.
+- **`distiller.mjs`**: passes raw `sliced` lines to `hasTier0Signal` so structural signals score correctly.
+- **`bin/relay.mjs`**: `relay init` seeds `memory.md` from `CLAUDE.md` if present (8 KB cap, skips empty/directory, one-time import).
+- **Install files**: executable bits set in git (`100644→100755`) for `bin/relay.mjs`, `hooks/run-hook.cmd`, `install.sh`, `scripts/installer.mjs`; `install.sh` now respects `RELAY_HOME`; `install.ps1` `$Args→$RelayArgs` (PS reserved variable), `$clone` quoted for space-in-path safety; `installer.mjs` surfaces npm stderr on CLI registration failure.
+- **Reviewer fixes**: `scoreTier0(null/undefined)` no longer throws; `EISDIR` crash when `CLAUDE.md` is a directory; empty `CLAUDE.md` skipped; `test-e2e.mjs` H1/H4 assertions updated for absolute-path installer (stale `${CLAUDE_PLUGIN_ROOT}` check).
+
+Test totals: **137 unit (136 pass, 1 skip POSIX-only) + 32 e2e = 169 total.**

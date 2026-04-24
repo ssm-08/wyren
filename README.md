@@ -138,7 +138,7 @@ node scripts/installer.mjs uninstall --home /tmp/fake-home
 
 3. **Claude Code transcript format.** Relay reads Claude Code's session files directly. If a future Claude Code update changes that format, distillation may skip some turns until Relay is updated. Check `.relay/log` if memory stops updating.
 
-4. **Tier 0 filter may miss conversational decisions.** The distiller only runs when the transcript contains signal words (`decide`, `workaround`, `rejected`, `TODO`, etc.). Design choices made without those words (e.g. "let's go with dark mode") get filtered out. Workaround: use explicit language ("we decided to use dark mode") or run `relay distill --force --push` manually after such sessions.
+4. **Tier 0 filter may miss purely conversational decisions.** The filter uses weighted scoring across signal categories (decisions, rejections, hacks, scope changes, maintenance flags) plus structural signals (session length, edit count). Most real work sessions pass. Edge case: design choices with no signal words (e.g. "let's go with dark mode") may not trigger. Workaround: use explicit language or run `relay distill --force --push` manually.
 
 ## Docs
 

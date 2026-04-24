@@ -85,7 +85,7 @@ relay init
 ```
 
 Creates:
-- `.relay/memory.md` — empty stub with `# Relay Memory` header
+- `.relay/memory.md` — seeded from `CLAUDE.md` if present in the repo root (first 8 KB, one-time import, not kept in sync); otherwise an empty `# Relay Memory` stub
 - `.relay/broadcast/` + `.gitkeep` so git tracks the empty dir
 - `.relay/broadcast/skills/` + `.gitkeep` so broadcast skills land in a pre-tracked dir
 - Appends `.relay/state/` and `.relay/log` to `.gitignore` (creates the file if absent)
@@ -168,6 +168,7 @@ Claude asks for a handoff note (press Enter to skip), prepends it under a `## Ha
 | `RELAY_SKIP_PULL` | unset | If set, `GitSync.pull()` returns immediately. Useful for offline / local-only demos or slow-network environments. |
 | `RELAY_TURNS_THRESHOLD` | `5` | Override the turn count that triggers automatic distillation. Set to `1` for faster test cycles. Unset to restore the default. |
 | `RELAY_IDLE_MS` | `120000` | Override the idle-time trigger window in milliseconds (default 2 min). E.g. `30000` for 30-second idle trigger during testing. |
+| `RELAY_TIER0_THRESHOLD` | `3` | Minimum score for a transcript slice to pass the Tier 0 filter. Lower values distill more aggressively; raise to reduce API calls on noisy repos. |
 | `CLAUDE_PLUGIN_ROOT` | set by Claude Code | Where the hook dispatcher looks up `distiller.mjs`. Never set manually. |
 | `RELAY_HOME` | `~/.claude/` | Override Relay's home directory. Takes precedence over `CLAUDE_HOME`. Mainly for testing. |
 | `CLAUDE_HOME` | `~/.claude/` | Alternative home override when `RELAY_HOME` is unset. |
