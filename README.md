@@ -56,7 +56,7 @@ curl -fsSL https://raw.githubusercontent.com/ssm-08/relay/master/install.sh | sh
 iwr -useb https://raw.githubusercontent.com/ssm-08/relay/master/install.ps1 | iex
 ```
 
-Clones Relay to `~/.claude/relay/`, wires the hooks. Idempotent — safe to re-run.
+Clones Relay to `~/.claude/relay/`, wires the hooks, and registers `relay` on PATH via `npm install -g`. Idempotent — safe to re-run.
 
 ## Init (per repo, once)
 
@@ -76,8 +76,9 @@ Teammates just need the plugin installed. They don't run `init` again.
 relay status                          # memory size, last distillation, sync state
 relay distill [--force] [--push]      # run distillation manually
 relay broadcast-skill <file>          # share a skill file with all teammates
+relay install                         # install hooks on a new machine (called by install.sh/ps1)
 relay update                          # pull latest Relay from GitHub
-relay uninstall                       # remove hooks from this machine
+relay uninstall                       # fully remove Relay from this machine
 relay doctor                          # verify install is working
 
 /relay-handoff                        # slash command: write a handoff note and push
@@ -136,6 +137,8 @@ node scripts/installer.mjs uninstall --home /tmp/fake-home
 2. **Push conflicts.** If two teammates distill at the same moment and both try to push, the second one retries automatically with the latest version. In practice it resolves within one session without losing anything.
 
 3. **Claude Code transcript format.** Relay reads Claude Code's session files directly. If a future Claude Code update changes that format, distillation may skip some turns until Relay is updated. Check `.relay/log` if memory stops updating.
+
+4. **Tier 0 filter may miss conversational decisions.** The distiller only runs when the transcript contains signal words (`decide`, `workaround`, `rejected`, `TODO`, etc.). Design choices made without those words (e.g. "let's go with dark mode") get filtered out. Workaround: use explicit language ("we decided to use dark mode") or run `relay distill --force --push` manually after such sessions.
 
 ## Docs
 
