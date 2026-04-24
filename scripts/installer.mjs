@@ -370,13 +370,12 @@ export function patchSettingsInMemory(settings, { mode, repoDir = '' }) {
   return out;
 }
 
-export function writeSettingsAtomic(p, obj) {
+export function writeSettingsAtomic(p, obj, { backup = true } = {}) {
   const dir = path.dirname(p);
   fs.mkdirSync(dir, { recursive: true });
 
   // Backup existing — keep only the most recent, prune older ones
-  if (fs.existsSync(p)) {
-    const dir = path.dirname(p);
+  if (backup && fs.existsSync(p)) {
     const base = path.basename(p);
     const old = fs.readdirSync(dir)
       .filter((f) => f.startsWith(`${base}.relay-backup-`))
@@ -554,7 +553,7 @@ export function uninstall(opts) {
     if (fs.existsSync(paths.settings)) {
       const settings = readSettings(paths.settings);
       const patched = patchSettingsInMemory(settings, { mode: 'uninstall' });
-      writeSettingsAtomic(paths.settings, patched);
+      writeSettingsAtomic(paths.settings, patched, { backup: false });
       r.ok(`Removed relay entries from settings.json`);
     }
 
@@ -578,8 +577,20 @@ export function uninstall(opts) {
         r.warn(`Could not delete clone at ${paths.clone}: ${e.message}`);
       }
     }
+
+    // Clean up settings backup files left by installs
+    const settingsDir = path.dirname(paths.settings);
+    const settingsBase = path.basename(paths.settings);
+    try {
+      const backups = fs.readdirSync(settingsDir)
+        .filter((f) => f.startsWith(`${settingsBase}.relay-backup-`));
+      for (const f of backups) {
+        try { fs.unlinkSync(path.join(settingsDir, f)); } catch {}
+      }
+      if (backups.length > 0) r.ok(`Removed ${backups.length} settings backup(s)`);
+    } catch {}
   } else {
-    r.ok('[dry-run] would remove link + strip settings entries + npm uninstall -g relay + delete clone');
+    r.ok('[dry-run] would remove link + strip settings entries + npm uninstall -g relay + delete clone + remove backups');
   }
 }
 
