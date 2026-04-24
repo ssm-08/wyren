@@ -281,6 +281,7 @@ export function relayLog(targetDir, argv) {
     if ((argv[i] === '--lines' || argv[i] === '-n') && argv[i + 1]) {
       const n = parseInt(argv[++i], 10);
       if (!isNaN(n) && n > 0) lines = n;
+      else if (!isNaN(n)) console.error(`relay log: --lines must be a positive integer (got ${n}), using default ${lines}`);
     }
   }
 

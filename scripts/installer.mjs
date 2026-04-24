@@ -604,15 +604,14 @@ export function update(opts) {
   // user-managed. Tell them to pull manually and re-install.
   const linkInfo = inspectLink(paths.plugin);
   if (linkInfo.kind !== 'missing' && linkInfo.target) {
-    const linkTarget = path.resolve(stripWinPathPrefix(linkInfo.target));
+    const linkTarget = path.resolve(linkInfo.target);
     if (linkTarget !== path.resolve(paths.clone)) {
-      r.warn(
+      throw new Error(
         `Local install detected — plugin points to: ${linkTarget}\n` +
         `  relay update only works for standard (cloned) installs.\n` +
         `  Pull your local checkout manually, then re-run:\n` +
         `    relay install --from-local "${linkTarget}"`
       );
-      return;
     }
   }
 
