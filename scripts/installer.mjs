@@ -545,8 +545,18 @@ export function uninstall(opts) {
     } else {
       r.warn('Could not deregister relay CLI globally — remove manually: npm uninstall -g relay');
     }
+
+    // Delete the relay clone — only the standard install location, never a --from-local path
+    if (fs.existsSync(paths.clone)) {
+      try {
+        fs.rmSync(paths.clone, { recursive: true, force: true });
+        r.ok(`Deleted clone: ${paths.clone}`);
+      } catch (e) {
+        r.warn(`Could not delete clone at ${paths.clone}: ${e.message}`);
+      }
+    }
   } else {
-    r.ok('[dry-run] would remove link + strip settings entries + npm uninstall -g relay');
+    r.ok('[dry-run] would remove link + strip settings entries + npm uninstall -g relay + delete clone');
   }
 }
 
