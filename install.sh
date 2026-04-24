@@ -24,7 +24,7 @@ if ! command -v git >/dev/null 2>&1; then
   exit 2
 fi
 
-CLAUDE_HOME="${CLAUDE_HOME:-$HOME/.claude}"
+CLAUDE_HOME="${RELAY_HOME:-${CLAUDE_HOME:-$HOME/.claude}}"
 CLONE="$CLAUDE_HOME/relay"
 
 # If --from-local is provided, skip clone

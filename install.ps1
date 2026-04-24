@@ -14,7 +14,7 @@
 
 param(
     [Parameter(ValueFromRemainingArguments)]
-    [string[]]$Args
+    [string[]]$RelayArgs
 )
 
 $ErrorActionPreference = 'Stop'
@@ -43,21 +43,21 @@ $clone = Join-Path $claudeHome 'relay'
 
 # Parse --from-local
 $fromLocal = $null
-for ($i = 0; $i -lt $Args.Count; $i++) {
-    if ($Args[$i] -eq '--from-local' -and $i + 1 -lt $Args.Count) {
-        $fromLocal = $Args[$i + 1]
+for ($i = 0; $i -lt $RelayArgs.Count; $i++) {
+    if ($RelayArgs[$i] -eq '--from-local' -and $i + 1 -lt $RelayArgs.Count) {
+        $fromLocal = $RelayArgs[$i + 1]
         break
     }
 }
 
 if (-not $fromLocal -and -not (Test-Path $clone)) {
     Write-Host "[relay] Cloning relay into $clone ..."
-    & git clone --depth=1 https://github.com/ssm-08/relay $clone
+    & git clone --depth=1 https://github.com/ssm-08/relay "$clone"
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
 $installerBase = if ($fromLocal) { $fromLocal } else { $clone }
 $installerPath = Join-Path $installerBase 'scripts\installer.mjs'
 
-& node $installerPath install @Args
+& node $installerPath install @RelayArgs
 exit $LASTEXITCODE

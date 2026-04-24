@@ -375,9 +375,9 @@ export function writeSettingsAtomic(p, obj) {
 // chmod (POSIX only)
 // --------------------------------------------------------------------------
 
-export function chmodHookDispatcher(clone) {
+export function chmodHookDispatcher(repoDir) {
   if (process.platform === 'win32') return;
-  const dispatcherPath = path.join(clone, 'hooks', 'run-hook.cmd');
+  const dispatcherPath = path.join(repoDir, 'hooks', 'run-hook.cmd');
   if (fs.existsSync(dispatcherPath)) {
     fs.chmodSync(dispatcherPath, 0o755);
   }
@@ -466,8 +466,10 @@ export function registerCli(repoDir, r) {
     timeout: 30_000,
   });
   if (result.error || result.status !== 0) {
+    const npmErr = (result.stderr || result.stdout || '').trim().slice(0, 300);
     r.warn(
       `Could not register relay CLI globally (npm install -g failed).\n` +
+      (npmErr ? `  npm: ${npmErr}\n` : '') +
       `  Run manually: cd "${repoDir}" && npm install -g .\n` +
       `  Or invoke directly: node "${path.join(repoDir, 'bin', 'relay.mjs')}" <command>`
     );
