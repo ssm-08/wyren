@@ -458,6 +458,34 @@ export function verifyInstall(paths) {
 }
 
 // --------------------------------------------------------------------------
+// CLI registration — npm link / npm install -g so `relay` is on PATH
+// --------------------------------------------------------------------------
+
+export function registerCli(repoDir, r) {
+  // npm install -g . from the repo dir registers the bin shim globally.
+  // Fail-open: if npm isn't found or fails, print a manual hint instead.
+  // npm is a cmd script on Windows — invoke via cmd /c to avoid shell:true + args deprecation
+  const [npmExe, npmArgs] = process.platform === 'win32'
+    ? ['cmd', ['/c', 'npm', 'install', '-g', '.']]
+    : ['npm', ['install', '-g', '.']];
+  const result = spawnSync(npmExe, npmArgs, {
+    cwd: repoDir,
+    encoding: 'utf8',
+    windowsHide: true,
+    timeout: 30_000,
+  });
+  if (result.error || result.status !== 0) {
+    r.warn(
+      `Could not register relay CLI globally (npm install -g failed).\n` +
+      `  Run manually: cd "${repoDir}" && npm install -g .\n` +
+      `  Or invoke directly: node "${path.join(repoDir, 'bin', 'relay.mjs')}" <command>`
+    );
+  } else {
+    r.ok('relay CLI registered globally (relay <command> now works)');
+  }
+}
+
+// --------------------------------------------------------------------------
 // Orchestrators
 // --------------------------------------------------------------------------
 
@@ -493,6 +521,7 @@ export function install(opts) {
   }
 
   if (!dryRun) {
+    registerCli(repoDir, reporter('cli'));
     process.stderr.write('\n[relay] Install complete.\n');
     process.stderr.write('  Next: cd <your-repo> && relay init\n');
   }
