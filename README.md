@@ -73,13 +73,17 @@ Teammates just need the plugin installed. They don't run `init` again.
 ## Commands
 
 ```bash
+relay init                            # bootstrap this repo (.relay/, .gitignore entries)
 relay status                          # memory size, last distillation, sync state
+relay log [--lines N]                 # tail distiller log (default 50 lines)
 relay distill [--force] [--push]      # run distillation manually
 relay broadcast-skill <file>          # share a skill file with all teammates
 relay install                         # install hooks on a new machine (called by install.sh/ps1)
 relay update                          # pull latest Relay from GitHub
 relay uninstall                       # fully remove Relay from this machine
 relay doctor                          # verify install is working
+relay --version                       # print relay version
+relay --help                          # show usage
 
 /relay-handoff                        # slash command: write a handoff note and push
 ```

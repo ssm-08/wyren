@@ -131,6 +131,44 @@ relay distill [--force] [--dry-run] [--push] [--transcript <path>]
 
 Exit codes: `0` on success, `1` on distiller failure, `2` if `--push` was requested but the sync lock was held by another process.
 
+## `relay log`
+
+Tail the distiller log — useful for debugging why memory wasn't updated.
+
+```bash
+relay log [--lines <n>]
+```
+
+| Flag | Effect |
+|---|---|
+| `--lines <n>` / `-n <n>` | Number of lines to show from the end of the log (default `50`). |
+
+Reads `.relay/log` in the current repo. If the log exceeds the line limit, prints an omission notice first so you know lines were cut. If no log exists yet (`distiller` hasn't run), prints a short message and exits 0.
+
+## `relay --version`
+
+Print the installed Relay version.
+
+```bash
+relay --version   # or: relay -v
+```
+
+Reads `version` from `package.json` in the Relay installation. Example output:
+
+```
+relay 0.4.0
+```
+
+## `relay --help`
+
+Print the command reference and exit 0.
+
+```bash
+relay --help   # or: relay -h
+```
+
+Running `relay` with no arguments also shows help (exit 0). Running `relay <unknown>` shows `relay: unknown command '<unknown>'` followed by help, then exits 1.
+
 ## `relay broadcast-skill`
 
 Copy a local skill file into `.relay/broadcast/skills/` and push to the team.
@@ -179,7 +217,6 @@ To disable the plugin temporarily, use `/plugins disable relay` in Claude Code.
 
 These were in early drafts but haven't been wired up:
 
-- `relay log`, `relay --version`, `relay --help` subcommands
 - `RELAY_DISABLE` env var for silencing hooks
 - `RELAY_MODEL` / `RELAY_DEEP_MODEL` env vars — model is hard-coded to Haiku 4.5 via `--model` arg to `distiller.mjs`
 - `--deep` / `--no-push` / `--name` flags

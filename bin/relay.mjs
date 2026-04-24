@@ -248,13 +248,77 @@ export function relayBroadcastSkill(targetDir, filePath) {
   return destPath;
 }
 
+const HELP_TEXT =
+  `Usage: relay <command>\n\nCommands:\n` +
+  `  init              Initialize relay in current repository\n` +
+  `  status            Show memory, watermark, and sync state\n` +
+  `  log               Show distiller log [--lines <n>] (default 50)\n` +
+  `  distill           Run distiller manually [--transcript <path>] [--force] [--dry-run] [--push]\n` +
+  `  broadcast-skill   Broadcast a skill file to all teammates [<file>]\n` +
+  `  install           Install relay hooks on this machine [--from-local <path>] [--home <path>]\n` +
+  `  update            Update relay to latest version\n` +
+  `  uninstall         Remove relay hooks from this machine [--yes]\n` +
+  `  doctor            Verify relay install is working correctly\n\n` +
+  `Options:\n` +
+  `  --version         Print relay version\n` +
+  `  --help            Show this help`;
+
+export function relayVersion() {
+  const pkgPath = path.join(__dirname, '..', 'package.json');
+  try {
+    const { version } = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+    console.log(`relay ${version}`);
+  } catch {
+    console.log('relay (unknown version)');
+  }
+}
+
+export function relayLog(targetDir, argv) {
+  const logPath = path.join(targetDir, '.relay', 'log');
+
+  let lines = 50;
+  for (let i = 0; i < argv.length; i++) {
+    if ((argv[i] === '--lines' || argv[i] === '-n') && argv[i + 1]) {
+      const n = parseInt(argv[++i], 10);
+      if (!isNaN(n) && n > 0) lines = n;
+    }
+  }
+
+  if (!fs.existsSync(logPath)) {
+    console.log('No log yet — distiller has not run in this repo.');
+    return;
+  }
+
+  const content = fs.readFileSync(logPath, 'utf8');
+  const allLines = content.split(/\r?\n/);
+  // Drop trailing empty line from final newline
+  if (allLines.length > 0 && allLines[allLines.length - 1] === '') allLines.pop();
+
+  if (allLines.length === 0) {
+    console.log('Log is empty.');
+    return;
+  }
+
+  const tail = allLines.slice(-lines);
+  if (allLines.length > lines) {
+    console.log(`... (${allLines.length - lines} earlier lines omitted — use --lines to show more)\n`);
+  }
+  console.log(tail.join('\n'));
+}
+
 if (isMain(import.meta.url)) {
   const [, , command, ...rest] = process.argv;
 
-  if (command === 'init') {
+  if (command === '--version' || command === '-v') {
+    relayVersion();
+  } else if (command === '--help' || command === '-h') {
+    console.log(HELP_TEXT);
+  } else if (command === 'init') {
     relayInit(process.cwd());
   } else if (command === 'status') {
     relayStatus(process.cwd());
+  } else if (command === 'log') {
+    relayLog(process.cwd(), rest);
   } else if (command === 'distill') {
     await relayDistill(process.cwd(), rest);
   } else if (command === 'broadcast-skill') {
@@ -285,18 +349,10 @@ if (isMain(import.meta.url)) {
   } else if (command === 'install' || command === 'update' || command === 'uninstall' || command === 'doctor') {
     const { main: installerMain } = await import('../scripts/installer.mjs');
     await installerMain([command, ...rest]);
+  } else if (command === undefined) {
+    console.log(HELP_TEXT);
   } else {
-    console.error(
-      `Usage: relay <command>\n\nCommands:\n` +
-      `  init              Initialize relay in current repository\n` +
-      `  status            Show memory, watermark, and sync state\n` +
-      `  distill           Run distiller manually [--transcript <path>] [--force] [--dry-run] [--push]\n` +
-      `  broadcast-skill   Broadcast a skill file to all teammates [<file>]\n` +
-      `  install           Install relay hooks on this machine [--from-local <path>] [--home <path>]\n` +
-      `  update            Update relay to latest version\n` +
-      `  uninstall         Remove relay hooks from this machine [--yes]\n` +
-      `  doctor            Verify relay install is working correctly`
-    );
+    console.error(`relay: unknown command '${command}'\n\n${HELP_TEXT}`);
     process.exit(1);
   }
 }
