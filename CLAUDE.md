@@ -163,6 +163,20 @@ node scripts/test-e2e.mjs --only stop   # filter to one group
 node scripts/test-e2e.mjs --verbose     # dump stdout/stderr on failure
 ```
 
+## Session wrap-up (when user says "ready to clear" / "update context" / "wrap up")
+
+Do all of the following before confirming clear:
+
+1. **CLAUDE.md** — add entry to Current status for anything shipped this session; fix any stale timing/counts/conventions.
+2. **README.md** — update commands table, known issues, install description if anything changed.
+3. **docs-site pages** — update whichever pages are stale: `reference/cli.md`, `reference/hooks.md`, `roadmap/overview.md`, `faq.md`. Add roadmap timeline row if a new post-ship phase shipped.
+4. **`~/.claude/projects/.../memory/relay_project.md`** — rewrite status, test counts, critical details, CLI surface, repo layout to reflect current state.
+5. **`~/.claude/projects/.../memory/MEMORY.md`** — update index descriptions to match.
+6. **New memory files if needed** — save any new feedback, project decisions, or references learned this session.
+7. **Commit + verify** — `git status` clean, `git log --oneline origin/master..HEAD` shows what's unpushed. Tell user to push.
+
+Only then confirm "safe to clear."
+
 ## What's out of scope (don't build these yet)
 
 Next planned specs: distillation quality, CLAUDE.md compatibility, reliability (`relay doctor` deep checks), sync robustness, decision traceability. See session context for per-area breakdown.
