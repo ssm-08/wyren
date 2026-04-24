@@ -3,7 +3,7 @@
 - Relay project: all 6 chunks + installer v1 shipped and live on master [session c02d8414, turn 30]
 - 132 tests passing (131 unit, 1 skipped POSIX-only): includes UserPromptSubmit Group I + fault-injection suites (network/git, corruption, concurrency, e2e); all pass, zero failures [session ee77f650, turn 38]
 - Two-system end-to-end verified: System A distilled + pushed; System B pulled + injected at SessionStart [session c02d8414, turn 320]
-- Installer architecture: Approach A (two shell shims + shared Node helper in scripts/installer.mjs). Shell scripts thin; all logic in Node. macOS/Linux symlink, Windows junction, no admin required. CLI: `npm install -g` registers relay globally on install; `npm uninstall -g relay` on uninstall (fail-open). Settings.json hook commands use absolute repoDir paths. [session 12e443d5, turn 193; updated ee77f650, turn 7]
+- Installer architecture: Approach A (two shell shims + shared Node helper in scripts/installer.mjs). Shell scripts thin; all logic in Node. macOS/Linux symlink, Windows junction, no admin required. CLI: `npm install -g` registers relay globally on install; `npm uninstall -g relay` (fail-open) removes plugin link, settings.json entries, global CLI registration, and relay clone directory at `~/.claude/relay/`. Settings.json hook commands use absolute repoDir paths. [session 12e443d5, turn 193; updated ee77f650, turn 9]
 - setup.ps1 is a deprecation stub — real install via install.sh (macOS) or install.ps1 (Windows) [session 12e443d5, turn 265]
 - UserPromptSubmit hook: B's session receives A's memory changes on every user turn via pull (1.5s fetch + 500ms checkout, 3s hook timeout, fail-open) + section-aware diffing. Same prompt injection if pull completes; else next UPS retries. Replaces session-boundary-only sync. [session 12e443d5, turn 6; updated ee77f650, turn 2]
 - UPS owns `.relay/state/ups-state.json`, Stop owns `watermark.json` — separate state files eliminate read-modify-write race where concurrent UPS + Stop hooks clobbered watermark keys. [session 12e443d5, turn 36]
@@ -20,5 +20,4 @@
 - Deployability v1 shipped 2026-04-23: install.sh, install.ps1, scripts/installer.mjs, relay install/update/uninstall/doctor CLI subcommands, CI matrix (ubuntu unit tests + macos/windows e2e), 26 new installer unit tests, Group H (6 e2e tests) [session 12e443d5, turn 425]
 - Live sync v1 shipped 2026-04-23: UserPromptSubmit hook (hooks/user-prompt-submit.mjs), lib/diff-memory.mjs, Group I (5 new e2e tests), hooks.json wired for UserPromptSubmit, plugin version 0.4.0 [session 12e443d5, turn 209]
 - Fault injection testing shipped 2026-04-23: 4 new test suites, 53 tests, 2 bugs found + fixed (EISDIR, watermark race). Test total now 132 (131 unit + 1 skipped POSIX-only). [session ee77f650, turn 38]
-- Old plan docs (docs/superpowers/plans/*.md + specs/*.md for chunks 2,4,5) deleted — shipped, no longer load-bearing [session 12e443d5, turn 475]
 ```
