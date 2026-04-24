@@ -320,7 +320,8 @@ function stripJsoncComments(src) {
 
 export function readSettings(p) {
   if (!fs.existsSync(p)) return {};
-  const raw = fs.readFileSync(p, 'utf8');
+  // Strip UTF-8 BOM (﻿) — Windows tools (PowerShell, VS Code) sometimes write it
+  const raw = fs.readFileSync(p, 'utf8').replace(/^﻿/, '');
   // Try strict JSON first
   try { return JSON.parse(raw); } catch {}
   // Try JSONC
