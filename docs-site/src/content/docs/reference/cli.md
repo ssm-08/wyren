@@ -5,14 +5,10 @@ description: Every bin/relay command and flag — what actually ships.
 
 The `relay` CLI is part of the plugin. Pure Node, zero runtime dependencies.
 
-After install, the binary is at `~/.claude/relay/bin/relay.mjs`. If `relay` isn't on your `$PATH`, either invoke it directly (`node ~/.claude/relay/bin/relay.mjs <command>`) or create an alias:
+`relay install` registers the CLI globally via `npm install -g .` — `relay <command>` works from any directory after install. If for some reason `relay` isn't on PATH (e.g. `npm`'s global bin isn't in your shell's PATH), invoke directly:
 
 ```bash
-# bash/zsh
-alias relay='node ~/.claude/relay/bin/relay.mjs'
-
-# PowerShell
-Set-Alias relay "$env:USERPROFILE\.claude\relay\bin\relay.mjs"
+node ~/.claude/relay/bin/relay.mjs <command>
 ```
 
 ## `relay install`
@@ -32,10 +28,11 @@ relay install [--from-local <path>] [--home <path>] [--dry-run]
 
 Creates:
 - Junction (Windows) or symlink (macOS) at `~/.claude/plugins/relay` → Relay clone.
-- `SessionStart` + `Stop` entries in `~/.claude/settings.json` using `${CLAUDE_PLUGIN_ROOT}` form.
+- `SessionStart`, `Stop`, and `UserPromptSubmit` entries in `~/.claude/settings.json` using the absolute path to the Relay clone (not `${CLAUDE_PLUGIN_ROOT}` — that variable only expands inside a plugin's own `hooks.json`, not in `settings.json`).
 - Backs up existing `settings.json` to `settings.json.relay-backup-<timestamp>`.
+- Registers the `relay` CLI globally via `npm install -g .` so `relay <command>` works from any directory.
 
-Idempotent — safe to re-run. Detects and normalises old `setup.ps1`-style absolute-path hook entries.
+Idempotent — safe to re-run. Detects and normalises stale hook entries from previous installs.
 
 ## `relay update`
 
@@ -49,13 +46,19 @@ Uses `git fetch + reset --hard FETCH_HEAD` (survives force-pushes). `--force` ov
 
 ## `relay uninstall`
 
-Remove Relay hooks from this machine. Preserves `~/.claude/relay/` clone (faster reinstall).
+Fully remove Relay from this machine.
 
 ```bash
 relay uninstall [--dry-run]
 ```
 
-Removes plugin link and strips Relay entries from `settings.json`. Foreign hook entries are preserved. To also delete the clone: `relay uninstall && rm -rf ~/.claude/relay`.
+Removes:
+- Plugin link at `~/.claude/plugins/relay`
+- Relay hook entries from `settings.json` (foreign entries preserved)
+- Global `relay` CLI registration (`npm uninstall -g relay`)
+- Relay clone at `~/.claude/relay/`
+
+After uninstall, `relay` is gone from PATH. Open a new terminal to confirm.
 
 ## `relay doctor`
 
@@ -68,7 +71,7 @@ relay doctor [--home <path>]
 Checks:
 - Plugin link exists and points to a valid Relay checkout.
 - `relay status` exits 0 from the linked directory.
-- `settings.json` has exactly one Relay `SessionStart` and one `Stop` entry.
+- `settings.json` has exactly one Relay `SessionStart`, `Stop`, and `UserPromptSubmit` entry each.
 - On POSIX: `hooks/run-hook.cmd` is executable.
 
 Exit codes: `0` all checks passed, `1` one or more issues found (issues printed to stdout).
@@ -163,6 +166,8 @@ Claude asks for a handoff note (press Enter to skip), prepends it under a `## Ha
 | Var | Default | Effect |
 |---|---|---|
 | `RELAY_SKIP_PULL` | unset | If set, `GitSync.pull()` returns immediately. Useful for offline / local-only demos or slow-network environments. |
+| `RELAY_TURNS_THRESHOLD` | `5` | Override the turn count that triggers automatic distillation. Set to `1` for faster test cycles. Unset to restore the default. |
+| `RELAY_IDLE_MS` | `120000` | Override the idle-time trigger window in milliseconds (default 2 min). E.g. `30000` for 30-second idle trigger during testing. |
 | `CLAUDE_PLUGIN_ROOT` | set by Claude Code | Where the hook dispatcher looks up `distiller.mjs`. Never set manually. |
 | `RELAY_HOME` | `~/.claude/` | Override Relay's home directory. Takes precedence over `CLAUDE_HOME`. Mainly for testing. |
 | `CLAUDE_HOME` | `~/.claude/` | Alternative home override when `RELAY_HOME` is unset. |
@@ -176,6 +181,5 @@ These were in early drafts but haven't been wired up:
 - `relay log`, `relay --version`, `relay --help` subcommands
 - `RELAY_DISABLE` env var for silencing hooks
 - `RELAY_MODEL` / `RELAY_DEEP_MODEL` env vars — model is hard-coded to Haiku 4.5 via `--model` arg to `distiller.mjs`
-- `RELAY_TURN_THRESHOLD` / `RELAY_IDLE_MS` — thresholds are constants in `hooks/stop.mjs` (5 turns, 2 minutes)
 - `--deep` / `--no-push` / `--name` flags
 - Automatic Tier 2 Sonnet re-compression on a timer or on `memory.md` size

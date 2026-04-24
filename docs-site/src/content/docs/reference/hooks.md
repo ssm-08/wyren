@@ -45,8 +45,8 @@ Fires once per Claude Code session (startup, resume, clear, or compact).
 ### Timing
 
 - Target: under 500ms.
-- Main cost: the scoped `git fetch` + `checkout` of `.relay/memory.md` and `.relay/broadcast/` during `GitSync.pull()`. Internal timeouts cap fetch at 3s and each checkout at 2s.
-- No hook-level hard cap — individual git commands time out on their own, then fail-open.
+- Main cost: the scoped `git fetch` + `checkout` of `.relay/memory.md` and `.relay/broadcast/` during `GitSync.pull()`. Internal timeouts cap fetch at **1.5s** and checkout at **0.5s**; hook-level budget is **2s** total.
+- Fail-open — individual git commands time out on their own, then fail-open.
 - On slow or offline networks, set `RELAY_SKIP_PULL=1` to short-circuit the pull entirely. Memory still injects from whatever is on disk.
 
 ### Failure mode
@@ -77,9 +77,9 @@ None required. Hook emits no JSON unless it wants to block the turn (Relay never
 ### Behavior
 
 1. Increment `turns_since_distill` in `.relay/state/watermark.json`.
-2. If threshold reached (default 5 turns) AND `distiller_running` flag is false:
-   - Set `distiller_running = true`.
+2. If threshold reached (default 5 turns, override with `RELAY_TURNS_THRESHOLD`) AND `distiller_running` is false (or its PID is no longer alive):
    - Spawn `distiller.mjs` **detached** (`spawn(..., { detached: true })` + `proc.unref()`).
+   - Set `distiller_running = true` + `distiller_pid = <pid>` in watermark.
    - Return immediately.
 3. Never block the turn. Distiller runs in background.
 
@@ -117,7 +117,7 @@ Only emitted when the diff detects new content. If nothing changed, the hook exi
 
 ### Behavior
 
-1. Pull `.relay/memory.md` from the remote (1s fetch cap). Skipped when `RELAY_SKIP_PULL=1`; diff still runs from disk.
+1. Pull `.relay/memory.md` from the remote (1.5s fetch cap, 3s hook budget). Skipped when `RELAY_SKIP_PULL=1`; diff still runs from disk.
 2. Compare the current file against the stored snapshot hash in `.relay/state/ups-state.json`.
 3. If content has changed, compute a section-aware delta (new or modified sections only).
 4. Inject the delta as `additionalContext` so the model receives it before processing the user's prompt.
@@ -135,7 +135,7 @@ Only emitted when the diff detects new content. If nothing changed, the hook exi
 ### Timing
 
 - Target: under 200ms on cache hits (local disk diff only).
-- Pull adds ~300–800ms on a fast network; capped at 1s to stay well within Claude Code's hook timeout.
+- Pull adds ~300ms–1.5s depending on network; fetch capped at **1.5s**, hook budget **3s** total.
 - Set `RELAY_SKIP_PULL=1` to skip the network call entirely (e.g., when working offline or in a flaky-network environment).
 
 ### Failure mode

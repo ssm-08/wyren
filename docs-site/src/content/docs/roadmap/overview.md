@@ -18,6 +18,7 @@ import { Badge } from '@astrojs/starlight/components';
 | — | 44-48 | Buffer, demo rehearsal, fallback video | <Badge text="Shipped" variant="success" /> |
 | [Post-ship](/roadmap/overview/#post-ship--deployability-v1) | 2026-04-23 | Cross-platform installer | <Badge text="Shipped" variant="success" /> |
 | [Post-ship](/roadmap/overview/#post-ship--live-sync--fault-hardening) | 2026-04-23 | Live sync + fault hardening | <Badge text="Shipped" variant="success" /> |
+| [Post-ship](/roadmap/overview/#post-ship--code-review--live-testing-polish) | 2026-04-23 | Code review + live testing polish | <Badge text="Shipped" variant="success" /> |
 
 ## Sequencing rules
 
@@ -96,7 +97,7 @@ Test totals after this work: **79 unit tests + 27 e2e tests = 106 total.**
 
 **Shipped.** B's running session now receives A's new memory automatically — no restart required.
 
-New files: `hooks/user-prompt-submit.mjs` (`UserPromptSubmit` hook — pulls `.relay/memory.md` on each user turn with a 1s fetch cap, diffs against a stored snapshot, injects only the delta as `additionalContext`), `lib/diff-memory.mjs` (pure section-aware diff + hash utilities, no deps).
+New files: `hooks/user-prompt-submit.mjs` (`UserPromptSubmit` hook — pulls `.relay/memory.md` on each user turn with a **1.5s fetch cap** + **3s hook budget**, diffs against a stored snapshot, injects only the delta as `additionalContext`), `lib/diff-memory.mjs` (pure section-aware diff + hash utilities, no deps).
 
 State file: `.relay/state/ups-state.json` — owned exclusively by the UPS hook (stores snapshot hash + last-pull timestamp). `RELAY_SKIP_PULL=1` skips the pull; diff still runs from disk.
 
@@ -105,3 +106,16 @@ State file: `.relay/state/ups-state.json` — owned exclusively by the UPS hook 
 New test files: `tests/fault-network.test.mjs`, `tests/fault-corruption.test.mjs`, `tests/fault-concurrency.test.mjs`, `tests/fault-e2e-livesync.test.mjs` (53 fault tests).
 
 Test totals after this work: **131 unit tests + 32 e2e tests = 163 total.**
+
+## Post-ship — Code review + live testing polish (2026-04-23) ✅
+
+**Shipped.** Two-machine live test surfaced 9 additional bugs; systematic code review caught 9 more. All fixed before any second user touched the plugin.
+
+Key fixes:
+- **Installer**: `${CLAUDE_PLUGIN_ROOT}` doesn't expand in `settings.json` (only in plugin `hooks.json`) — installer now writes absolute repoDir path. UTF-8 BOM in `settings.json` (written by PowerShell) crashed the JSONC parser — stripped on read. `relay install` + `relay update` now register the `relay` CLI globally via `npm install -g`; `relay uninstall` deregisters and deletes the clone.
+- **UPS hook**: fetch timeout 1s→1.5s, hook budget 2s→3s — fixes timeouts on higher-latency connections.
+- **Stop hook**: `distiller_running` could get permanently stuck if the OS killed the distiller process mid-flight — PID liveness check added to `shouldDistill`. `RELAY_TURNS_THRESHOLD` + `RELAY_IDLE_MS` env vars added for test-cycle acceleration.
+- **sync.mjs**: `resetWatermarkTurns` used non-atomic write and didn't clear `distiller_running` on conflict recovery — both fixed.
+- **Tests**: `RELAY_ROOT` in three fault test files used raw URL pathname (spaces → `%20` → ENOENT); `fault-concurrency` had a hardcoded machine path. All fixed with `fileURLToPath`.
+
+Test totals unchanged: **131 unit + 32 e2e = 163 total** (all passing).
