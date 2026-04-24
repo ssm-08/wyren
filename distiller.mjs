@@ -52,7 +52,7 @@ function buildPrompt({ systemPrompt, sessionId, existingMemory, transcriptSlice 
 
 function runClaude(prompt, model) {
   return new Promise((resolve, reject) => {
-    const args = [
+    const claudeArgs = [
       '-p',
       '--bare',
       '--no-session-persistence',
@@ -60,12 +60,16 @@ function runClaude(prompt, model) {
       '--output-format', 'text',
       '--max-budget-usd', '1.00',
     ];
-    if (model) args.push('--model', model);
+    if (model) claudeArgs.push('--model', model);
+
+    // Windows: use cmd /c to invoke claude without shell:true (avoids injection surface)
+    const [exe, args] = process.platform === 'win32'
+      ? ['cmd', ['/c', 'claude', ...claudeArgs]]
+      : ['claude', claudeArgs];
 
     let proc;
     try {
-      proc = spawn('claude', args, {
-        shell: process.platform === 'win32',
+      proc = spawn(exe, args, {
         windowsHide: true,
         stdio: ['pipe', 'pipe', 'pipe'],
       });
@@ -103,6 +107,7 @@ function runClaude(prompt, model) {
   });
 }
 
+// Intentionally not imported from stop.mjs — distiller runs detached and must be self-contained.
 function writeWatermark(cwd, uuid, { clearRunning = false, transcript = '' } = {}) {
   if (!cwd) return;
   const statePath = path.join(cwd, '.relay', 'state', 'watermark.json');

@@ -278,6 +278,14 @@ function buildHookEntries() {
         timeout: 5,
       }],
     },
+    UserPromptSubmit: {
+      matcher: '',
+      hooks: [{
+        type: 'command',
+        command: '"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd" user-prompt-submit',
+        timeout: 2,
+      }],
+    },
   };
 }
 
@@ -327,7 +335,7 @@ export function patchSettingsInMemory(settings, { mode }) {
   if (!out.hooks || typeof out.hooks !== 'object') out.hooks = {};
   const hooks = out.hooks;
 
-  for (const event of ['SessionStart', 'Stop']) {
+  for (const event of ['SessionStart', 'Stop', 'UserPromptSubmit']) {
     // Coerce to array
     let current = hooks[event];
     if (!current) current = [];
@@ -419,7 +427,7 @@ export function verifyInstall(paths) {
   try {
     const settings = readSettings(paths.settings);
     const hooksObj = settings.hooks || {};
-    for (const event of ['SessionStart', 'Stop']) {
+    for (const event of ['SessionStart', 'Stop', 'UserPromptSubmit']) {
       const entries = Array.isArray(hooksObj[event]) ? hooksObj[event] : [];
       const relayEntries = entries.filter(isRelayHookEntry);
       if (relayEntries.length === 0) {

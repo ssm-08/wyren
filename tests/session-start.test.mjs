@@ -46,18 +46,19 @@ test('buildContext returns empty string when memory.md is blank', () => {
   }
 });
 
-test('readBroadcastDir returns empty string when dir missing', () => {
-  const result = readBroadcastDir('/nonexistent/relay-test-broadcast-dir');
-  assert.equal(result, '');
+test('readBroadcastDir returns empty content when dir missing', () => {
+  const { content, skillFiles } = readBroadcastDir('/nonexistent/relay-test-broadcast-dir');
+  assert.equal(content, '');
+  assert.deepEqual(skillFiles, []);
 });
 
 test('readBroadcastDir includes file contents with broadcast header', () => {
   const dir = makeTmpDir();
   try {
     fs.writeFileSync(path.join(dir, 'style.md'), '# Style guide\nUse 2-space indent.\n', 'utf8');
-    const result = readBroadcastDir(dir);
-    assert.ok(result.includes('broadcast: style.md'), `Expected broadcast header, got: ${result}`);
-    assert.ok(result.includes('Style guide'), `Expected file content, got: ${result}`);
+    const { content } = readBroadcastDir(dir);
+    assert.ok(content.includes('broadcast: style.md'), `Expected broadcast header, got: ${content}`);
+    assert.ok(content.includes('Style guide'), `Expected file content, got: ${content}`);
   } finally {
     fs.rmSync(dir, { recursive: true });
   }

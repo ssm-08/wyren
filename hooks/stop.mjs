@@ -34,7 +34,21 @@ export function updateWatermark(relayDir) {
 }
 
 export function shouldDistill(state) {
-  if (state.distiller_running) return false;
+  if (state.distiller_running) {
+    // PID liveness check — if the distiller was killed (OOM, forced reboot) the flag would
+    // stick forever. Verify the PID is still alive; only treat as stale on ESRCH (no such process).
+    if (state.distiller_pid) {
+      try {
+        process.kill(state.distiller_pid, 0);
+        return false; // still alive
+      } catch (e) {
+        if (e.code !== 'ESRCH') return false; // EPERM or unknown — conservatively honor flag
+        // ESRCH: process is gone — stale flag, fall through to normal threshold checks
+      }
+    } else {
+      return false; // no PID stored, honor flag
+    }
+  }
   if (state.turns_since_distill >= TURNS_THRESHOLD) return true;
   // idle trigger: turns accumulated but not yet at threshold
   if (
@@ -81,6 +95,7 @@ export function spawnDistiller({ relayDir, transcriptPath, since, cwd }) {
   proc.unref();
   // close parent's copy — child already inherited its own fd
   if (typeof logFd === 'number') { try { fs.closeSync(logFd); } catch {} }
+  return proc;
 }
 
 async function main() {
@@ -103,19 +118,20 @@ async function main() {
       }
 
       const watermarkPath = path.join(relayDir, 'state', 'watermark.json');
-      state.distiller_running = true;
-      state.turns_since_distill = 0;
-      writeWatermarkAtomic(watermarkPath, state);
-
       // release trigger lock immediately — distiller_running flag takes over
       try { fs.unlinkSync(triggerLock); } catch {}
 
-      spawnDistiller({
+      const distProc = spawnDistiller({
         relayDir,
         transcriptPath: transcript_path,
         since: state.last_uuid || '',
         cwd,
       });
+
+      state.distiller_running = true;
+      state.turns_since_distill = 0;
+      state.distiller_pid = distProc?.pid ?? null;
+      writeWatermarkAtomic(watermarkPath, state);
     }
   } catch (e) {
     process.stderr.write(`[relay] stop error: ${e.message}\n`);

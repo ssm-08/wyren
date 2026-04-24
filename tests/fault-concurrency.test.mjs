@@ -16,12 +16,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { spawn, spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-const RELAY_ROOT = 'C:/Users/shree/Documents/Vibejam';
+const RELAY_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 function makeTmpDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'relay-conc-'));

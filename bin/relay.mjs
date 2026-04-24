@@ -217,6 +217,12 @@ export function relayBroadcastSkill(targetDir, filePath) {
   }
 
   const skillName = path.basename(filePath);
+  const ext = path.extname(filePath).toLowerCase();
+  const TEXT_EXTS = new Set(['.md', '.toml', '.txt', '.json', '.yaml', '.yml']);
+  if (!TEXT_EXTS.has(ext)) {
+    console.error(`Warning: "${skillName}" has extension "${ext}" — expected a text skill file (.md, .toml). Proceeding anyway.`);
+  }
+
   const destDir = path.join(relayDir, 'broadcast', 'skills');
   fs.mkdirSync(destDir, { recursive: true });
 

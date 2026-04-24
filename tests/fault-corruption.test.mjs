@@ -297,6 +297,9 @@ test('TOCTOU: memory.md rewritten after seed → second call detects change, ret
     // Now rewrite memory.md with new content (TOCTOU: file changed)
     const v2 = '## Decisions\n- Use SQLite [session a, turn 1]\n- Rate limiting added [session b, turn 3]\n';
     fs.writeFileSync(memoryPath, v2, 'utf8');
+    // Ensure mtime advances even on fast machines where same-ms writes are possible
+    const futureSec = (Date.now() + 2000) / 1000;
+    try { fs.utimesSync(memoryPath, futureSec, futureSec); } catch {}
 
     // Second call → should detect the change and return a delta
     let result;

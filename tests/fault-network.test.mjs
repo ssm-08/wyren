@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { buildInjection } from '../hooks/user-prompt-submit.mjs';
 import { hashMemory } from '../lib/diff-memory.mjs';
 
@@ -20,7 +21,7 @@ import { hashMemory } from '../lib/diff-memory.mjs';
 // Helpers
 // ---------------------------------------------------------------------------
 
-const RELAY_ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1')), '..');
+const RELAY_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 function makeTmpDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'relay-fault-'));
@@ -271,7 +272,7 @@ test('no .relay dir — hook exits 0 immediately', () => {
   }
 });
 
-// Also test via buildInjection — the memoryPath doesn't exist path
+// Also test via buildInjection — memory.md doesn't exist (hook exits 0, buildInjection returns null)
 test('no .relay dir — buildInjection returns null for missing memoryPath', () => {
   const dir = makeTmpDir();
   try {
@@ -280,7 +281,7 @@ test('no .relay dir — buildInjection returns null for missing memoryPath', () 
     const result = buildInjection({
       cwd: dir,
       relayDir,
-      watermarkPath: path.join(stateDir, 'watermark.json'),
+      upsStatePath: path.join(stateDir, 'ups-state.json'),
       snapshotPath: path.join(stateDir, 'last-injected-memory.md'),
       memoryPath: path.join(relayDir, 'memory.md'),  // does not exist
     });

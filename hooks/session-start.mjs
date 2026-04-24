@@ -5,8 +5,9 @@ import { readMemory } from '../lib/memory.mjs';
 import { readStdin, isMain } from '../lib/util.mjs';
 import { GitSync } from '../lib/sync.mjs';
 
+// Returns { content: string, skillFiles: string[] }
 export function readBroadcastDir(broadcastDir) {
-  if (!fs.existsSync(broadcastDir)) return '';
+  if (!fs.existsSync(broadcastDir)) return { content: '', skillFiles: [] };
   const files = [];
   function walk(dir) {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -17,14 +18,22 @@ export function readBroadcastDir(broadcastDir) {
   }
   walk(broadcastDir);
   files.sort();
-  if (files.length === 0) return '';
-  return files
+  if (files.length === 0) return { content: '', skillFiles: [] };
+
+  const skillsDir = path.join(broadcastDir, 'skills');
+  const skillFiles = files
+    .filter((f) => path.dirname(f) === skillsDir)
+    .map((f) => path.basename(f));
+
+  const content = files
     .map((f) => {
       const name = path.relative(broadcastDir, f).replace(/\\/g, '/');
-      const content = fs.readFileSync(f, 'utf8');
-      return `## broadcast: ${name}\n\n${content.trim()}`;
+      const body = fs.readFileSync(f, 'utf8');
+      return `## broadcast: ${name}\n\n${body.trim()}`;
     })
     .join('\n\n---\n\n');
+
+  return { content, skillFiles };
 }
 
 export function buildContext(cwd) {
@@ -32,20 +41,11 @@ export function buildContext(cwd) {
   if (!fs.existsSync(relayDir)) return '';
 
   const memory = readMemory(path.join(relayDir, 'memory.md'));
-  const broadcast = readBroadcastDir(path.join(relayDir, 'broadcast'));
+  const { content: broadcast, skillFiles } = readBroadcastDir(path.join(relayDir, 'broadcast'));
 
   const parts = [];
   if (memory.trim()) parts.push(`# Relay Memory\n\n${memory.trim()}`);
   if (broadcast.trim()) {
-    const skillsDir = path.join(relayDir, 'broadcast', 'skills');
-    let skillFiles = [];
-    if (fs.existsSync(skillsDir)) {
-      try {
-        skillFiles = fs.readdirSync(skillsDir, { withFileTypes: true })
-          .filter((e) => e.isFile() && e.name !== '.gitkeep')
-          .map((e) => e.name);
-      } catch {}
-    }
     let broadcastSection = `# Relay Broadcast\n\n${broadcast.trim()}`;
     if (skillFiles.length > 0) {
       const count = skillFiles.length;
@@ -70,7 +70,7 @@ async function main() {
 
     // Pull latest .relay/ from remote before reading memory (fail-open, 3s cap inside pull)
     if (fs.existsSync(path.join(cwd, '.relay'))) {
-      try { new GitSync().pull(cwd); } catch {}
+      try { new GitSync().pull(cwd, { fetchTimeoutMs: 1500, checkoutTimeoutMs: 500 }); } catch {}
     }
 
     const context = buildContext(cwd);
