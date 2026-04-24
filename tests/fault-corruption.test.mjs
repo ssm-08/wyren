@@ -38,7 +38,7 @@ function makeRelayDir(base, { memory = null, snapshot = null, upsState = null } 
 // ---------------------------------------------------------------------------
 // 1. Corrupt ups-state.json (invalid JSON)
 // ---------------------------------------------------------------------------
-test('corrupt watermark (invalid JSON) → treated as empty {}, seeds on first run', () => {
+test('corrupt ups-state.json (invalid JSON) → treated as empty {}, seeds on first run', () => {
   const dir = makeTmpDir();
   try {
     const memory = '## Decisions\n- Use SQLite [session a, turn 1]\n';
@@ -63,7 +63,7 @@ test('corrupt watermark (invalid JSON) → treated as empty {}, seeds on first r
 // ---------------------------------------------------------------------------
 // 2. ups-state with null mtime (NaN-equivalent edge case)
 // ---------------------------------------------------------------------------
-test('watermark null last_injected_mtime → no fast-path skip, falls through to seed/diff', () => {
+test('ups-state.json null last_injected_mtime → no fast-path skip, falls through to seed/diff', () => {
   const dir = makeTmpDir();
   try {
     const memory = '## Decisions\n- Use SQLite [session a, turn 1]\n';
@@ -144,7 +144,7 @@ test('memory.md is a directory → hook returns null without crashing', () => {
 // ---------------------------------------------------------------------------
 // 5. memory.md is empty (0 bytes)
 // ---------------------------------------------------------------------------
-test('empty memory.md → no delta (empty vs empty snapshot), watermark seeded', () => {
+test('empty memory.md → no delta (empty vs empty snapshot), ups-state seeded', () => {
   const dir = makeTmpDir();
   try {
     const { relayDir, upsStatePath, snapshotPath, memoryPath } = makeRelayDir(dir, {
@@ -171,7 +171,7 @@ test('empty memory.md → no delta (empty vs empty snapshot), watermark seeded',
 // ---------------------------------------------------------------------------
 // 6. UPS state hash matches empty content → no delta (content unchanged)
 // ---------------------------------------------------------------------------
-test('watermark hash matches empty content → no delta returned', () => {
+test('ups-state.json hash matches empty content → no delta returned', () => {
   const dir = makeTmpDir();
   try {
     const emptyHash = hashMemory('');
@@ -239,7 +239,7 @@ test('100KB snapshot + small memory.md → diff works, delta is additions only',
 // ---------------------------------------------------------------------------
 // 8. All .relay/state/ files read-only (POSIX only)
 // ---------------------------------------------------------------------------
-test('read-only watermark.json → buildInjection fails gracefully on write (POSIX only)', {
+test('read-only ups-state.json → buildInjection fails gracefully on write (POSIX only)', {
   skip: process.platform === 'win32' ? 'Windows permission model differs' : false,
 }, () => {
   const dir = makeTmpDir();
@@ -317,7 +317,7 @@ test('TOCTOU: memory.md rewritten after seed → second call detects change, ret
 // ---------------------------------------------------------------------------
 // 10. ups-state.json is 1 MB of garbage — parse must fail, fall back to {}
 // ---------------------------------------------------------------------------
-test('1MB garbage watermark → parse fails, falls back to empty {}, seeds without crash', () => {
+test('1MB garbage ups-state.json → parse fails, falls back to empty {}, seeds without crash', () => {
   const dir = makeTmpDir();
   try {
     const memory = '## Decisions\n- Use SQLite [session a, turn 1]\n';

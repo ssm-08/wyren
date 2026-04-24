@@ -154,7 +154,7 @@ export function cloneOrUpdate(dest, { ref = 'master', force = false } = {}) {
   if (dirty && !force) {
     throw new Error(
       `Clone at ${dest} has local changes. Commit or stash them, or pass --force to overwrite.\n` +
-      'This usually means you were dogfooding — your edits are safe, just stash first.'
+      'Your edits are safe — stash them first, then re-run.'
     );
   }
 
@@ -536,7 +536,7 @@ export function install(opts) {
   if (!dryRun) {
     registerCli(repoDir, reporter('cli'));
     process.stderr.write('\n[relay] Install complete.\n');
-    process.stderr.write('  Next: cd <your-repo> && relay init\n');
+    process.stderr.write('  Next: cd /path/to/your/repo && relay init\n');
   }
   return result;
 }
@@ -628,7 +628,7 @@ export function update(opts) {
   const settings = readSettings(paths.settings);
   const patched = patchSettingsInMemory(settings, { mode: 'install', repoDir: paths.clone });
   writeSettingsAtomic(paths.settings, patched);
-  r.ok('settings.json re-patched');
+  r.ok('settings.json refreshed');
 
   registerCli(paths.clone, reporter('cli'));
 
@@ -652,6 +652,7 @@ export function doctor(opts) {
     for (const issue of result.issues) {
       process.stdout.write(`  - ${issue}\n`);
     }
+    process.stdout.write('  Run: relay install to repair.\n');
   }
   return result;
 }

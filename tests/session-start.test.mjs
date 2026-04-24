@@ -112,6 +112,25 @@ test('buildContext includes acknowledgment instruction when skills present', () 
   }
 });
 
+test('buildContext: broadcast dir with files but no memory.md → returns broadcast only', () => {
+  const dir = makeTmpDir();
+  try {
+    fs.mkdirSync(path.join(dir, '.relay', 'broadcast'), { recursive: true });
+    // no memory.md
+    fs.writeFileSync(
+      path.join(dir, '.relay', 'broadcast', 'team.md'),
+      '# Team notes\nReview at 10am.',
+      'utf8'
+    );
+    const result = buildContext(dir);
+    assert.ok(result.includes('Relay Broadcast'), `should have broadcast section: ${result}`);
+    assert.ok(!result.includes('Relay Memory'), `should not have memory section: ${result}`);
+    assert.ok(result.includes('Team notes'), `should have broadcast content: ${result}`);
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
+
 test('buildContext no acknowledgment when broadcast has no skills', () => {
   const dir = makeTmpDir();
   try {

@@ -61,7 +61,7 @@ export function relayInit(targetDir) {
     fs.appendFileSync(gitignorePath, prefix + toAdd.join('\n') + '\n', 'utf8');
   }
 
-  console.log('Relay initialized. Run: git add .relay/memory.md && git commit');
+  console.log('Relay initialized. Run: git add .relay/ && git commit');
   return true;
 }
 
@@ -100,17 +100,22 @@ export function relayStatus(targetDir) {
       console.log(`${label('Distilled:')} never`);
     }
 
-    console.log(`${label('Last UUID:')} ${state.last_uuid || '(none)'}`);
-    console.log(
-      `${label('Watermark:')} turns_since_distill=${state.turns_since_distill ?? 0}` +
-      `, distiller_running=${!!state.distiller_running}`
-    );
+    if (state.last_uuid) {
+      console.log(`${label('Last UUID:')} ${state.last_uuid}`);
+    }
+
+    const turns = state.turns_since_distill ?? 0;
+    const threshold = parseInt(process.env.RELAY_TURNS_THRESHOLD ?? '5', 10);
+    const progressLine = state.distiller_running
+      ? `${turns} turns (distilling now...)`
+      : `${turns} / ${threshold} turns until next distill`;
+    console.log(`${label('Progress:')} ${progressLine}`);
 
     if (state.last_transcript) {
       console.log(`${label('Transcript:')} ${state.last_transcript}`);
     }
   } else {
-    console.log(`${label('Watermark:')} (no state yet)`);
+    console.log(`${label('Progress:')} (no state yet — run a session to start tracking)`);
   }
 
   // Git remote
@@ -130,17 +135,15 @@ export function relayStatus(targetDir) {
     console.log(`${label('Remote:')} (none configured)`);
   }
 
-  // Lock
+  // Only show lock when held — not held is the normal state, not worth showing
   const lockPath = path.join(relayDir, 'state', '.lock');
   if (fs.existsSync(lockPath)) {
     try {
       const age = Math.round((Date.now() - fs.statSync(lockPath).mtimeMs) / 1000);
       console.log(`${label('Lock:')} held (${age}s old)`);
     } catch {
-      console.log(`${label('Lock:')} (unknown)`);
+      console.log(`${label('Lock:')} held`);
     }
-  } else {
-    console.log(`${label('Lock:')} not held`);
   }
 }
 
@@ -173,7 +176,7 @@ export async function relayDistill(targetDir, argv) {
   }
 
   if (!transcriptPath) {
-    console.error('No transcript found. Use: relay distill --transcript <path>');
+    console.error('No transcript found. Start a Claude Code session in this repo first, or pass --transcript <path>.');
     process.exit(1);
   }
 
@@ -198,7 +201,7 @@ export async function relayDistill(targetDir, argv) {
     let release = () => {};
     try { release = sync.lock(targetDir); } catch (e) {
       if (e.message !== 'LOCKED') console.error(`relay distill: lock error: ${e.message}`);
-      else console.error('relay distill: sync locked by another process');
+      else console.error('relay distill: sync locked by another process — retry in a moment');
       // M1: exit 2 so callers can detect that push was skipped (not conflated with success)
       process.exit(2);
     }
@@ -236,7 +239,7 @@ export function relayBroadcastSkill(targetDir, filePath) {
   const ext = path.extname(filePath).toLowerCase();
   const TEXT_EXTS = new Set(['.md', '.toml', '.txt', '.json', '.yaml', '.yml']);
   if (!TEXT_EXTS.has(ext)) {
-    console.error(`Warning: "${skillName}" has extension "${ext}" — expected a text skill file (.md, .toml). Proceeding anyway.`);
+    console.warn(`Warning: "${skillName}" has extension "${ext}" — expected a text skill file (.md, .toml). Proceeding anyway.`);
   }
 
   const destDir = path.join(relayDir, 'broadcast', 'skills');

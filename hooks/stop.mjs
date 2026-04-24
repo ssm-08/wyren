@@ -128,9 +128,14 @@ async function main() {
         cwd,
       });
 
-      state.distiller_running = true;
-      state.turns_since_distill = 0;
-      state.distiller_pid = distProc?.pid ?? null;
+      // Only set distiller_running + reset turns if OS assigned a pid.
+      // If spawn silently failed (pid undefined), don't reset turns — distiller never ran.
+      const pid = distProc?.pid;
+      if (pid) {
+        state.distiller_running = true;
+        state.distiller_pid = pid;
+        state.turns_since_distill = 0;
+      }
       writeWatermarkAtomic(watermarkPath, state);
     }
   } catch (e) {

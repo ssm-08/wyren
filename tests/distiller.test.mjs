@@ -66,3 +66,30 @@ test('scoreTier0 caps per-category contribution', () => {
   // Weight 1, cap = weight*3 = 3; structural = 0; edit = 0
   assert.equal(score, 3);
 });
+
+test('scoreTier0: non-string input → score 0, passes false', () => {
+  assert.deepEqual(scoreTier0(null), { score: 0, passes: false, breakdown: [] });
+  assert.deepEqual(scoreTier0(undefined), { score: 0, passes: false, breakdown: [] });
+  assert.deepEqual(scoreTier0(42), { score: 0, passes: false, breakdown: [] });
+});
+
+test('scoreTier0: edit cap — 5 Edit matches capped at EDIT_WEIGHT*4=12', () => {
+  const text = '[tool_use Edit] a\n[tool_use Edit] b\n[tool_use Edit] c\n[tool_use Edit] d\n[tool_use Edit] e';
+  const { score, breakdown } = scoreTier0(text);
+  const editEntry = breakdown.find((b) => b.pattern === 'tool_use Edit/Write/MultiEdit');
+  assert.ok(editEntry, 'should have edit breakdown entry');
+  assert.equal(editEntry.contribution, 12, 'edit contribution capped at 12');
+  assert.ok(score >= 12, `total score should be >= 12, got ${score}`);
+});
+
+test('scoreTier0: structural score alone can reach threshold with 20-turn session', () => {
+  // 20 turns with long user messages: score += 2 (>=10 turns) + 2 (>=20 turns) + 2 (avg > 200)
+  // That's structural=6 which exceeds threshold=3
+  const lines = Array.from({ length: 20 }, (_, i) => ({
+    type: i % 2 === 0 ? 'user' : 'assistant',
+    message: { content: 'x'.repeat(300) },
+  }));
+  const { score, passes } = scoreTier0('', lines);
+  assert.ok(score >= 6, `expected structural score >= 6, got ${score}`);
+  assert.equal(passes, true, 'structural score alone should pass threshold');
+});

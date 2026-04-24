@@ -365,7 +365,7 @@ test('D12: distiller Tier-0 filter skips no-signal transcript without API call',
     '--cwd', dir,
   ], { cwd: dir });
   assert(r.status === 0, `exit ${r.status}: ${r.stderr}`);
-  assertIncludes(r.stderr, 'Tier 0 filter', 'Tier0 skip message in stderr');
+  assertIncludes(r.stderr, 'low-signal session', 'Tier0 skip message in stderr');
   const newMtime = fs.statSync(memPath).mtimeMs;
   assert(origMtime === newMtime, 'memory.md should be untouched by Tier-0 skip');
 });
@@ -407,7 +407,7 @@ test('E14: relay status prints expected fields in initialized repo', async (dir)
   const r = runNode([path.join(RELAY_ROOT, 'bin', 'relay.mjs'), 'status'], { cwd: dir });
   assert(r.status === 0, `exit ${r.status}: ${r.stderr}`);
   assertIncludes(r.stdout, 'Memory:', 'Memory label');
-  assertIncludes(r.stdout, 'Watermark:', 'Watermark label');
+  assertIncludes(r.stdout, 'Progress:', 'Progress label');
   assertIncludes(r.stdout, 'Remote:', 'Remote label');
 });
 
