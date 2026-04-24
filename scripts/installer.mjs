@@ -580,6 +580,8 @@ export function update(opts) {
   writeSettingsAtomic(paths.settings, patched);
   r.ok('settings.json re-patched');
 
+  registerCli(paths.clone, reporter('cli'));
+
   const result = verifyInstall(paths);
   if (!result.ok) {
     for (const issue of result.issues) r.warn(`Verify: ${issue}`);
