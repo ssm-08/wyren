@@ -3,11 +3,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { readStdin, isMain } from '../lib/util.mjs';
 import { readMemory, writeMemoryAtomic } from '../lib/memory.mjs';
-import { writeWatermarkAtomic } from './stop.mjs';
 import { GitSync } from '../lib/sync.mjs';
 import { diffMemory, renderDelta, hashMemory } from '../lib/diff-memory.mjs';
 
 const SNAPSHOT_FILE = 'last-injected-memory.md';
+
+/**
+ * UPS owns its own state file — separate from watermark.json (owned by stop.mjs).
+ * This eliminates the read-modify-write race that existed when both hooks wrote
+ * to the shared watermark.json: UPS only needs last_injected_mtime + last_injected_hash,
+ * Stop only needs turns_since_distill + distiller_running + last_turn_at.
+ * No shared mutable state → no lock needed.
+ */
+const UPS_STATE_FILE = 'ups-state.json';
 
 function appendLog(cwd, msg) {
   try {
@@ -16,48 +24,63 @@ function appendLog(cwd, msg) {
   } catch {}
 }
 
-function readWatermark(watermarkPath) {
-  try { return JSON.parse(fs.readFileSync(watermarkPath, 'utf8')); } catch { return {}; }
+function readUpsState(upsStatePath) {
+  try { return JSON.parse(fs.readFileSync(upsStatePath, 'utf8')); } catch { return {}; }
+}
+
+function writeUpsStateAtomic(upsStatePath, state) {
+  const tmp = `${upsStatePath}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(state, null, 2));
+  fs.renameSync(tmp, upsStatePath);
 }
 
 /**
  * Exported for unit testing — all logic with no I/O side effects except reading files.
- * Returns { delta: string, newWatermark: object, newSnapshot: string } or null (skip).
+ * Returns { delta: string, newUpsState: object, newSnapshot: string } or null (skip).
+ *
+ * @param {object} opts
+ * @param {string} opts.cwd
+ * @param {string} opts.relayDir
+ * @param {string} opts.upsStatePath  - path to ups-state.json (UPS-owned, never written by stop.mjs)
+ * @param {string} opts.snapshotPath
+ * @param {string} opts.memoryPath
  */
-export function buildInjection({ cwd, relayDir, watermarkPath, snapshotPath, memoryPath }) {
+export function buildInjection({ cwd, relayDir, upsStatePath, snapshotPath, memoryPath }) {
   // 1. Check memory.md exists
   if (!fs.existsSync(memoryPath)) return null;
 
-  const wm = readWatermark(watermarkPath);
+  const st = readUpsState(upsStatePath);
   let currentMtime;
   try {
-    currentMtime = fs.statSync(memoryPath).mtimeMs;
+    const stat = fs.statSync(memoryPath);
+    if (!stat.isFile()) return null;
+    currentMtime = stat.mtimeMs;
   } catch {
     return null;
   }
 
   // 2. Fast path: mtime unchanged since last injection check
-  if (wm.last_injected_mtime === currentMtime) return null;
+  if (st.last_injected_mtime === currentMtime) return null;
 
   // 3. Read current memory content + compute hash
   const currentContent = readMemory(memoryPath);
   const currentHash = hashMemory(currentContent);
 
   // 4. First-run seed: no prior injection → seed without injecting
-  if (!wm.last_injected_hash) {
+  if (!st.last_injected_hash) {
     return {
       delta: null,
-      newWatermark: { ...wm, last_injected_mtime: currentMtime, last_injected_hash: currentHash },
+      newUpsState: { last_injected_mtime: currentMtime, last_injected_hash: currentHash },
       newSnapshot: currentContent,
     };
   }
 
   // 5. Hash unchanged (e.g. file re-written with same content) → update mtime only
-  if (currentHash === wm.last_injected_hash) {
+  if (currentHash === st.last_injected_hash) {
     return {
       delta: null,
-      newWatermark: { ...wm, last_injected_mtime: currentMtime },
-      newSnapshot: null, // no snapshot update needed
+      newUpsState: { ...st, last_injected_mtime: currentMtime },
+      newSnapshot: null,
     };
   }
 
@@ -76,7 +99,7 @@ export function buildInjection({ cwd, relayDir, watermarkPath, snapshotPath, mem
 
   return {
     delta: delta || null,
-    newWatermark: { ...wm, last_injected_mtime: currentMtime, last_injected_hash: currentHash },
+    newUpsState: { last_injected_mtime: currentMtime, last_injected_hash: currentHash },
     newSnapshot: currentContent,
   };
 }
@@ -100,19 +123,19 @@ async function main() {
     }
 
     const stateDir = path.join(relayDir, 'state');
-    const watermarkPath = path.join(stateDir, 'watermark.json');
+    const upsStatePath = path.join(stateDir, UPS_STATE_FILE);
     const snapshotPath = path.join(stateDir, SNAPSHOT_FILE);
     const memoryPath = path.join(relayDir, 'memory.md');
 
-    const result = buildInjection({ cwd, relayDir, watermarkPath, snapshotPath, memoryPath });
+    const result = buildInjection({ cwd, relayDir, upsStatePath, snapshotPath, memoryPath });
 
     if (!result) { process.exit(0); }
 
-    const { delta, newWatermark, newSnapshot } = result;
+    const { delta, newUpsState, newSnapshot } = result;
 
-    // Write state updates
+    // Write state updates — only to UPS-owned files; never touch watermark.json
     fs.mkdirSync(stateDir, { recursive: true });
-    writeWatermarkAtomic(watermarkPath, newWatermark);
+    writeUpsStateAtomic(upsStatePath, newUpsState);
     if (newSnapshot !== null) {
       writeMemoryAtomic(snapshotPath, newSnapshot);
     }

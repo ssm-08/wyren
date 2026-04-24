@@ -790,18 +790,28 @@ function hookUPSInput(cwd) {
   });
 }
 
-test('I1: UPS hook fires, memory.md unchanged mtime → empty stdout, watermark preserved', async (dir) => {
+// UPS hook owns ups-state.json (separate from watermark.json owned by stop.mjs)
+function writeUpsState(dir, state) {
+  const p = path.join(dir, '.relay', 'state', 'ups-state.json');
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  fs.writeFileSync(p, JSON.stringify(state, null, 2), 'utf8');
+}
+
+function readUpsState(dir) {
+  const p = path.join(dir, '.relay', 'state', 'ups-state.json');
+  try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return null; }
+}
+
+test('I1: UPS hook fires, memory.md unchanged mtime → empty stdout, watermark.json untouched', async (dir) => {
   initGit(dir);
   seedRelay(dir, { memory: '## Decisions\n- Use SQLite [session a, turn 1]\n' });
 
-  // Write watermark with matching mtime
+  // Write ups-state with matching mtime (fast-path)
   const memPath = path.join(dir, '.relay', 'memory.md');
   const mtime = fs.statSync(memPath).mtimeMs;
-  writeWatermark(dir, {
-    last_injected_mtime: mtime,
-    last_injected_hash: 'abc123def456',
-    turns_since_distill: 2,
-  });
+  writeUpsState(dir, { last_injected_mtime: mtime, last_injected_hash: 'abc123def456' });
+  // Write watermark with stop.mjs-owned keys — hook must not touch them
+  writeWatermark(dir, { turns_since_distill: 2 });
 
   const r = runNode([path.join(RELAY_ROOT, 'hooks', 'user-prompt-submit.mjs')], {
     cwd: dir, stdin: hookUPSInput(dir), env: { RELAY_SKIP_PULL: '1' },
@@ -811,10 +821,10 @@ test('I1: UPS hook fires, memory.md unchanged mtime → empty stdout, watermark 
   assert(r.stdout.trim() === '', 'stdout should be empty when nothing changed');
 
   const wm = readWatermark(dir);
-  assert(wm.turns_since_distill === 2, 'unrelated watermark key preserved');
+  assert(wm.turns_since_distill === 2, 'watermark.json untouched by UPS hook');
 });
 
-test('I2: first UPS run (no watermark) → seeded, no additionalContext in stdout', async (dir) => {
+test('I2: first UPS run (no ups-state) → seeded, no additionalContext in stdout', async (dir) => {
   initGit(dir);
   seedRelay(dir, { memory: '## Decisions\n- Use SQLite [session a, turn 1]\n' });
 
@@ -825,9 +835,9 @@ test('I2: first UPS run (no watermark) → seeded, no additionalContext in stdou
   assert(r.status === 0, `exit ${r.status}: ${r.stderr}`);
   assert(r.stdout.trim() === '', 'no injection on first run');
 
-  const wm = readWatermark(dir);
-  assert(wm.last_injected_hash, 'hash seeded');
-  assert(wm.last_injected_mtime, 'mtime seeded');
+  const st = readUpsState(dir);
+  assert(st && st.last_injected_hash, 'ups-state hash seeded');
+  assert(st && st.last_injected_mtime, 'ups-state mtime seeded');
 });
 
 test('I3: memory.md mtime changed but hash same → mtime updated, no injection', async (dir) => {
@@ -835,12 +845,11 @@ test('I3: memory.md mtime changed but hash same → mtime updated, no injection'
   const memory = '## Decisions\n- Use SQLite [session a, turn 1]\n';
   seedRelay(dir, { memory });
 
-  // Compute hash of memory content
   const { hashMemory } = await import('../lib/diff-memory.mjs');
   const hash = hashMemory(memory);
 
-  // Seed watermark with stale mtime but correct hash
-  writeWatermark(dir, { last_injected_mtime: 1, last_injected_hash: hash });
+  // Seed ups-state with stale mtime but correct hash
+  writeUpsState(dir, { last_injected_mtime: 1, last_injected_hash: hash });
 
   const r = runNode([path.join(RELAY_ROOT, 'hooks', 'user-prompt-submit.mjs')], {
     cwd: dir, stdin: hookUPSInput(dir), env: { RELAY_SKIP_PULL: '1' },
@@ -849,8 +858,8 @@ test('I3: memory.md mtime changed but hash same → mtime updated, no injection'
   assert(r.status === 0, `exit ${r.status}: ${r.stderr}`);
   assert(r.stdout.trim() === '', 'no injection when hash unchanged');
 
-  const wm = readWatermark(dir);
-  assert(wm.last_injected_mtime > 1, 'mtime updated');
+  const st = readUpsState(dir);
+  assert(st && st.last_injected_mtime > 1, 'mtime updated');
 });
 
 test('I4: real content delta → stdout contains additionalContext with new bullet', async (dir) => {
@@ -861,11 +870,10 @@ test('I4: real content delta → stdout contains additionalContext with new bull
 
   const stateDir = path.join(dir, '.relay', 'state');
   fs.mkdirSync(stateDir, { recursive: true });
-  // Write snapshot with old content
   fs.writeFileSync(path.join(stateDir, 'last-injected-memory.md'), oldMem, 'utf8');
 
   const { hashMemory } = await import('../lib/diff-memory.mjs');
-  writeWatermark(dir, { last_injected_mtime: 1, last_injected_hash: hashMemory(oldMem) });
+  writeUpsState(dir, { last_injected_mtime: 1, last_injected_hash: hashMemory(oldMem) });
 
   const r = runNode([path.join(RELAY_ROOT, 'hooks', 'user-prompt-submit.mjs')], {
     cwd: dir, stdin: hookUPSInput(dir), env: { RELAY_SKIP_PULL: '1' },
@@ -886,9 +894,8 @@ test('I5: corrupt snapshot → hook exits 0, no crash', async (dir) => {
 
   const stateDir = path.join(dir, '.relay', 'state');
   fs.mkdirSync(stateDir, { recursive: true });
-  // Write corrupt binary snapshot
   fs.writeFileSync(path.join(stateDir, 'last-injected-memory.md'), Buffer.from([0xff, 0xfe, 0x00]));
-  writeWatermark(dir, { last_injected_mtime: 1, last_injected_hash: 'stale000aaaa' });
+  writeUpsState(dir, { last_injected_mtime: 1, last_injected_hash: 'stale000aaaa' });
 
   const r = runNode([path.join(RELAY_ROOT, 'hooks', 'user-prompt-submit.mjs')], {
     cwd: dir, stdin: hookUPSInput(dir), env: { RELAY_SKIP_PULL: '1' },
