@@ -259,32 +259,23 @@ function isRelayHookEntry(entry) {
   );
 }
 
-function buildHookEntries() {
+// ${CLAUDE_PLUGIN_ROOT} only expands in plugin hooks.json, NOT in settings.json.
+// Use the absolute path to the relay repo so hooks work when wired via settings.json.
+function buildHookEntries(repoDir) {
+  const dispatcher = path.join(repoDir, 'hooks', 'run-hook.cmd');
+  const q = `"${dispatcher}"`;
   return {
     SessionStart: {
       matcher: '',
-      hooks: [{
-        type: 'command',
-        command: '"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd" session-start',
-        timeout: 2,
-        statusMessage: 'Loading relay memory...',
-      }],
+      hooks: [{ type: 'command', command: `${q} session-start`, timeout: 2, statusMessage: 'Loading relay memory...' }],
     },
     Stop: {
       matcher: '',
-      hooks: [{
-        type: 'command',
-        command: '"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd" stop',
-        timeout: 5,
-      }],
+      hooks: [{ type: 'command', command: `${q} stop`, timeout: 5 }],
     },
     UserPromptSubmit: {
       matcher: '',
-      hooks: [{
-        type: 'command',
-        command: '"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd" user-prompt-submit',
-        timeout: 2,
-      }],
+      hooks: [{ type: 'command', command: `${q} user-prompt-submit`, timeout: 2 }],
     },
   };
 }
@@ -330,7 +321,7 @@ export function readSettings(p) {
   }
 }
 
-export function patchSettingsInMemory(settings, { mode }) {
+export function patchSettingsInMemory(settings, { mode, repoDir = '' }) {
   const out = JSON.parse(JSON.stringify(settings)); // deep clone
 
   if (!out.hooks || typeof out.hooks !== 'object') out.hooks = {};
@@ -346,7 +337,7 @@ export function patchSettingsInMemory(settings, { mode }) {
     const filtered = current.filter((entry) => !isRelayHookEntry(entry));
 
     if (mode === 'install') {
-      const fresh = buildHookEntries();
+      const fresh = buildHookEntries(repoDir);
       hooks[event] = [...filtered, fresh[event]];
     } else {
       // uninstall
@@ -506,7 +497,7 @@ export function install(opts) {
     createLink(repoDir, paths.plugin);
 
     const settings = readSettings(paths.settings);
-    const patched = patchSettingsInMemory(settings, { mode: 'install' });
+    const patched = patchSettingsInMemory(settings, { mode: 'install', repoDir });
     writeSettingsAtomic(paths.settings, patched);
     r.ok(`settings.json updated`);
   } else {
@@ -564,7 +555,7 @@ export function update(opts) {
 
   // Re-patch settings in case hooks.json changed
   const settings = readSettings(paths.settings);
-  const patched = patchSettingsInMemory(settings, { mode: 'install' });
+  const patched = patchSettingsInMemory(settings, { mode: 'install', repoDir: paths.clone });
   writeSettingsAtomic(paths.settings, patched);
   r.ok('settings.json re-patched');
 

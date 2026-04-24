@@ -132,25 +132,28 @@ test('readSettings throws on unparseable content', () => {
 // patchSettingsInMemory — install mode
 // ---------------------------------------------------------------------------
 
+const FAKE_REPO = path.join('/fake', 'relay');
+
 test('patchSettingsInMemory install: creates hooks when absent', () => {
-  const result = patchSettingsInMemory({}, { mode: 'install' });
+  const result = patchSettingsInMemory({}, { mode: 'install', repoDir: FAKE_REPO });
   assert.ok(Array.isArray(result.hooks.SessionStart));
   assert.ok(Array.isArray(result.hooks.Stop));
   assert.equal(result.hooks.SessionStart.length, 1);
   assert.equal(result.hooks.Stop.length, 1);
 });
 
-test('patchSettingsInMemory install: hook command contains ${CLAUDE_PLUGIN_ROOT}', () => {
-  const result = patchSettingsInMemory({}, { mode: 'install' });
+test('patchSettingsInMemory install: hook command uses absolute repoDir path', () => {
+  const result = patchSettingsInMemory({}, { mode: 'install', repoDir: FAKE_REPO });
   const cmd = result.hooks.SessionStart[0].hooks[0].command;
-  assert.ok(cmd.includes('${CLAUDE_PLUGIN_ROOT}'), `Command: ${cmd}`);
   assert.ok(cmd.includes('run-hook.cmd'), `Command: ${cmd}`);
+  assert.ok(cmd.includes(FAKE_REPO), `Command must contain repoDir: ${cmd}`);
+  assert.ok(!cmd.includes('${CLAUDE_PLUGIN_ROOT}'), `Must not use CLAUDE_PLUGIN_ROOT: ${cmd}`);
 });
 
 test('patchSettingsInMemory install: preserves foreign SessionStart entries', () => {
   const foreign = { matcher: 'src/**', hooks: [{ type: 'command', command: 'echo hi' }] };
   const settings = { hooks: { SessionStart: [foreign] } };
-  const result = patchSettingsInMemory(settings, { mode: 'install' });
+  const result = patchSettingsInMemory(settings, { mode: 'install', repoDir: FAKE_REPO });
   const entries = result.hooks.SessionStart;
   assert.equal(entries.length, 2);
   assert.equal(entries[0].hooks[0].command, 'echo hi');
@@ -159,18 +162,18 @@ test('patchSettingsInMemory install: preserves foreign SessionStart entries', ()
 test('patchSettingsInMemory install: replaces stale relay entry, no duplicate', () => {
   const stale = { matcher: '', hooks: [{ type: 'command', command: '"C:\\old\\path\\run-hook.cmd" session-start' }] };
   const settings = { hooks: { SessionStart: [stale] } };
-  const result = patchSettingsInMemory(settings, { mode: 'install' });
+  const result = patchSettingsInMemory(settings, { mode: 'install', repoDir: FAKE_REPO });
   const relayEntries = result.hooks.SessionStart.filter((e) =>
     e.hooks && e.hooks[0] && e.hooks[0].command.includes('run-hook.cmd')
   );
   assert.equal(relayEntries.length, 1, 'Exactly one relay entry after replace');
-  assert.ok(relayEntries[0].hooks[0].command.includes('${CLAUDE_PLUGIN_ROOT}'), 'Uses canonical form');
+  assert.ok(relayEntries[0].hooks[0].command.includes(FAKE_REPO), 'Uses new repoDir path');
 });
 
 test('patchSettingsInMemory install: handles Stop as single object (not array)', () => {
   const stopEntry = { matcher: '', hooks: [{ type: 'command', command: 'echo stop' }] };
   const settings = { hooks: { Stop: stopEntry } };
-  const result = patchSettingsInMemory(settings, { mode: 'install' });
+  const result = patchSettingsInMemory(settings, { mode: 'install', repoDir: FAKE_REPO });
   assert.ok(Array.isArray(result.hooks.Stop));
   // should have the foreign entry + new relay entry
   assert.equal(result.hooks.Stop.length, 2);
@@ -178,7 +181,7 @@ test('patchSettingsInMemory install: handles Stop as single object (not array)',
 
 test('patchSettingsInMemory install: preserves _comment key', () => {
   const settings = { _comment: 'my settings', hooks: {} };
-  const result = patchSettingsInMemory(settings, { mode: 'install' });
+  const result = patchSettingsInMemory(settings, { mode: 'install', repoDir: FAKE_REPO });
   assert.equal(result._comment, 'my settings');
 });
 
