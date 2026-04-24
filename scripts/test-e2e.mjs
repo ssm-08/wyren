@@ -469,13 +469,13 @@ test('F17: run-hook.cmd stop routes correctly', async (dir) => {
 
 /** Spawn N concurrent stop hooks against the same .relay/ dir.
  *  Returns array of exit codes once all settle. */
-function spawnStopHooks(n, dir, transcriptPath) {
+function spawnStopHooks(n, dir, transcriptPath, extraEnv = {}) {
   const hookPath = path.join(RELAY_ROOT, 'hooks', 'stop.mjs');
   const input = hookInput('Stop', dir, { transcript_path: transcriptPath });
   const procs = [];
   for (let i = 0; i < n; i++) {
     const p = spawn('node', [hookPath], {
-      env: { ...process.env, RELAY_SKIP_PULL: '1' },
+      env: { ...process.env, RELAY_SKIP_PULL: '1', ...extraEnv },
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     p.stdin.end(input, 'utf8');
@@ -496,7 +496,10 @@ test('G18: concurrent stop hooks — no watermark corruption (10 simultaneous)',
   ]);
 
   const N = 10;
-  const codes = await spawnStopHooks(N, dir, transcriptPath);
+  // Set threshold above N so no hook triggers the distiller reset (which would zero turns).
+  // On Windows, process startup stagger means hooks can run near-sequentially — without a
+  // high threshold the watermark reaches 5, distiller resets it to 0, and the test fails.
+  const codes = await spawnStopHooks(N, dir, transcriptPath, { RELAY_TURNS_THRESHOLD: '100' });
 
   // All hooks exit 0 (fail-open)
   const nonZero = codes.filter((c) => c !== 0);
@@ -708,12 +711,14 @@ test('H3: uninstall removes link + relay settings entries, foreign entries kept'
 test('H4: migrate-from-setup.ps1 — old absolute-path hook replaced with canonical form', async (dir) => {
   const fakeHome = makeHomeDirs(path.join(dir, 'fake-home'));
 
-  // Seed settings.json with setup.ps1-style absolute-path hook
+  // Seed settings.json with setup.ps1-style absolute-path hook pointing to a DIFFERENT
+  // (fictional) relay install — simulates a teammate's machine or a moved checkout.
+  const OLD_RELAY_PATH = 'C:\\Users\\olduser\\old-relay-checkout';
   const oldWindowsHook = {
     matcher: '',
     hooks: [{
       type: 'command',
-      command: `"C:\\Users\\shree\\Documents\\Vibejam\\hooks\\run-hook.cmd" session-start`,
+      command: `"${OLD_RELAY_PATH}\\hooks\\run-hook.cmd" session-start`,
       timeout: 2,
       statusMessage: 'Loading relay memory...',
     }],
@@ -728,13 +733,13 @@ test('H4: migrate-from-setup.ps1 — old absolute-path hook replaced with canoni
   ]);
   assert(r.status === 0, `exit ${r.status}: ${r.stderr.slice(0, 400)}`);
 
-  // Should have exactly 1 entry with the current relay root (not the old shree path)
+  // Should have exactly 1 entry with the current relay root (old fictional path gone)
   const settings = readInstallerSettings(fakeHome);
   assert(countRelayHooks(settings, 'SessionStart') === 1, 'Exactly 1 SessionStart hook after migration');
   const cmd = settings.hooks.SessionStart[0].hooks[0].command;
   const expectedDispatcher = path.join(RELAY_ROOT, 'hooks', 'run-hook.cmd');
   assert(cmd.includes(expectedDispatcher), `Should use current relay root path: ${cmd}`);
-  assert(!cmd.toLowerCase().includes('shree\\documents'), 'Should not retain old user absolute path');
+  assert(!cmd.toLowerCase().includes('olduser\\old-relay-checkout'), 'Should not retain old user absolute path');
 });
 
 test('H5: relay doctor on broken install exits non-zero and names the issue', async (dir) => {
