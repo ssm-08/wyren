@@ -71,6 +71,32 @@ test('relayInit returns false and is a no-op when already initialized', () => {
   }
 });
 
+test('relayInit seeds memory.md from CLAUDE.md when present', () => {
+  const dir = makeTmpDir();
+  try {
+    fs.writeFileSync(path.join(dir, 'CLAUDE.md'), '# My Project\n\nKey decision: use ESM.\n', 'utf8');
+    relayInit(dir);
+    const content = fs.readFileSync(path.join(dir, '.relay', 'memory.md'), 'utf8');
+    assert.ok(content.includes('Seeded from CLAUDE.md'), 'memory.md should have seeded section');
+    assert.ok(content.includes('Key decision: use ESM.'), 'memory.md should contain CLAUDE.md content');
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
+
+test('relayInit truncates CLAUDE.md seed at 8000 chars', () => {
+  const dir = makeTmpDir();
+  try {
+    fs.writeFileSync(path.join(dir, 'CLAUDE.md'), 'x'.repeat(9000), 'utf8');
+    relayInit(dir);
+    const content = fs.readFileSync(path.join(dir, '.relay', 'memory.md'), 'utf8');
+    assert.ok(content.includes('<!-- truncated -->'), 'long CLAUDE.md should be truncated');
+    assert.ok(content.length < 9500, 'memory.md should not contain full 9000-char content');
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
+
 test('relayInit does not duplicate .gitignore entries on repeated calls', () => {
   const dir = makeTmpDir();
   try {

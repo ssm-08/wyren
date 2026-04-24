@@ -15,11 +15,27 @@ export function relayInit(targetDir) {
     return false;
   }
 
-  // Create .relay/memory.md
+  // Create .relay/memory.md — optionally seeded from existing CLAUDE.md
   fs.mkdirSync(relayDir, { recursive: true });
+
+  let seedSection = '';
+  const claudeMdPath = path.join(targetDir, 'CLAUDE.md');
+  let claudeStat;
+  try { claudeStat = fs.statSync(claudeMdPath); } catch {}
+  if (claudeStat && claudeStat.isFile()) {
+    const raw = fs.readFileSync(claudeMdPath, 'utf8');
+    const MAX = 8000;
+    const body = raw.length > MAX ? raw.slice(0, MAX) + '\n<!-- truncated -->' : raw;
+    const trimmed = body.trim();
+    if (trimmed) {
+      seedSection = `\n\n## Seeded from CLAUDE.md\n\n<!-- One-time import on relay init. Not kept in sync. -->\n\n${trimmed}`;
+      console.log('  → Seeded memory.md from existing CLAUDE.md');
+    }
+  }
+
   fs.writeFileSync(
     path.join(relayDir, 'memory.md'),
-    '# Relay Memory\n<!-- Populated by distiller. Edit manually to seed context. -->\n',
+    `# Relay Memory\n<!-- Populated by distiller. Edit manually to seed context. -->${seedSection}\n`,
     'utf8'
   );
 

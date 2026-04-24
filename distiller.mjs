@@ -184,7 +184,7 @@ async function main() {
   }
 
   // Tier 0: skip API call if slice has no actionable signal (bypass with --force)
-  if (!force && !hasTier0Signal(transcriptSlice)) {
+  if (!force && !hasTier0Signal(transcriptSlice, sliced)) {
     console.error('distiller: Tier 0 filter — no signal words; skipping API call');
     const endUuid = lastUuid(sliced) || lastUuid(limited) || lastUuid(lines);
     writeWatermark(cwd, endUuid, { clearRunning: true });

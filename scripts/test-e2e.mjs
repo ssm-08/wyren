@@ -647,9 +647,10 @@ test('H1: fresh install into fake HOME creates link + settings', async (dir) => 
   assert(countRelayHooks(settings, 'SessionStart') === 1, 'Should have 1 SessionStart hook');
   assert(countRelayHooks(settings, 'Stop') === 1, 'Should have 1 Stop hook');
 
-  // Command uses ${CLAUDE_PLUGIN_ROOT}
+  // Command uses absolute path to run-hook.cmd (CLAUDE_PLUGIN_ROOT does not expand in settings.json)
   const cmd = settings.hooks.SessionStart[0].hooks[0].command;
-  assert(cmd.includes('${CLAUDE_PLUGIN_ROOT}'), `Command should use CLAUDE_PLUGIN_ROOT: ${cmd}`);
+  const expectedDispatcher = path.join(RELAY_ROOT, 'hooks', 'run-hook.cmd');
+  assert(cmd.includes(expectedDispatcher), `Command should reference run-hook.cmd at relay root: ${cmd}`);
 });
 
 test('H2: idempotent re-install — no duplicate entries', async (dir) => {
@@ -727,12 +728,13 @@ test('H4: migrate-from-setup.ps1 — old absolute-path hook replaced with canoni
   ]);
   assert(r.status === 0, `exit ${r.status}: ${r.stderr.slice(0, 400)}`);
 
-  // Should have exactly 1 canonical entry (no duplicate)
+  // Should have exactly 1 entry with the current relay root (not the old shree path)
   const settings = readInstallerSettings(fakeHome);
   assert(countRelayHooks(settings, 'SessionStart') === 1, 'Exactly 1 SessionStart hook after migration');
   const cmd = settings.hooks.SessionStart[0].hooks[0].command;
-  assert(cmd.includes('${CLAUDE_PLUGIN_ROOT}'), `Should use canonical form: ${cmd}`);
-  assert(!cmd.includes('C:\\\\Users'), 'Should not have old absolute path');
+  const expectedDispatcher = path.join(RELAY_ROOT, 'hooks', 'run-hook.cmd');
+  assert(cmd.includes(expectedDispatcher), `Should use current relay root path: ${cmd}`);
+  assert(!cmd.toLowerCase().includes('shree\\documents'), 'Should not retain old user absolute path');
 });
 
 test('H5: relay doctor on broken install exits non-zero and names the issue', async (dir) => {
