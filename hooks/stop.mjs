@@ -7,8 +7,8 @@ import { readStdin, isMain } from '../lib/util.mjs';
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 
-const TURNS_THRESHOLD = 5;
-const IDLE_MS = 2 * 60 * 1000;
+const TURNS_THRESHOLD = process.env.RELAY_TURNS_THRESHOLD ? parseInt(process.env.RELAY_TURNS_THRESHOLD, 10) : 5;
+const IDLE_MS = process.env.RELAY_IDLE_MS ? parseInt(process.env.RELAY_IDLE_MS, 10) : 2 * 60 * 1000;
 
 export function writeWatermarkAtomic(watermarkPath, state) {
   const tmp = `${watermarkPath}.${process.pid}.${Date.now()}.tmp`;
