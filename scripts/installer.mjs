@@ -588,6 +588,23 @@ export function update(opts) {
   const r = reporter('update');
   const paths = relayPaths(home);
 
+  // Detect --from-local install: plugin link exists but points outside paths.clone.
+  // relay update only knows how to update the standard clone — local checkouts are
+  // user-managed. Tell them to pull manually and re-install.
+  const linkInfo = inspectLink(paths.plugin);
+  if (linkInfo.kind !== 'missing' && linkInfo.target) {
+    const linkTarget = path.resolve(stripWinPathPrefix(linkInfo.target));
+    if (linkTarget !== path.resolve(paths.clone)) {
+      r.warn(
+        `Local install detected — plugin points to: ${linkTarget}\n` +
+        `  relay update only works for standard (cloned) installs.\n` +
+        `  Pull your local checkout manually, then re-run:\n` +
+        `    relay install --from-local "${linkTarget}"`
+      );
+      return;
+    }
+  }
+
   if (!fs.existsSync(paths.clone)) {
     throw new Error(
       `Relay not installed at ${paths.clone}. Run: relay install`
