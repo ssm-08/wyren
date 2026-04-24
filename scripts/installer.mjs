@@ -134,11 +134,21 @@ export function cloneOrUpdate(dest, { ref = 'master', force = false } = {}) {
     return;
   }
 
-  // Check dirty
+  // Check dirty — use content diff (not stat-cache status) to avoid false positives
+  // from LF→CRLF stat noise on Windows after npm touches files.
+  // git diff --quiet exits 0 (clean) or 1 (dirty); untracked files checked separately.
   let dirty = false;
   try {
-    const status = git(['status', '--porcelain'], dest, { timeout: 5_000 });
-    dirty = status.trim().length > 0;
+    try {
+      git(['diff', '--quiet', 'HEAD'], dest, { timeout: 5_000 });
+    } catch (e) {
+      if (e.status === 1) dirty = true;
+      else throw e;
+    }
+    if (!dirty) {
+      const untracked = git(['ls-files', '--others', '--exclude-standard'], dest, { timeout: 5_000 });
+      if (untracked.length > 0) dirty = true;
+    }
   } catch {}
 
   if (dirty && !force) {
@@ -364,11 +374,16 @@ export function writeSettingsAtomic(p, obj) {
   const dir = path.dirname(p);
   fs.mkdirSync(dir, { recursive: true });
 
-  // Backup existing
+  // Backup existing — keep only the most recent, prune older ones
   if (fs.existsSync(p)) {
+    const dir = path.dirname(p);
+    const base = path.basename(p);
+    const old = fs.readdirSync(dir)
+      .filter((f) => f.startsWith(`${base}.relay-backup-`))
+      .map((f) => path.join(dir, f));
+    for (const f of old) { try { fs.unlinkSync(f); } catch {} }
     const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const backup = `${p}.relay-backup-${ts}`;
-    fs.copyFileSync(p, backup);
+    fs.copyFileSync(p, `${p}.relay-backup-${ts}`);
   }
 
   const tmp = `${p}.tmp`;
