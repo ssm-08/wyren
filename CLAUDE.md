@@ -21,8 +21,9 @@ Relay is a Claude Code plugin that gives a team shared memory across every teamm
 - **Scripts (2026-04-22):** ✅ `scripts/setup.ps1` + `scripts/test-e2e.mjs` shipped. 21 e2e tests across 7 groups (init, SessionStart, Stop, distiller, CLI, dispatcher, stress/concurrency). Full lifecycle verified.
 - **Live two-system test (2026-04-22):** ✅ verified end-to-end across two machines. Fixed: setup.ps1 cwd bug, windowsHide: true for distiller spawn.
 - **Deployability v1 (2026-04-23):** ✅ `install.sh` (macOS/Linux) + `install.ps1` (Windows) one-liner installers. `scripts/installer.mjs` — shared Node logic for install/update/uninstall/doctor (zero deps, JSONC-tolerant settings.json patch, atomic write, symlink/junction, verify). `relay install|update|uninstall|doctor` CLI subcommands. `setup.ps1` shrunk to deprecation stub. CI matrix: ubuntu unit + macos/windows e2e. Code review: 3 Important bugs caught + fixed.
-- **Live sync (2026-04-23):** ✅ `hooks/user-prompt-submit.mjs` — `UserPromptSubmit` hook pulls latest `.relay/memory.md` on each user turn (1s tight cap), computes section-aware delta against stored snapshot, injects only new content as `additionalContext`. B's running session auto-receives A's updates without restart. `lib/diff-memory.mjs` — pure diff/hash utilities. `writeWatermarkAtomic` exported from `stop.mjs`. `GitSync.pull` extended with configurable timeouts. UPS owns `.relay/state/ups-state.json` (snapshot + pull timestamp).
+- **Live sync (2026-04-23):** ✅ `hooks/user-prompt-submit.mjs` — `UserPromptSubmit` hook pulls latest `.relay/memory.md` on each user turn (**1.5s fetch cap, 3s hook budget**), computes section-aware delta against stored snapshot, injects only new content as `additionalContext`. B's running session auto-receives A's updates without restart. `lib/diff-memory.mjs` — pure diff/hash utilities. `writeWatermarkAtomic` exported from `stop.mjs`. `GitSync.pull` extended with configurable timeouts. UPS owns `.relay/state/ups-state.json` (snapshot + pull timestamp).
 - **Fault injection testing (2026-04-23):** ✅ `tests/fault-network.test.mjs`, `tests/fault-corruption.test.mjs`, `tests/fault-concurrency.test.mjs`, `tests/fault-e2e-livesync.test.mjs` — 53 fault tests covering network failure, corrupted state files, concurrent distiller races, and live-sync edge cases. Two bugs found and fixed: (1) EISDIR crash when `.relay/state/` exists as directory but `ups-state.json` missing; (2) watermark race — UPS now exclusively owns `ups-state.json` rather than sharing with Stop hook. `windowsHide: true` added to remaining `spawnSync` calls. **131 unit tests + 32 e2e = 163 total.**
+- **Code review + live testing polish (2026-04-23):** ✅ Two-machine live test surfaced 9 bugs; systematic code review caught 9 more. All fixed. Key: `${CLAUDE_PLUGIN_ROOT}` doesn't expand in `settings.json` (installer now writes absolute repoDir path); UTF-8 BOM in `settings.json` crashed parser (stripped on read); `relay install`/`update` register CLI via `npm install -g`; `relay uninstall` now fully removes link + settings + CLI + clone; UPS fetch 1s→1.5s; Stop hook PID liveness check prevents stuck `distiller_running`; `resetWatermarkTurns` made atomic; `RELAY_TURNS_THRESHOLD`/`RELAY_IDLE_MS` env vars added. Docs fully updated. **163 total tests, 0 fail.**
 
 ## Repo layout
 
@@ -63,7 +64,7 @@ Vibejam/
 ├── scripts/
 │   ├── installer.mjs           # cross-platform install/update/uninstall/doctor logic (Node, zero deps)
 │   ├── setup.ps1               # DEPRECATED stub — forwards to install.ps1
-│   └── test-e2e.mjs            # 27 e2e tests across 8 groups (A–H)
+│   └── test-e2e.mjs            # 32 e2e tests across 8 groups (A–H)
 ├── tests/                      # 131 unit tests (node:test)
 │   ├── installer.test.mjs      # installer pure-function tests (26)
 │   ├── diff-memory.test.mjs    # diff-memory pure-function tests (10)
@@ -81,16 +82,19 @@ Vibejam/
 
 ## Plugin registration (non-obvious — read before touching hooks)
 
-Junction into `~/.claude/plugins/relay` is NOT sufficient. Claude Code only fires hooks for plugins listed in `installed_plugins.json`. For local dev, wire hooks directly in `~/.claude/settings.json`:
+Junction into `~/.claude/plugins/relay` is NOT sufficient. Claude Code only fires hooks for plugins listed in `installed_plugins.json`. For local dev, wire hooks directly in `~/.claude/settings.json`.
+
+**CRITICAL: `${CLAUDE_PLUGIN_ROOT}` does NOT expand in `settings.json`.** It only works inside a plugin's own `hooks/hooks.json`. The installer writes the **absolute path** to the relay clone. Example:
 
 ```json
 "hooks": {
-  "SessionStart": [{"matcher": "", "hooks": [{"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\\hooks\\run-hook.cmd\" session-start", "timeout": 2, "statusMessage": "Loading relay memory..."}]}],
-  "Stop": [{"matcher": "", "hooks": [{"type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\\hooks\\run-hook.cmd\" stop", "timeout": 5}]}]
+  "SessionStart": [{"matcher": "", "hooks": [{"type": "command", "command": "\"C:\\Users\\you\\.claude\\relay\\hooks\\run-hook.cmd\" session-start", "timeout": 2, "statusMessage": "Loading relay memory..."}]}],
+  "Stop": [{"matcher": "", "hooks": [{"type": "command", "command": "\"C:\\Users\\you\\.claude\\relay\\hooks\\run-hook.cmd\" stop", "timeout": 5}]}],
+  "UserPromptSubmit": [{"matcher": "", "hooks": [{"type": "command", "command": "\"C:\\Users\\you\\.claude\\relay\\hooks\\run-hook.cmd\" user-prompt-submit", "timeout": 3}]}]
 }
 ```
 
-**`install.sh` / `install.ps1` automates this.** Run from anywhere:
+**`install.sh` / `install.ps1` automates this** (also registers `relay` CLI via `npm install -g`):
 
 ```bash
 # macOS / Linux
@@ -105,7 +109,7 @@ node scripts/installer.mjs doctor --home /tmp/fake-home
 node scripts/installer.mjs uninstall --home /tmp/fake-home
 ```
 
-**Hook command uses `${CLAUDE_PLUGIN_ROOT}` variable** (not absolute path). Claude Code expands this at invocation. `run-hook.cmd` is a polyglot bash+cmd file — same file works on both OSes.
+`run-hook.cmd` is a polyglot bash+cmd file — same file works on both OSes.
 
 ## Non-obvious conventions
 
@@ -126,7 +130,10 @@ node scripts/installer.mjs uninstall --home /tmp/fake-home
 - **Node.js ESM `.mjs`. Zero runtime dependencies** — stdlib only (`node:fs`, `node:child_process`, `node:path`, `node:readline`, `node:os`). `@anthropic-ai/sdk` is a SDK-fallback-only dep (tree-shakeable out of the preferred path).
 - **Preferred AI call: `claude -p`** (headless Claude Code). Rides the user's existing Claude Code auth; no separate API key. SDK path is the fallback when `claude` CLI is unavailable.
 - **Tier 0 regex filter is mandatory** before any API call. See `docs-site/src/content/docs/cost-model.md` for the exact regex and rationale. ~70% of triggers skip the API entirely.
-- **Hooks never block.** `SessionStart` must return in < 500ms (hard-capped 2s with fail-open). `Stop` spawns the distiller detached and returns immediately. On any error: log to `.relay/log` and `process.exit(0)` — never break Claude Code on a Relay failure.
+- **Hooks never block.** `SessionStart` 2s budget (fetch 1.5s + checkout 0.5s). `UserPromptSubmit` 3s budget (fetch 1.5s + checkout 0.5s). `Stop` spawns distiller detached and returns immediately. On any error: log to `.relay/log` and `process.exit(0)` — never break Claude Code on a Relay failure.
+- **`distiller_running` + PID liveness.** `stop.mjs` stores `distiller_pid` alongside the flag. `shouldDistill` calls `process.kill(pid, 0)` — clears stale flag if process is gone (ESRCH). Prevents stuck-forever on OS kill.
+- **`RELAY_TURNS_THRESHOLD` / `RELAY_IDLE_MS` env vars** override distill trigger thresholds (defaults: 5 turns, 120s). Set before launching Claude Code for faster test cycles. Unset for normal use.
+- **Windows: `cmd /c claude` not `shell:true`.** Distiller spawns Claude via `['cmd', ['/c', 'claude', ...]]` on Windows — avoids DEP0190 (shell+args deprecation) and keeps no-injection-surface rule intact.
 - **Atomic memory writes.** Write to `.relay/memory.md.tmp`, then `rename()`.
 - **Path-scoped git pushes.** `git add .relay/memory.md .relay/broadcast/` — never push main code from within a hook.
 - **`git()` helper uses `spawnSync(array)`** — never shell strings (no injection surface).
