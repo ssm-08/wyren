@@ -1,9 +1,9 @@
 ---
 title: Future
-description: What ships after the 48h hackathon. Cloud sync, MCP RAG, permissions, dashboard.
+description: Cloud sync, MCP RAG, permissions, dashboard — what comes next.
 ---
 
-Relay's 48h scope ends when the [demo script](/demo/) runs end-to-end. Everything below is explicitly out of scope for the hackathon but designed for.
+Everything below is designed for but not yet built. The architecture is already pluggable — these are the natural extensions.
 
 ## Cloud sync backend
 
@@ -54,7 +54,7 @@ Current Relay assumes trust model = same team. A real product needs:
 - **Team boundaries.** Memory is scoped to a team, not a repo.
 - **Audit log.** Who saw what memory, when.
 
-All of this requires a server (or at least a signed-identity layer over git). Out of scope for hackathon.
+All of this requires a server (or at least a signed-identity layer over git). Out of scope for the current release.
 
 ## Dashboard / web UI
 
@@ -121,7 +121,7 @@ For larger codebases, split memory by directory:
 
 Distiller routes entries to the right module based on file paths mentioned in the transcript. Injection picks the relevant ones based on `cwd` at session start.
 
-Out of scope because most hackathon projects don't need it. Obvious addition for long-term team use.
+Out of scope for now — most projects don't need it early. Obvious addition as the codebase scales.
 
 ## Evaluation harness
 

@@ -25,7 +25,7 @@ curl -fsSL https://raw.githubusercontent.com/ssm-08/relay/master/install.sh | sh
 iwr -useb https://raw.githubusercontent.com/ssm-08/relay/master/install.ps1 | iex
 ```
 
-This clones Relay to `~/.claude/relay/`, creates a plugin link, and patches `~/.claude/settings.json` with the `SessionStart` and `Stop` hooks.
+This clones Relay to `~/.claude/relay/`, creates a plugin link, and patches `~/.claude/settings.json` with the `SessionStart`, `Stop`, and `UserPromptSubmit` hooks.
 
 :::note
 The installer preserves any existing entries in `settings.json`. It backs up your file before writing.

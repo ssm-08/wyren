@@ -54,7 +54,7 @@ Verify install is healthy:
 relay doctor
 # [relay] doctor: all checks passed
 
-node scripts/test-e2e.mjs   # 27 tests, ~25s, no Claude session needed
+node scripts/test-e2e.mjs   # 32 tests, ~25s, no Claude session needed
 ```
 
 ---
@@ -91,7 +91,7 @@ cd relay-test-repo
 relay init
 # Output: "Relay initialized. Run: git add .relay/memory.md && git commit"
 
-git add .relay/memory.md .gitignore
+git add .relay/ .gitignore
 git commit -m "chore: init relay"
 git push
 ```
@@ -130,12 +130,12 @@ Expected `relay status` output:
 Memory:     .relay/memory.md  (1.2 KB, 34 lines)
 Distilled:  2026-04-22T10:30:00.000Z (2 min ago)
 Last UUID:  abc12345
-Watermark:  turns_since_distill=0, distiller_running=false
+Progress:   0 / 5 turns until next distill
+Transcript: /Users/alice/.claude/projects/.../abc12345.jsonl
 Remote:     origin → git@github.com:YOUR_USERNAME/relay-test-repo.git
-Lock:       not held
 ```
 
-If `distiller_running=true` persists after 2+ minutes, the distiller crashed — check `.relay/log`.
+The `Lock:` line only appears when a distiller process is actively running. If distillation appears stuck, run `relay distill --force` to reset — check `.relay/log` for the crash reason.
 
 ---
 
@@ -158,7 +158,7 @@ relay distill --push --force
 
 ## Phase 5b — Live sync: A's updates reach B without restart
 
-Once both systems have active Claude Code sessions open in the shared repo, live sync kicks in automatically. After System A finishes a turn and the distiller pushes updated memory to git, System B's **next user prompt** triggers the `UserPromptSubmit` hook: it pulls the latest `.relay/memory.md` (1s cap), diffs it against the last-seen snapshot, and injects only the new sections as hidden `additionalContext`. System B should see a `Relay live update` block in its session context containing just the delta — no restart needed. To disable the pull while keeping the diff-based injection, set `RELAY_SKIP_PULL=1` in System B's environment.
+Once both systems have active Claude Code sessions open in the shared repo, live sync kicks in automatically. After System A finishes a turn and the distiller pushes updated memory to git, System B's **next user prompt** triggers the `UserPromptSubmit` hook: it pulls the latest `.relay/memory.md` (1.5s cap), diffs it against the last-seen snapshot, and injects only the new sections as hidden `additionalContext`. System B should see a `Relay live update` block in its session context containing just the delta — no restart needed. To disable the pull while keeping the diff-based injection, set `RELAY_SKIP_PULL=1` in System B's environment.
 
 ---
 

@@ -1,13 +1,13 @@
 ---
 title: The problem
-description: Why shared context is the real bottleneck in team hackathons.
+description: Why shared context is the real bottleneck for teams using Claude Code.
 ---
 
 > **The core insight:** The problem is not that Claude forgets. It's that Claude never knew in the first place.
 
 ## The coordination wall
 
-In team hackathons and collaborative sprints, the bottleneck isn't technical skill — it's **shared context**. You end up with one person doing an all-nighter coding, one waiting to make slides, and one doing nothing because they can't get up to speed fast enough. The wall people hit isn't capability. It's coordination.
+In any team using Claude Code — a startup, an enterprise squad, or a short-duration sprint — the bottleneck isn't technical skill. It's **shared context**. When someone picks up a ticket, reviews another's work, or joins mid-project, they hit a wall. Not a capability wall. A coordination wall.
 
 When multiple people use Claude Code on the same project, every session starts blank. Each person's Claude is an island: **same codebase, zero shared understanding**. Context that lives in one session — why a decision was made, what was tried and rejected, what's intentionally broken — evaporates when that session closes. The next person (or the same person in a new session) inherits code but not comprehension.
 
@@ -15,7 +15,7 @@ The four specific failure modes:
 
 1. **Empty sessions.** Every new Claude opens blank — no memory of what was built, why, or what was intentionally left broken.
 2. **Rationale evaporates.** Markdown captures decisions but never the reasoning. Rejected paths, live workarounds, and constraints vanish when a session closes.
-3. **Push-pull collaboration.** Teams work in sequence, not parallel. Every handoff has a dead zone while context transfers manually. In a 24-hour hackathon, three handoffs can cost two hours.
+3. **Push-pull collaboration.** Teams work in sequence, not parallel. Every handoff has a dead zone while context transfers manually. Three handoffs in a sprint can cost hours of lost productivity.
 4. **Inconsistent Claude behavior.** Different skills and settings mean each person's Claude behaves differently — same repo, different outputs. One teammate gets a table, another gets prose.
 
 **Root cause:** Claude has no shared state across humans or sessions. Every person's Claude is an island.
@@ -50,7 +50,7 @@ Several tools solve parts of this problem. None address the core gap.
 **Why existing tools fall short:**
 
 - **Git** syncs code perfectly but has no mechanism for syncing the *understanding* of that code — the why behind it, the what-not-to-touch, the this-is-intentional flags.
-- **`CLAUDE.md`** requires someone to remember to write it, at the moment they have least time. In a hackathon, that person is coding at 2am.
+- **`CLAUDE.md`** requires someone to remember to write it, at the moment they have least time. That person is already at capacity doing the actual work.
 - **Claude Projects** offer shared docs, but context is static and manually uploaded — not continuously distilled from live sessions.
 - **Agent Teams** coordinates AI-to-AI task distribution under one human. It doesn't solve N humans each with their own Claude.
 

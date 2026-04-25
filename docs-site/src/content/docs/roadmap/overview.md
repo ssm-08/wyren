@@ -1,6 +1,6 @@
 ---
-title: Roadmap — six chunks at a glance
-description: Pre-build docs + five build chunks across 48 hours.
+title: Roadmap — how Relay was built
+description: Six build chunks plus post-ship phases. All shipped.
 ---
 
 import { Badge } from '@astrojs/starlight/components';
@@ -15,17 +15,19 @@ import { Badge } from '@astrojs/starlight/components';
 | [3](/roadmap/3-distillation/) | 14-22 | Distiller wired to Stop hook | <Badge text="Shipped" variant="success" /> |
 | [4](/roadmap/4-git-sync/) | 22-32 | Git sync layer | <Badge text="Shipped" variant="success" /> |
 | [5](/roadmap/5-broadcast/) | 32-44 | Broadcast + polish + demo | <Badge text="Shipped" variant="success" /> |
-| — | 44-48 | Buffer, demo rehearsal, fallback video | <Badge text="Shipped" variant="success" /> |
 | [Post-ship](/roadmap/overview/#post-ship--deployability-v1) | 2026-04-23 | Cross-platform installer | <Badge text="Shipped" variant="success" /> |
 | [Post-ship](/roadmap/overview/#post-ship--live-sync--fault-hardening) | 2026-04-23 | Live sync + fault hardening | <Badge text="Shipped" variant="success" /> |
 | [Post-ship](/roadmap/overview/#post-ship--code-review--live-testing-polish) | 2026-04-23 | Code review + live testing polish | <Badge text="Shipped" variant="success" /> |
 | [Post-ship](/roadmap/overview/#post-ship--filter-upgrade--install-polish) | 2026-04-24 | Weighted Tier 0 + install polish | <Badge text="Shipped" variant="success" /> |
+| [Post-ship](/roadmap/overview/#post-ship--windows-ci-fix) | 2026-04-24 | Windows CI fix | <Badge text="Shipped" variant="success" /> |
+| [Post-ship](/roadmap/overview/#post-ship--e2e-fixes--cli-polish) | 2026-04-24 | E2E fixes + CLI polish | <Badge text="Shipped" variant="success" /> |
+| [Post-ship](/roadmap/overview/#post-ship--parallel-code-review--integration) | 2026-04-24 | Parallel code review + integration | <Badge text="Shipped" variant="success" /> |
 
-## Sequencing rules
+## How the build was sequenced
 
-1. **Each chunk has exit criteria.** Do NOT start the next chunk until current criteria pass.
-2. **Chunk 1 is the go/no-go gate.** If distiller quality fails there, kill the project or pivot to handoff-only. All downstream infra is wasted without it.
-3. **Living docs discipline.** Each chunk ends with a 5-min docs update. Docs ship with code.
+1. **Each chunk had exit criteria.** The next chunk did not start until current criteria passed.
+2. **Chunk 1 was the go/no-go gate.** If distiller quality had failed, the project would have pivoted to handoff-only. All downstream infra depends on it.
+3. **Living docs discipline.** Each chunk ended with a docs update. Docs shipped with code.
 
 ## Chunk 0 — Documentation site (this site)
 
@@ -72,15 +74,11 @@ Key implementation detail: conflict resolution uses `reset --mixed FETCH_HEAD` r
 
 ## Chunk 5 — Broadcast + polish + demo (Hours 32-44) ✅
 
-**Shipped.** Skills/CLAUDE.md broadcast via `.relay/broadcast/`. `relay broadcast-skill <name>` CLI copies a local skill file to `.relay/broadcast/skills/` for teammates to receive on their next `SessionStart`. Session-start wraps broadcast content with explicit authoritative headers so Claude treats it as team override. 46 unit tests green (6 broadcast-skill + 9 session-start + rest from prior chunks).
+**Shipped.** Skills/CLAUDE.md broadcast via `.relay/broadcast/`. `relay broadcast-skill <name>` CLI copies a local skill file to `.relay/broadcast/skills/` for teammates to receive on their next `SessionStart`. Session-start injects broadcast content as additional context; an acknowledgment instruction prompts Claude to announce loaded skills in its first message. 46 unit tests green (6 broadcast-skill + 9 session-start + rest from prior chunks).
 
 **Exit criteria:** full scripted demo runs end-to-end in under 4 minutes without intervention.
 
 [Full Chunk 5 detail →](/roadmap/5-broadcast/)
-
-## Buffer (Hours 44-48)
-
-Fix whatever broke during rehearsal. Record fallback demo video. Short design-doc writeup for judges.
 
 ## Post-ship — Deployability v1 (2026-04-23) ✅
 
@@ -133,3 +131,40 @@ Key changes:
 - **Reviewer fixes**: `scoreTier0(null/undefined)` no longer throws; `EISDIR` crash when `CLAUDE.md` is a directory; empty `CLAUDE.md` skipped; `test-e2e.mjs` H1/H4 assertions updated for absolute-path installer (stale `${CLAUDE_PLUGIN_ROOT}` check).
 
 Test totals: **137 unit (136 pass, 1 skip POSIX-only) + 32 e2e = 169 total.**
+
+## Post-ship — Windows CI fix (2026-04-24) ✅
+
+**Shipped.** Two targeted fixes to make CI green on Windows Server 2022.
+
+1. **`scripts/installer.mjs` `inspectLink()`** — extracted `stripWinPathPrefix()` helper strips both `\\?\` (Win32 extended) and `\??\` (NT namespace) prefixes from `readlinkSync` output. Windows Server 2022 returns the NT-namespace form; the old code only stripped Win32-form, causing junction idempotency false-positives and install failures.
+
+2. **`tests/fault-network.test.mjs` test 59** — switched remote URL from `git://localhost:9/nonexistent.git` to `file:///nonexistent-relay-test-remote`. The `git://` scheme spawns network helpers on Windows that held a handle to the temp directory, causing `rmSync` to throw `EBUSY`. The `file://` scheme fails immediately with no helpers spawned.
+
+Test totals unchanged: **169 total, CI green on all platforms.**
+
+## Post-ship — E2E fixes + CLI polish (2026-04-24) ✅
+
+**Shipped.** Two e2e test fixes plus CLI quality-of-life improvements.
+
+- **G18 fix**: `spawnStopHooks` gets an `extraEnv` parameter; G18 passes `RELAY_TURNS_THRESHOLD: '100'` so Windows process-startup stagger cannot accumulate to the default threshold of 5 and trigger a distiller reset mid-test.
+- **H4 fix**: old hook seed hardcoded the actual `RELAY_ROOT` path, causing the test to always fail on any dev machine other than the original. Replaced with a fictional path.
+- **`relay log [--lines N]`**: tail the distiller log from any directory (`default 50 lines`). `-n` shorthand supported.
+- **`relay --version` / `-v`**: print `relay <version>` from `package.json`.
+- **`relay --help` / `-h`**: print command reference; `relay` with no args also shows help (exit 0). Unknown commands print `relay: unknown command '<X>'` + help to stderr (exit 1).
+
+Test totals: **169 total, e2e 32/32.**
+
+## Post-ship — Parallel code review + integration (2026-04-24) ✅
+
+**Shipped.** Three-agent parallel review pass caught logic, reliability, and quality-of-life issues. 28 additional unit tests added.
+
+Key changes:
+- **`sync.mjs` `push()`**: stages paths separately so absence of `.relay/broadcast/` dir no longer aborts the `memory.md` push. `_rebase()` also checks out `.relay/broadcast` from `FETCH_HEAD`.
+- **`stop.mjs`**: skips setting `distiller_running` / resetting `turns_since_distill` if spawn produces no PID. Prevents stuck-forever state on failed spawn.
+- **`lib/filter.mjs`**: NaN guard on `RELAY_TIER0_THRESHOLD` parse (falls back to default `3`).
+- **`distiller.mjs`**: lock error handling consolidated — any failure skips push and exits conservatively.
+- **`relay status`**: shows human-readable progress (`N/5 turns until next distill`); lock line hidden when not held; init hint updated to `git add .relay/`.
+- **`tests/transcript.test.mjs`**: new file — 17 tests covering `lib/transcript.mjs` (previously zero coverage).
+- 11 additional tests across stop, filter, session-start, and fault-corruption test files.
+
+Test totals: **165 unit (164 pass, 1 skip POSIX-only) + 32 e2e = 197 total.**

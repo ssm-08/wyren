@@ -71,7 +71,7 @@ Most likely the transcript didn't mention the resolution explicitly. The distill
 
 No. Relay uses Claude Code's hook system. Other editors have different (or no) hook surfaces.
 
-Post-hackathon: a generic "transcript watcher" daemon could in theory support Cursor + Windsurf via their respective APIs. See [Future](/future/).
+In a future release, a generic "transcript watcher" daemon could support Cursor + Windsurf via their respective APIs. See [Future](/future/).
 
 ## How does Relay handle merge conflicts on `memory.md`?
 

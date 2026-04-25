@@ -8,7 +8,7 @@ import { Steps } from '@astrojs/starlight/components';
 ## Setup
 
 - Two laptops, screen-shared.
-- Both have Relay installed (`claude /plugins add relay`).
+- Both have Relay installed (see [Install guide](/reference/install/)).
 - Test repo on GitHub with Relay initialized (`relay init` done, committed, pushed).
 - Claude Code open on both laptops, pointed at the test repo.
 - Text editor side-by-side showing `.relay/memory.md` live on laptop A.
@@ -40,7 +40,7 @@ import { Steps } from '@astrojs/starlight/components';
 
    ```markdown
    ## Decisions
-   - SQLite over Postgres — hackathon scope
+   - SQLite over Postgres — simpler, no external DB needed
    - SSE for live sync
 
    ## Rejected paths
@@ -106,5 +106,5 @@ Target: **under 4 minutes**. If over, cut step 5 (broadcast) — the core story 
 | "How much does this cost?" | $0 under the preferred path (rides Claude Code auth). See [Cost model](/cost-model/). |
 | "Doesn't this spam git history?" | Scoped to `.relay/` path. Main code history untouched. Optional daily squash. |
 | "What about privacy? My transcripts leak?" | Transcripts stay local. Only the *distilled* memory is pushed — no verbatim conversation. |
-| "Does this work for non-hackathon long-term teams?" | Designed for hackathons first. Cloud backend + permissions are the obvious next step. See [Future](/future/). |
+| "Does this scale beyond short sprints?" | Yes — same plugin, same git sync, same distillation loop. Cloud sync and per-user permissions are the natural additions for larger teams. See [Future](/future/). |
 | "Why not an MCP server?" | MCPs are tool-invocable only — can't inject at SessionStart. Hook is the right surface. MCP for on-demand query is a great addition later. |

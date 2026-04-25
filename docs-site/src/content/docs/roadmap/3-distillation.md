@@ -63,24 +63,39 @@ if (!hasTier0Signal(transcriptSlice)) {
 
 ## lib/filter.mjs
 
+The filter was initially a simple regex presence-check, then upgraded to a weighted scoring system (see [Post-ship — Filter upgrade](/roadmap/overview/#post-ship--filter-upgrade--install-polish)).
+
+Current implementation uses `scoreTier0(transcriptText, lines)`:
+
 ```js
-const TIER0_REGEX = /\b(decide|decided|won'?t|doesn'?t work|workaround|hack|TODO|FIXME|
-  rejected|tried|instead|actually|broken|skip|stub|hardcod|mock|placeholder|
-  out of scope|for now|revisit|later)\b/i;
+// Categories with weights 1-3
+const SIGNALS = [
+  { weight: 3, pattern: /\b(decided?|we('re| are) going with|chose|picked|settled on|agreed)\b/i },
+  { weight: 3, pattern: /\b(rejected?|doesn'?t work|won'?t work|tried .{0,30} (but|and it)|abandoned|reverted)\b/i },
+  { weight: 3, pattern: /\b(workaround|hack|hardcod\w*|stub|mock|placeholder|skip for now)\b/i },
+  { weight: 2, pattern: /\b(out of scope|descoped|added to scope|deferred|cut|dropping)\b/i },
+  { weight: 2, pattern: /\b(open question|still (need|deciding)|not sure yet|revisit|TBD)\b/i },
+  { weight: 2, pattern: /\b(TODO|FIXME|before (demo|launch|merge))\b/ },
+  { weight: 1, pattern: /\b(actually|instead|broken|later|for now)\b/i },
+];
 
-// renderForDistiller emits tool calls as: [tool_use ToolName] {...}
-const TIER0_TOOL_REGEX = /\[tool_use (Edit|Write)\]/;
+// File edits are strong signal — weight 3, capped at 4×
+const EDIT_TOOL_REGEX = /\[tool_use (Edit|Write|MultiEdit)\]/;
 
-export function hasTier0Signal(transcriptText) {
-  if (TIER0_REGEX.test(transcriptText)) return true;
-  if (TIER0_TOOL_REGEX.test(transcriptText)) return true;
-  return false;
-}
+// Structural signals (scored on raw JSONL lines, not rendered text)
+// +2 if >= 10 turns, +2 more if >= 20 turns
+// +2 if avg user message length > 200 chars
+// +2 if >= 3 file edits, +2 more if >= 8 file edits
+
+export function hasTier0Signal(transcriptText, lines = []) { ... }  // backwards-compat
+export function scoreTier0(transcriptText, lines = []) { ... }       // returns { score, passes, breakdown }
 ```
 
-**Why a separate file?** Importing `distiller.mjs` in tests would trigger `main()` (the module's entry-point guard fires on `process.argv[1]` match). Extracting the filter keeps it purely testable.
+`RELAY_TIER0_THRESHOLD` env var (default `3`) controls the minimum score to pass.
 
-**Why `[tool_use Edit]` format?** The distiller receives *rendered* transcript text from `renderForDistiller()`, not raw JSONL. The renderer converts `tool_use` blocks to `[tool_use ToolName] {input}` prose. The raw JSONL `"tool_name":"Edit"` format never reaches the filter.
+**Why a separate file?** Importing `distiller.mjs` in tests would trigger `main()`. Extracting the filter keeps it purely testable.
+
+**Why `[tool_use Edit]` format?** The distiller receives *rendered* transcript text, not raw JSONL. The renderer converts `tool_use` blocks to `[tool_use ToolName] {input}` prose. The raw JSONL `"tool_name":"Edit"` format never reaches the filter.
 
 ## Tier 0 in context
 

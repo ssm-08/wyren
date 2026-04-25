@@ -34,7 +34,7 @@ Empty sections are omitted by the distiller.
 _Last distilled: 2026-04-21T14:32Z by session 7a2e-… (Tier 1 Haiku)_
 
 ## Decisions
-- SQLite over Postgres — hackathon scope, no external DB  [session 7a2e, turn 12]
+- SQLite over Postgres — simpler, no external DB needed  [session 7a2e, turn 12]
 - Auth via magic-link, no OAuth — saves 3h  [session 3f1b, turn 8]
 - SSE for live sync (not WebSocket)  [session 7a2e, turn 19]
 
@@ -74,4 +74,4 @@ If you want something preserved permanently (e.g. a hand-crafted team charter), 
 
 ## Size budget
 
-Target: under 60 lines for a 1-day hackathon. If it grows past that, the distiller is instructed to cull aggressively on the next run. Sonnet Tier 2 specifically checks line count and triggers on violation.
+Target: under 60 lines. If it grows past that, the distiller is instructed to cull aggressively on the next run. Sonnet Tier 2 specifically checks line count and triggers on violation.

@@ -106,11 +106,12 @@ Example output (actual format):
 Memory:     .relay/memory.md  (1.2 KB, 23 lines)
 Distilled:  2026-04-22T14:30:00.000Z (4 min ago)
 Last UUID:  7a2e-...
-Watermark:  turns_since_distill=2, distiller_running=false
+Progress:   2 / 5 turns until next distill
 Transcript: /Users/alice/.claude/projects/.../7a2e.jsonl
 Remote:     origin → https://github.com/team/project.git
-Lock:       not held
 ```
+
+Lock line only appears when the lock is held (`Lock:  held (3s old)`). Not shown in normal state.
 
 If the repo isn't initialized, prints `Relay not initialized in this repo. Run: relay init` and exits 0.
 

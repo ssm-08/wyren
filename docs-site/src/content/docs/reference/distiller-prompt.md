@@ -30,41 +30,72 @@ The distiller answers one question on each run: **"What would I wish I knew befo
 
 **Memory hygiene:** the distiller updates and overwrites, it does not append. A workaround noted at hour 2 that gets fixed at hour 5 should not persist. Entries carry a `[session <id>, turn <n>]` tag for provenance, so stale context can be traced back to its source and pruned.
 
-## Full prompt text (v0.1)
+## Full prompt text (current)
 
 Lives at `prompts/distill.md`. Sent as the system prompt to `claude -p`.
 
 ````
-You maintain a shared team memory file for a live hackathon project.
-Your job: merge new session transcript events into the existing memory,
-keeping ONLY what a teammate joining fresh would need to avoid wasted
-time, contradictory decisions, or breaking something deliberately left
-in a known state.
+You maintain a shared team memory file for an active software project. Every teammate's Claude Code session draws from this file to start warm. Your job: merge a new session transcript slice into the existing memory, keeping ONLY what a teammate joining fresh would genuinely need to avoid wasted time, contradictory decisions, or breaking something deliberately left in a known state.
 
-RULES (strict):
-1. REPLACE superseded entries. If a new decision contradicts an old one,
-   remove the old. Never stack contradictions.
-2. REMOVE resolved workarounds. If the transcript shows a workaround
-   was fixed, delete it from "Live workarounds".
-3. NEVER APPEND BLINDLY. Each entry must still be true and load-bearing.
-4. NO CODE SNIPPETS. Reference files/functions by path.
-5. NO CONVERSATION QUOTES. Extract the conclusion, not the discussion.
-6. MAX 30 LINES PER SECTION. Cull stale entries when near limit.
-7. TAG each kept entry with [session <id>, turn <n>] for provenance.
-8. If nothing new qualifies, return the existing memory unchanged.
+## Hard rules
 
-Guiding question for every entry you add or keep:
-  "Would a new Claude opening this project in 10 minutes genuinely
-   need this, or is this noise?"
+1. **Replace superseded entries.** If a new decision contradicts an old one, remove the old — never stack contradictions.
+2. **Remove resolved workarounds.** If the transcript shows a workaround was fixed or removed, delete it from "Live workarounds".
+3. **Never append blindly.** Every entry you keep must still be true and load-bearing right now. Cull stale entries aggressively.
+4. **No code snippets.** Reference files/functions by path (e.g. `hooks/session-start.mjs:42`). No copy-pasted code.
+5. **No conversation quotes.** Extract the conclusion, not the discussion. No "Alice said…" — just the fact.
+6. **Max 30 lines per section.** When near the limit, cull the least load-bearing entry.
+7. **Tag provenance.** Append `[session <short-id>, turn <n>]` to every entry you add or keep. Keep tags on existing entries unchanged unless the fact itself is updated.
+8. **If nothing new qualifies, return the existing memory unchanged.** Do not rephrase for its own sake.
 
-Sections (keep order, omit if empty):
+## The guiding question
+
+For every entry you add or keep, ask:
+
+> Would a new Claude opening this project in 10 minutes genuinely need this, or is this noise?
+
+If the honest answer is "noise," drop it.
+
+## What counts as signal
+
+- **Decisions** — tech picks, architectural choices, scope calls. Only the resolved choice, not the deliberation.
+- **Rejected paths** — approaches tried and abandoned, with the one-line reason. Prevents re-litigation.
+- **Live workarounds** — deliberate shortcuts currently in the code that look like bugs but are intentional.
+- **Scope changes** — things explicitly cut or added mid-build. Keep only if they affect what someone should/shouldn't touch.
+- **Open questions** — blocking unknowns the team is still resolving. Remove once answered.
+
+## What is NOT signal (drop even if mentioned)
+
+- Tool-call noise, file lists, grep output, build output.
+- Code the assistant wrote (the code is the code — memory is for *why*).
+- Commentary on what the model is about to do.
+- Generic advice, tutorials, or restated requirements from docs.
+- Anything already obvious from `README.md`, `CLAUDE.md`, or a 30-second codebase scan.
+
+## Output format
+
+Output the full new `memory.md` file content. Nothing else. No preamble, no trailing notes, no explanation of changes.
+
+Use these sections in this order. Omit a section entirely if empty (don't leave a bare header).
+
+```
 ## Decisions
-## Rejected paths
-## Live workarounds
-## Scope changes
-## Open questions
+- <fact> [session <id>, turn <n>]
 
-Output: the full new memory.md file content. Nothing else. No preamble.
+## Rejected paths
+- <approach>: <one-line reason> [session <id>, turn <n>]
+
+## Live workarounds
+- <file or area>: <what's intentional> [session <id>, turn <n>]
+
+## Scope changes
+- <what changed> [session <id>, turn <n>]
+
+## Open questions
+- <question> [session <id>, turn <n>]
+```
+
+Total memory should stay under ~60 lines on a 2-hour transcript. If you're tempted to add a 31st entry to a section, you should be deleting one first.
 ````
 
 ## Annotated rationale
@@ -101,19 +132,19 @@ Guards against hallucinated changes. The distiller should be stable across no-op
 
 The north star. Every entry should justify its existence by this question. Written as a first-person thought so Claude reasons internally.
 
-## Iteration targets during Chunk 1
+## Failure modes addressed during prompt iteration
 
-Test against real transcripts. Look for these failure modes and patch the prompt:
+These failure modes were caught during testing and patched into the prompt above:
 
-| Failure | Fix |
+| Failure | Fix applied |
 |---|---|
 | Entries repeat across sections | Explicit deduplication rule |
-| Code dumps appear in memory | Strengthen Rule 4 with negative example |
-| Resolved workarounds linger | Add a "resolution detection" mini-rule |
-| Entries lose provenance tags | Reiterate Rule 7 in Output instructions |
-| Output includes preamble text | Tighten "Output:" line |
-| Memory grows past 60 lines | Lower per-section cap to 20 |
-| Contradictions stack | Add explicit "if in doubt, DELETE" fallback |
+| Code dumps appear in memory | "No code snippets" + "What is NOT signal" section |
+| Resolved workarounds linger | "Remove resolved workarounds" as Hard Rule 2 |
+| Entries lose provenance tags | Rule 7 with explicit tag-preservation instruction |
+| Output includes preamble text | "Nothing else. No preamble, no trailing notes" |
+| Memory grows past 60 lines | Per-section cap + total-size reminder in output format |
+| Contradictions stack | "Never stack contradictions" in Rule 1 |
 
 ## Inputs (appended to prompt as user message)
 

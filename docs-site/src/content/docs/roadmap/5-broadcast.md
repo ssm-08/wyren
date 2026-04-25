@@ -97,12 +97,15 @@ Target runtime: under 4 minutes.
 Copy-paste install steps a stranger can follow:
 
 ```bash
-# 1. Install plugin
-claude /plugins add https://github.com/ssm-08/relay
+# 1. Install plugin (macOS / Linux)
+curl -fsSL https://raw.githubusercontent.com/ssm-08/relay/master/install.sh | sh
 
-# 2. In your repo
+# Windows
+# iwr -useb https://raw.githubusercontent.com/ssm-08/relay/master/install.ps1 | iex
+
+# 2. In your repo (one teammate, once)
 relay init
-git add .relay && git commit -m "Add Relay" && git push
+git add .relay .gitignore && git commit -m "Add Relay" && git push
 
 # 3. Teammates pull. Open Claude Code. Done.
 ```

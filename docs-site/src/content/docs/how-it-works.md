@@ -29,7 +29,7 @@ The rest of this page walks through the full sequence step by step.
 
 ## T=0 — Install once
 
-Alice runs `/plugins add relay` once. Bob does the same on his laptop. Both machines now have `~/.claude/plugins/relay/` with hooks registered. No further setup per session.
+Alice and Bob each run the one-liner on their machines (see [Install guide](/reference/install/)). The installer clones Relay to `~/.claude/relay/`, patches `~/.claude/settings.json` with the three hooks, and registers `relay` on PATH. No further setup per session.
 
 ## T=1 — Initialize the repo
 
@@ -51,7 +51,7 @@ She commits and pushes. Bob pulls. They're ready.
 
 Claude Code fires the `SessionStart` hook. `session-start.mjs`:
 
-1. Calls `RelaySync.pull()` → `git fetch && git pull --rebase` scoped to `.relay/`.
+1. Calls `RelaySync.pull()` → `git fetch`, then `git checkout FETCH_HEAD -- .relay/` (path-scoped, 1.5s cap).
 2. Reads `.relay/memory.md` and any files under `.relay/broadcast/`.
 3. Prints a JSON envelope to stdout with `hookSpecificOutput.additionalContext` containing the merged memory + broadcast content.
 
@@ -69,6 +69,16 @@ Every assistant turn fires the `Stop` hook. `stop.mjs`:
 
 - Appends the turn's UUID to `.relay/state/watermark.json` (per-machine, not git-tracked).
 - After 5 new turns (or 2 min idle), spawns `distiller.mjs` **detached**. The turn itself is never blocked.
+
+## T=3b — Live sync on every user prompt
+
+While Alice works, the `UserPromptSubmit` hook fires on each prompt she sends — before Claude sees it:
+
+1. `git fetch` then `git checkout FETCH_HEAD -- .relay/memory.md` (1.5s cap, 3s hook budget).
+2. Computes a section-aware diff against the memory version injected at `SessionStart`.
+3. If there's new content (a teammate pushed a distilled update mid-session), injects only the **delta** as `additionalContext`.
+
+If Bob is working concurrently and his distiller pushes an update, Alice's next prompt picks it up automatically — no restart required. Sessions stay warm without polling.
 
 ## T=4 — Distiller runs in background
 
@@ -89,7 +99,7 @@ Alice's `.relay/memory.md` now contains:
 # Relay Memory
 
 ## Decisions
-- SQLite over Postgres — hackathon scope, no external DB  [session 7a2e, turn 12]
+- SQLite over Postgres — lightweight, no external DB needed  [session 7a2e, turn 12]
 
 ## Rejected paths
 - WebSocket for live sync — browser proxy drops long-lived conn; switched to SSE
@@ -105,7 +115,7 @@ Alice's `.relay/memory.md` now contains:
 
 Bob opens Claude Code in his clone. `SessionStart` fires:
 
-1. `git pull` — pulls Alice's `.relay/memory.md`.
+1. `git fetch`, then `git checkout FETCH_HEAD -- .relay/` — picks up Alice's `.relay/memory.md`.
 2. Reads the file, emits `additionalContext`.
 3. Claude Code injects it as hidden system context.
 
