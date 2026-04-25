@@ -27,6 +27,7 @@ Relay is a Claude Code plugin that gives a team shared memory across every teamm
 - **Filter upgrade + install polish (2026-04-24):** ✅ `lib/filter.mjs` rewritten — weighted `scoreTier0()` replaces simple regex (decision/rejection/hack/scope/maintenance categories, structural scoring on raw JSONL lines, `RELAY_TIER0_THRESHOLD` env var, `MultiEdit` support). `distiller.mjs` passes `sliced` lines for structural scoring. `relay init` seeds `memory.md` from `CLAUDE.md` if present (8 KB cap, skips empty/dir). Install polish: executable bits (`100644→100755`) on `bin/relay.mjs`, `hooks/run-hook.cmd`, `install.sh`, `scripts/installer.mjs`; `install.sh` respects `RELAY_HOME`; `install.ps1` `$Args→$RelayArgs`, `$clone` quoted; `installer.mjs` npm stderr surfaced. Reviewer caught 4 bugs + H1/H4 e2e test assertions fixed. **137 unit (136 pass, 1 skip) + 32 e2e = 169 total.**
 - **Windows CI fix (2026-04-24):** ✅ Two Windows fixes. (1) `scripts/installer.mjs` `inspectLink()` — extracted `stripWinPathPrefix()` helper strips both `\\?\` (Win32 extended) and `\??\` (NT namespace) from `readlinkSync` output; prevents junction idempotency false-positive on Windows Server 2022. (2) `tests/fault-network.test.mjs` test 59 — switched remote URL from `git://localhost:9/nonexistent.git` to `file:///nonexistent-relay-test-remote`; `git://` spawns network helpers on Windows that held temp dir handle → `rmSync` threw `EBUSY`; `file://` fails immediately, no helpers. **169 total tests, CI green on all platforms.**
 - **E2E fixes + CLI polish (2026-04-24):** ✅ G18 fix: `spawnStopHooks` gets `extraEnv` param; G18 passes `RELAY_TURNS_THRESHOLD: '100'` so Windows process-startup stagger can't accumulate to threshold=5 and trigger distiller reset (leaving turns=0). H4 fix: old hook seed hardcoded actual RELAY_ROOT path → test always failed on dev machine; replaced with fictional `C:\Users\olduser\old-relay-checkout`. `relay log [--lines N]`, `relay --version`, `relay --help` / `-h` / `-v` implemented. Unknown-command UX: no-args → help stdout exit 0; unknown command → `relay: unknown command 'X'` + help stderr exit 1. **169 tests, CI should be 32/32.**
+- **Parallel code review + integration (2026-04-24):** ✅ Three-agent review pass. Logic: `sync.mjs` `push()` stages paths separately (broadcast dir absence no longer aborts memory.md push); `_rebase()` also checkouts `.relay/broadcast` from FETCH_HEAD. Reliability: `stop.mjs` — don't set `distiller_running` or reset `turns_since_distill` if spawn produced no PID; `lib/filter.mjs` NaN guard on `RELAY_TIER0_THRESHOLD` parse; `distiller.mjs` lock error handling consolidated (any failure → skip push, conservative). QoL: `relay status` shows human-readable progress (`N/5 turns until next distill`); init hint uses `git add .relay/`; lock hidden when not held; distill + install messages improved. Tests: `tests/transcript.test.mjs` new (17 tests — `lib/transcript.mjs` had zero coverage); 11 more tests across stop/filter/session-start/fault-corruption; D12 + E14 e2e assertions updated to match new messages. **165 unit (164 pass, 1 skip) + 32 e2e = 197 total.**
 
 ## Repo layout
 
@@ -68,7 +69,7 @@ Vibejam/
 │   ├── installer.mjs           # cross-platform install/update/uninstall/doctor logic (Node, zero deps)
 │   ├── setup.ps1               # DEPRECATED stub — forwards to install.ps1
 │   └── test-e2e.mjs            # 32 e2e tests across 8 groups (A–H)
-├── tests/                      # 131 unit tests (node:test)
+├── tests/                      # 165 unit tests (node:test)
 │   ├── installer.test.mjs      # installer pure-function tests (26)
 │   ├── diff-memory.test.mjs    # diff-memory pure-function tests (10)
 │   ├── user-prompt-submit.test.mjs  # UPS hook logic tests (6)
@@ -160,7 +161,7 @@ npm run build        # static HTML in dist/
 
 Plugin tests:
 ```bash
-npm test             # 131 unit tests (~15s)
+npm test             # 165 unit tests (~15s)
 npm run test:e2e     # 32 e2e tests (~25s, no Claude API needed)
 node scripts/test-e2e.mjs --only stop   # filter to one group
 node scripts/test-e2e.mjs --verbose     # dump stdout/stderr on failure
