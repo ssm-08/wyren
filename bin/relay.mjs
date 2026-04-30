@@ -89,6 +89,7 @@ export function relayStatus(targetDir) {
 
   // Watermark / distiller state
   const watermarkPath = path.join(relayDir, 'state', 'watermark.json');
+  const logPath = path.join(relayDir, 'log');
   if (fs.existsSync(watermarkPath)) {
     let state = {};
     try { state = JSON.parse(fs.readFileSync(watermarkPath, 'utf8')); } catch {}
@@ -116,6 +117,13 @@ export function relayStatus(targetDir) {
     }
   } else {
     console.log(`${label('Progress:')} (no state yet — run a session to start tracking)`);
+  }
+  const inj = getLastInjection(logPath);
+  if (inj) {
+    const ago = Math.round((Date.now() - inj.ts) / 60_000);
+    console.log(`${label('Injected:')} ${new Date(inj.ts).toISOString()} (${ago} min ago via ${inj.event})`);
+  } else {
+    console.log(`${label('Injected:')} never`);
   }
 
   // Git remote
@@ -307,7 +315,26 @@ export function relayLog(targetDir, argv) {
   if (allLines.length > lines) {
     console.log(`... (${allLines.length - lines} earlier lines omitted — use --lines to show more)\n`);
   }
+  const inj = getLastInjection(logPath);
+  if (inj) {
+    const ago = Math.round((Date.now() - inj.ts) / 60_000);
+    console.log(`Last injected: ${new Date(inj.ts).toISOString()} (${ago} min ago via ${inj.event})\n`);
+  }
   console.log(tail.join('\n'));
+}
+
+function getLastInjection(logPath) {
+  if (!fs.existsSync(logPath)) return null;
+  const lines = fs.readFileSync(logPath, 'utf8').split(/\r?\n/);
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i];
+    if (!line) continue;
+    const m = line.match(/^\[([^\]]+)\]\s+injection:\s+([a-z0-9-]+)\s*$/i);
+    if (!m) continue;
+    const ts = Date.parse(m[1]);
+    if (!isNaN(ts)) return { ts, event: m[2] };
+  }
+  return null;
 }
 
 if (isMain(import.meta.url)) {

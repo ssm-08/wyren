@@ -94,7 +94,7 @@ Creates:
 
 ## `relay status`
 
-Print current memory, watermark, sync, and lock state.
+Print current memory, distillation, injection, sync, and lock state.
 
 ```bash
 relay status
@@ -107,11 +107,14 @@ Memory:     .relay/memory.md  (1.2 KB, 23 lines)
 Distilled:  2026-04-22T14:30:00.000Z (4 min ago)
 Last UUID:  7a2e-...
 Progress:   2 / 5 turns until next distill
+Injected:  2026-04-22T14:31:00.000Z (3 min ago via session-start)
 Transcript: /Users/alice/.claude/projects/.../7a2e.jsonl
 Remote:     origin → https://github.com/team/project.git
 ```
 
 Lock line only appears when the lock is held (`Lock:  held (3s old)`). Not shown in normal state.
+
+`Distilled`/`Progress` fields come from `.relay/state/watermark.json`. `Injected` is derived from the latest `injection:` event in `.relay/log`.
 
 If the repo isn't initialized, prints `Relay not initialized in this repo. Run: relay init` and exits 0.
 
@@ -134,7 +137,7 @@ Exit codes: `0` on success, `1` on distiller failure, `2` if `--push` was reques
 
 ## `relay log`
 
-Tail the distiller log — useful for debugging why memory wasn't updated.
+Tail the Relay log — useful for debugging distillation and injection flow.
 
 ```bash
 relay log [--lines <n>]
@@ -144,7 +147,7 @@ relay log [--lines <n>]
 |---|---|
 | `--lines <n>` / `-n <n>` | Number of lines to show from the end of the log (default `50`). |
 
-Reads `.relay/log` in the current repo. If the log exceeds the line limit, prints an omission notice first so you know lines were cut. If no log exists yet (`distiller` hasn't run), prints a short message and exits 0.
+Reads `.relay/log` in the current repo. If the log exceeds the line limit, prints an omission notice first so you know lines were cut. If no log exists yet, prints a short message and exits 0.
 
 ## `relay --version`
 

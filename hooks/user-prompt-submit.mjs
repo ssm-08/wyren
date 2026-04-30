@@ -34,6 +34,13 @@ function writeUpsStateAtomic(upsStatePath, state) {
   fs.renameSync(tmp, upsStatePath);
 }
 
+function markInjection(stateDir, event) {
+  try {
+    const logPath = path.join(path.dirname(stateDir), 'log');
+    fs.appendFileSync(logPath, `[${new Date().toISOString()}] injection: ${event}\n`);
+  } catch {}
+}
+
 /**
  * Exported for unit testing — all logic with no I/O side effects except reading files.
  * Returns { delta: string, newUpsState: object, newSnapshot: string } or null (skip).
@@ -141,6 +148,8 @@ async function main() {
     }
 
     if (!delta) { process.exit(0); }
+
+    markInjection(stateDir, 'user-prompt-submit');
 
     // Emit additionalContext
     process.stdout.write(JSON.stringify({

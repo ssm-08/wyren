@@ -62,6 +62,13 @@ export function buildContext(cwd) {
   return parts.join('\n\n---\n\n');
 }
 
+function appendLog(cwd, msg) {
+  try {
+    const logPath = path.join(cwd, '.relay', 'log');
+    fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${msg}\n`);
+  } catch {}
+}
+
 async function main() {
   try {
     const raw = await readStdin();
@@ -75,6 +82,7 @@ async function main() {
 
     const context = buildContext(cwd);
     if (!context) process.exit(0);
+    appendLog(cwd, 'injection: session-start');
     process.stdout.write(
       JSON.stringify({
         hookSpecificOutput: {

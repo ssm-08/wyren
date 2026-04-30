@@ -74,8 +74,8 @@ Teammates just need the plugin installed. They don't run `init` again.
 
 ```bash
 relay init                            # bootstrap this repo (.relay/, .gitignore entries)
-relay status                          # memory size, last distillation, sync state
-relay log [--lines N]                 # tail distiller log (default 50 lines)
+relay status                          # memory size, last distillation, last injection, sync state
+relay log [--lines N]                 # tail relay log (distillation + injection events)
 relay distill [--force] [--push]      # run distillation manually
 relay broadcast-skill <file>          # share a skill file with all teammates
 relay install                         # install hooks on a new machine (called by install.sh/ps1)
