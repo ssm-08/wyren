@@ -8,6 +8,19 @@ import { isMain } from '../lib/util.mjs';
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 const REPO_URL = 'https://github.com/ssm-08/relay';
+const SPARSE_PATHS = [
+  '/.claude-plugin/',
+  '/bin/',
+  '/commands/',
+  '/hooks/',
+  '/lib/',
+  '/prompts/',
+  '/scripts/',
+  '/install.sh',
+  '/install.ps1',
+  '/distiller.mjs',
+  '/package.json',
+];
 
 // --------------------------------------------------------------------------
 // Logging
@@ -129,7 +142,16 @@ export function cloneOrUpdate(dest, { ref = 'master', force = false } = {}) {
         '[relay] [clone]  TIP  If macOS shows a Command Line Tools dialog, install it and re-run.\n'
       );
     }
-    git(['clone', '--depth=1', '--branch', ref, REPO_URL, dest]);
+    try {
+      git(['clone', '--depth=1', '--filter=blob:none', '--sparse', '--branch', ref, REPO_URL, dest]);
+    } catch (e) {
+      throw new Error(
+        `Could not clone ${REPO_URL}: ${e.message}\n` +
+        'If GitHub access is blocked (proxy/auth/private mirror), install from a local checkout:\n' +
+        '  relay install --from-local /path/to/relay'
+      );
+    }
+    git(['sparse-checkout', 'set', '--no-cone', ...SPARSE_PATHS], dest);
     r.ok(`Cloned (${ref})`);
     return;
   }
@@ -168,6 +190,12 @@ export function cloneOrUpdate(dest, { ref = 'master', force = false } = {}) {
     return;
   }
   git(['reset', '--hard', 'FETCH_HEAD'], dest, { timeout: 5_000 });
+  // Keep existing installs slim; migrate older full clones to sparse checkout.
+  try {
+    git(['sparse-checkout', 'set', '--no-cone', ...SPARSE_PATHS], dest, { timeout: 10_000 });
+  } catch (e) {
+    r.warn(`Could not enforce sparse checkout: ${e.message}`);
+  }
   r.ok(`Updated to latest ${ref}`);
 }
 
