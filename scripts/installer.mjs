@@ -9,17 +9,17 @@ import { isMain } from '../lib/util.mjs';
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 const REPO_URL = 'https://github.com/ssm-08/relay';
 const SPARSE_PATHS = [
-  '/.claude-plugin/',
-  '/bin/',
-  '/commands/',
-  '/hooks/',
-  '/lib/',
-  '/prompts/',
-  '/scripts/',
-  '/install.sh',
-  '/install.ps1',
-  '/distiller.mjs',
-  '/package.json',
+  '.claude-plugin',
+  'bin',
+  'commands',
+  'hooks',
+  'lib',
+  'prompts',
+  'scripts',
+  'install.sh',
+  'install.ps1',
+  'distiller.mjs',
+  'package.json',
 ];
 
 // --------------------------------------------------------------------------
@@ -151,7 +151,7 @@ export function cloneOrUpdate(dest, { ref = 'master', force = false } = {}) {
         '  relay install --from-local /path/to/relay'
       );
     }
-    git(['sparse-checkout', 'set', '--no-cone', ...SPARSE_PATHS], dest);
+    git(['sparse-checkout', 'set', ...SPARSE_PATHS], dest);
     r.ok(`Cloned (${ref})`);
     return;
   }
@@ -192,7 +192,7 @@ export function cloneOrUpdate(dest, { ref = 'master', force = false } = {}) {
   git(['reset', '--hard', 'FETCH_HEAD'], dest, { timeout: 5_000 });
   // Keep existing installs slim; migrate older full clones to sparse checkout.
   try {
-    git(['sparse-checkout', 'set', '--no-cone', ...SPARSE_PATHS], dest, { timeout: 10_000 });
+    git(['sparse-checkout', 'set', ...SPARSE_PATHS], dest, { timeout: 10_000 });
   } catch (e) {
     r.warn(`Could not enforce sparse checkout: ${e.message}`);
   }

@@ -48,18 +48,18 @@ if [ -z "$FROM_LOCAL" ] && [ ! -d "$CLONE" ]; then
     echo "[relay] run from a local checkout instead: ./install.sh --from-local /path/to/relay" >&2
     exit 2
   fi
-  git -C "$CLONE" sparse-checkout set --no-cone \
-    /.claude-plugin/ \
-    /bin/ \
-    /commands/ \
-    /hooks/ \
-    /lib/ \
-    /prompts/ \
-    /scripts/ \
-    /install.sh \
-    /install.ps1 \
-    /distiller.mjs \
-    /package.json
+  git -C "$CLONE" sparse-checkout set \
+    .claude-plugin \
+    bin \
+    commands \
+    hooks \
+    lib \
+    prompts \
+    scripts \
+    install.sh \
+    install.ps1 \
+    distiller.mjs \
+    package.json
 fi
 
 INSTALLER="${FROM_LOCAL:-$CLONE}/scripts/installer.mjs"
