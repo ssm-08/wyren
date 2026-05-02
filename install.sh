@@ -43,7 +43,23 @@ if [ -z "$FROM_LOCAL" ] && [ ! -d "$CLONE" ]; then
   if [ "$(uname)" = "Darwin" ]; then
     echo "[relay] TIP: If macOS shows a Command Line Tools dialog, install it and re-run." >&2
   fi
-  git clone --depth=1 https://github.com/ssm-08/relay "$CLONE"
+  if ! git clone --depth=1 --filter=blob:none --sparse https://github.com/ssm-08/relay "$CLONE"; then
+    echo "[relay] ERROR: Clone failed. If this environment cannot access GitHub (proxy/auth/private repo)," >&2
+    echo "[relay] run from a local checkout instead: ./install.sh --from-local /path/to/relay" >&2
+    exit 2
+  fi
+  git -C "$CLONE" sparse-checkout set \
+    .claude-plugin \
+    bin \
+    commands \
+    hooks \
+    lib \
+    prompts \
+    scripts \
+    install.sh \
+    install.ps1 \
+    distiller.mjs \
+    package.json
 fi
 
 INSTALLER="${FROM_LOCAL:-$CLONE}/scripts/installer.mjs"
