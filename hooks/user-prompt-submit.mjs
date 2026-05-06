@@ -31,7 +31,15 @@ function readUpsState(upsStatePath) {
 function writeUpsStateAtomic(upsStatePath, state) {
   const tmp = `${upsStatePath}.${process.pid}.${Date.now()}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(state, null, 2));
-  fs.renameSync(tmp, upsStatePath);
+  let lastErr;
+  for (let i = 0; i < 3; i++) {
+    try { fs.renameSync(tmp, upsStatePath); return; } catch (e) {
+      lastErr = e;
+      if (e.code !== 'EPERM' && e.code !== 'EBUSY') break;
+    }
+  }
+  try { fs.unlinkSync(tmp); } catch {}
+  throw lastErr;
 }
 
 function markInjection(stateDir, event) {

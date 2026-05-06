@@ -13,7 +13,15 @@ const IDLE_MS = process.env.RELAY_IDLE_MS ? parseInt(process.env.RELAY_IDLE_MS, 
 export function writeWatermarkAtomic(watermarkPath, state) {
   const tmp = `${watermarkPath}.${process.pid}.${Date.now()}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(state, null, 2));
-  fs.renameSync(tmp, watermarkPath);
+  let lastErr;
+  for (let i = 0; i < 3; i++) {
+    try { fs.renameSync(tmp, watermarkPath); return; } catch (e) {
+      lastErr = e;
+      if (e.code !== 'EPERM' && e.code !== 'EBUSY') break;
+    }
+  }
+  try { fs.unlinkSync(tmp); } catch {}
+  throw lastErr;
 }
 
 export function updateWatermark(relayDir) {

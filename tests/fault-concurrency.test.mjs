@@ -10,7 +10,7 @@
  * All subprocess spawns use RELAY_SKIP_PULL=1 to avoid network calls.
  */
 
-import { test } from 'node:test';
+import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -125,6 +125,10 @@ function spawnStop(targetCwd) {
     proc.on('error', (err) => resolve({ code: -1, stdout, stderr: stderr + err.message }));
   });
 }
+
+// Run tests sequentially: each test spawns 5-20 subprocesses; running all concurrently
+// overwhelms Windows process creation limits and causes intermittent EPERM failures.
+describe('fault-concurrency (sequential)', { concurrency: false }, () => {
 
 // ---------------------------------------------------------------------------
 // Test 1: 10 concurrent UPS fires on same .relay/ dir
@@ -559,3 +563,5 @@ test('Test 8 (race eliminated): UPS writes ups-state.json, Stop writes watermark
 
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+}); // describe fault-concurrency (sequential)

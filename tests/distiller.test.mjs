@@ -20,6 +20,13 @@ test('hasTier0Signal is case-insensitive', () => {
   assert.equal(hasTier0Signal('TODO: add tests — workaround for now'), true);
 });
 
+test('hasTier0Signal detects known-broken language', () => {
+  assert.equal(hasTier0Signal('known issue in the sync layer'), true);
+  assert.equal(hasTier0Signal('intentionally disabled until the race is fixed'), true);
+  assert.equal(hasTier0Signal("won't fix this sprint"), true);
+  assert.equal(hasTier0Signal('deliberately broken pending investigation'), true);
+});
+
 test('hasTier0Signal returns false for neutral transcript', () => {
   assert.equal(hasTier0Signal('reading the file contents'), false);
   assert.equal(hasTier0Signal('here is the function signature'), false);
