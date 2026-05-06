@@ -4,9 +4,18 @@ import path from 'node:path';
 import os from 'node:os';
 import url from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { isMain } from '../lib/util.mjs';
-
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
+
+function isMain(metaUrl) {
+  if (!process.argv[1]) return false;
+  try {
+    const argv1 = fs.realpathSync(path.resolve(process.argv[1]));
+    const meta = fs.realpathSync(path.resolve(url.fileURLToPath(metaUrl)));
+    return argv1 === meta;
+  } catch {
+    return path.resolve(process.argv[1]) === path.resolve(url.fileURLToPath(metaUrl));
+  }
+}
 const REPO_URL = 'https://github.com/ssm-08/relay';
 
 // Cone-mode sparse-checkout dirs (root-level files always included by cone mode).
