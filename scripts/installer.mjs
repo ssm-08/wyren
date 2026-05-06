@@ -133,6 +133,13 @@ function cleanInstall(dest) {
   }
 }
 
+// Apply sparse-checkout to working tree: removes tests/, docs-site/, .github/ etc.
+// Called after every clone and every reset --hard (which clears skip-worktree bits).
+// Silent on failure — git < 2.25 or old clones without partial-clone support.
+function applySparse(dest) {
+  try { git(['sparse-checkout', 'set', ...SPARSE_DIRS], dest); } catch {}
+}
+
 export function cloneOrUpdate(dest, { ref = 'master', force = false } = {}) {
   const r = reporter('clone');
   if (!fs.existsSync(dest)) {
@@ -146,12 +153,6 @@ export function cloneOrUpdate(dest, { ref = 'master', force = false } = {}) {
     let cloneOk = false;
     try {
       git(['clone', '--depth=1', '--filter=blob:none', '--sparse', '--branch', ref, REPO_URL, dest]);
-      try {
-        git(['sparse-checkout', 'set', ...SPARSE_DIRS], dest);
-        r.ok(`Cloned (sparse — only runtime files installed, tests/ docs-site/ excluded)`);
-      } catch {
-        r.ok(`Cloned (sparse-checkout set failed — full repo installed)`);
-      }
       cloneOk = true;
     } catch {
       // Old git or remote doesn't support partial-clone — clean up and fall back
@@ -160,9 +161,12 @@ export function cloneOrUpdate(dest, { ref = 'master', force = false } = {}) {
 
     if (!cloneOk) {
       git(['clone', '--depth=1', '--branch', ref, REPO_URL, dest]);
-      r.ok(`Cloned (${ref})`);
     }
+    // Always apply sparse after clone (sparse or full) — limits working tree to runtime dirs.
+    // On git < 2.25 this is a no-op; cleanInstall handles root files regardless.
+    applySparse(dest);
     cleanInstall(dest);
+    r.ok(`Cloned — runtime files only (tests/ docs-site/ .github/ excluded)`);
     return;
   }
 
@@ -199,7 +203,9 @@ export function cloneOrUpdate(dest, { ref = 'master', force = false } = {}) {
     r.warn(`Fetch failed: ${e.message} — proceeding with existing clone`);
     return;
   }
+  // reset --hard clears skip-worktree bits — re-apply sparse immediately after.
   git(['reset', '--hard', 'FETCH_HEAD'], dest, { timeout: 5_000 });
+  applySparse(dest);
   cleanInstall(dest);
   r.ok(`Updated to latest ${ref}`);
 }
@@ -680,16 +686,6 @@ export function update(opts) {
   }
 
   cloneOrUpdate(paths.clone, { force });
-
-  // Migrate older non-sparse clones: removes tests/ docs-site/ .github/ from the working tree.
-  // Idempotent — safe to run on already-sparse clones.
-  try {
-    git(['sparse-checkout', 'set', ...SPARSE_DIRS], paths.clone);
-    r.ok('Sparse checkout applied (tests/ docs-site/ removed from clone)');
-  } catch {
-    // git < 2.25 or sparse-checkout unavailable — skip migration
-  }
-
   chmodHookDispatcher(paths.clone);
 
   // Re-patch settings in case hooks.json changed
