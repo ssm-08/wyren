@@ -119,10 +119,22 @@ function writeWatermark(cwd, uuid, { clearRunning = false, transcript = '' } = {
     state.last_distilled_at = Date.now();
   }
   if (transcript) state.last_transcript = transcript;
-  if (clearRunning) delete state.distiller_running;
+  if (clearRunning) {
+    delete state.distiller_running;
+    delete state.distiller_pid; // clear stale PID alongside the flag
+  }
   const tmp = `${statePath}.${process.pid}.${Date.now()}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(state, null, 2));
-  fs.renameSync(tmp, statePath);
+  // Retry loop matches writeWatermarkAtomic in stop.mjs — EPERM/EBUSY transient on Windows
+  let lastErr;
+  for (let i = 0; i < 3; i++) {
+    try { fs.renameSync(tmp, statePath); return; } catch (e) {
+      lastErr = e;
+      if (e.code !== 'EPERM' && e.code !== 'EBUSY') break;
+    }
+  }
+  try { fs.unlinkSync(tmp); } catch {}
+  throw lastErr;
 }
 
 async function main() {

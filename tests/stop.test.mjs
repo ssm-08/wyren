@@ -94,13 +94,13 @@ test('shouldDistill returns true when turns exceed threshold', () => {
 test('shouldDistill returns true on idle trigger', () => {
   const state = {
     turns_since_distill: 2,
-    last_distilled_at: Date.now() - 3 * 60 * 1000, // 3min ago
+    last_turn_at: Date.now() - 3 * 60 * 1000, // 3min ago
   };
   assert.equal(shouldDistill(state), true);
 });
 
-test('shouldDistill returns false on idle trigger with no prior distillation', () => {
-  // no last_distilled_at means first-ever distillation; wait for turn threshold
+test('shouldDistill returns false on idle trigger with no prior turns', () => {
+  // no last_turn_at means updateWatermark never ran — no idle trigger
   const state = { turns_since_distill: 2 };
   assert.equal(shouldDistill(state), false);
 });
@@ -108,7 +108,7 @@ test('shouldDistill returns false on idle trigger with no prior distillation', (
 test('shouldDistill returns false when idle time is under 2min', () => {
   const state = {
     turns_since_distill: 2,
-    last_distilled_at: Date.now() - 60 * 1000, // only 1min ago
+    last_turn_at: Date.now() - 60 * 1000, // only 1min ago
   };
   assert.equal(shouldDistill(state), false);
 });

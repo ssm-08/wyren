@@ -25,13 +25,23 @@ export function readBroadcastDir(broadcastDir) {
     .filter((f) => path.dirname(f) === skillsDir)
     .map((f) => path.basename(f));
 
-  const content = files
-    .map((f) => {
-      const name = path.relative(broadcastDir, f).replace(/\\/g, '/');
-      const body = fs.readFileSync(f, 'utf8');
-      return `## broadcast: ${name}\n\n${body.trim()}`;
-    })
-    .join('\n\n---\n\n');
+  const MAX_FILE_BYTES = 50_000;
+  const MAX_TOTAL_BYTES = 200_000;
+  let totalBytes = 0;
+  const parts = [];
+  for (const f of files) {
+    const name = path.relative(broadcastDir, f).replace(/\\/g, '/');
+    let body = fs.readFileSync(f, 'utf8');
+    if (Buffer.byteLength(body, 'utf8') > MAX_FILE_BYTES) {
+      body = body.slice(0, MAX_FILE_BYTES) + '\n<!-- relay: truncated — file exceeds 50 KB -->';
+    }
+    const entry = `## broadcast: ${name}\n\n${body.trim()}`;
+    const entryBytes = Buffer.byteLength(entry, 'utf8');
+    if (totalBytes + entryBytes > MAX_TOTAL_BYTES) break; // aggregate cap
+    parts.push(entry);
+    totalBytes += entryBytes;
+  }
+  const content = parts.join('\n\n---\n\n');
 
   return { content, skillFiles };
 }

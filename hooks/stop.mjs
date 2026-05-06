@@ -59,10 +59,11 @@ export function shouldDistill(state) {
   }
   if (state.turns_since_distill >= TURNS_THRESHOLD) return true;
   // idle trigger: turns accumulated but not yet at threshold
+  // Use last_turn_at (not last_distilled_at) so idle trigger fires even before first distillation
   if (
     state.turns_since_distill > 0 &&
-    state.last_distilled_at &&
-    Date.now() - state.last_distilled_at > IDLE_MS
+    state.last_turn_at &&
+    Date.now() - state.last_turn_at > IDLE_MS
   ) return true;
   return false;
 }
@@ -126,8 +127,6 @@ async function main() {
       }
 
       const watermarkPath = path.join(relayDir, 'state', 'watermark.json');
-      // release trigger lock immediately — distiller_running flag takes over
-      try { fs.unlinkSync(triggerLock); } catch {}
 
       const distProc = spawnDistiller({
         relayDir,
@@ -145,6 +144,9 @@ async function main() {
         state.turns_since_distill = 0;
       }
       writeWatermarkAtomic(watermarkPath, state);
+      // Release trigger lock only after distiller_running is written — prevents a second
+      // concurrent Stop hook from passing the lock check before the flag is set.
+      try { fs.unlinkSync(triggerLock); } catch {}
     }
   } catch (e) {
     process.stderr.write(`[relay] stop error: ${e.message}\n`);
