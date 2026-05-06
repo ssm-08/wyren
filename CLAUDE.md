@@ -1,97 +1,57 @@
 # Relay — Project Context
 
-Relay is a Claude Code plugin that gives a team shared memory across every teammate's sessions on the same repo. Each session's transcript is distilled in the background; a compact `memory.md` is synced via git and injected as hidden system context at every new `SessionStart` — so any Claude, on any laptop, starts warm with the team's reasoning (decisions, rejected paths, live workarounds).
+Relay is a Claude Code plugin for shared team memory across sessions. Transcripts are distilled in the background; `memory.md` is synced via git and injected as hidden context at every `SessionStart` and on each user turn (`UserPromptSubmit`).
 
-**Audience for this file:** future Claude Code sessions working on this repo. Keep it terse; leave depth to the docs site.
+**Audience:** future Claude Code sessions on this repo. Terse; depth lives in the docs site.
 
 ## Canonical references
 
-- **Docs site** (polished, team-facing): `docs-site/` → deployed at `https://ssm-08.github.io/relay/`. Good for onboarding a teammate; updated live during the build.
-- **GitHub repo:** `https://github.com/ssm-08/relay` (branch `master`).
+- **Docs site:** `docs-site/` → `https://ssm-08.github.io/relay/`
+- **GitHub:** `https://github.com/ssm-08/relay` (branch `master`)
 
-## Current status
+## Current state
 
-- **Chunk 0 (pre-build docs site):** ✅ shipped. Astro Starlight, 19 content pages, Mermaid diagrams, GitHub Pages via Actions.
-- **Chunk 1 (distiller quality gate):** ✅ shipped. `distiller.mjs` + `lib/transcript.mjs` + `lib/memory.mjs` + `prompts/distill.md`. Gate passed first iteration: 34-line memory from 828-line transcript, hygiene test passed, blind A/B test 3/3. Uses `claude -p --bare` — `--bare` flag critical to strip global plugins/hooks from subprocess.
-- **Chunk 2 (plugin skeleton + injection):** ✅ shipped. `.claude-plugin/plugin.json` + `hooks/hooks.json` + `hooks/run-hook.cmd` + `hooks/session-start.mjs` + `hooks/stop.mjs` (stub) + `bin/relay.mjs` + `lib/util.mjs`. 17 unit tests green. E2E verified via hook pipe test.
-- **Chunk 3 (distiller wired into Stop hook):** ✅ shipped. `stop.mjs` spawns distiller detached after 5 turns (or 2min idle). Tier 0 regex filter in `lib/filter.mjs` — matches rendered transcript format `[tool_use Edit]`, not raw JSONL. Default model Haiku 4.5. `distiller_running` lock prevents concurrent runs. 29 unit tests green.
-- **Chunk 4 (git sync layer):** ✅ shipped. `lib/sync.mjs` — `GitSync` with `pull()` (fetch + checkout `.relay/` from remote, 3s cap, `RELAY_SKIP_PULL` escape), `push()` (commit + retry-on-conflict, `reset --mixed FETCH_HEAD` keeps HEAD in sync), `lock()` (atomic `openSync('wx')`, 60s stale-steal). `relay status` + `relay distill [--force|--push|--dry-run]` CLI. 38 unit tests green.
-- **Chunk 5 (broadcast + polish + demo):** ✅ shipped. `relay broadcast-skill` CLI, `/relay-handoff` slash command (`commands/relay-handoff.toml`), acknowledgment instruction in SessionStart, polished README + docs. All 6 chunks complete — plugin is feature-complete.
-- **Post-ship (2026-04-22):** ✅ code review + 7 bug fixes (fd leak, double-distiller race, atomic watermark writes, handoff conflict retry, execSync→spawnSync, JSONL error logging, plugin.json hooks pointer). Two Windows/junction bugs fixed: `isMain()` now uses `realpathSync`, `run-hook.cmd` self-locates `CLAUDE_PLUGIN_ROOT`. 48 unit tests green. Docs: 22 pages + guides/two-system-test.md.
-- **Scripts (2026-04-22):** ✅ `scripts/setup.ps1` + `scripts/test-e2e.mjs` shipped. 21 e2e tests across 7 groups (init, SessionStart, Stop, distiller, CLI, dispatcher, stress/concurrency). Full lifecycle verified.
-- **Live two-system test (2026-04-22):** ✅ verified end-to-end across two machines. Fixed: setup.ps1 cwd bug, windowsHide: true for distiller spawn.
-- **Deployability v1 (2026-04-23):** ✅ `install.sh` (macOS/Linux) + `install.ps1` (Windows) one-liner installers. `scripts/installer.mjs` — shared Node logic for install/update/uninstall/doctor (zero deps, JSONC-tolerant settings.json patch, atomic write, symlink/junction, verify). `relay install|update|uninstall|doctor` CLI subcommands. `setup.ps1` shrunk to deprecation stub. CI matrix: ubuntu unit + macos/windows e2e. Code review: 3 Important bugs caught + fixed.
-- **Live sync (2026-04-23):** ✅ `hooks/user-prompt-submit.mjs` — `UserPromptSubmit` hook pulls latest `.relay/memory.md` on each user turn (**1.5s fetch cap, 3s hook budget**), computes section-aware delta against stored snapshot, injects only new content as `additionalContext`. B's running session auto-receives A's updates without restart. `lib/diff-memory.mjs` — pure diff/hash utilities. `writeWatermarkAtomic` exported from `stop.mjs`. `GitSync.pull` extended with configurable timeouts. UPS owns `.relay/state/ups-state.json` (snapshot + pull timestamp).
-- **Fault injection testing (2026-04-23):** ✅ `tests/fault-network.test.mjs`, `tests/fault-corruption.test.mjs`, `tests/fault-concurrency.test.mjs`, `tests/fault-e2e-livesync.test.mjs` — 53 fault tests covering network failure, corrupted state files, concurrent distiller races, and live-sync edge cases. Two bugs found and fixed: (1) EISDIR crash when `.relay/state/` exists as directory but `ups-state.json` missing; (2) watermark race — UPS now exclusively owns `ups-state.json` rather than sharing with Stop hook. `windowsHide: true` added to remaining `spawnSync` calls. **131 unit tests + 32 e2e = 163 total.**
-- **Code review + live testing polish (2026-04-23):** ✅ Two-machine live test surfaced 9 bugs; systematic code review caught 9 more. All fixed. Key: `${CLAUDE_PLUGIN_ROOT}` doesn't expand in `settings.json` (installer now writes absolute repoDir path); UTF-8 BOM in `settings.json` crashed parser (stripped on read); `relay install`/`update` register CLI via `npm install -g`; `relay uninstall` now fully removes link + settings + CLI + clone; UPS fetch 1s→1.5s; Stop hook PID liveness check prevents stuck `distiller_running`; `resetWatermarkTurns` made atomic; `RELAY_TURNS_THRESHOLD`/`RELAY_IDLE_MS` env vars added. Docs fully updated. **163 total tests, 0 fail.**
-- **Filter upgrade + install polish (2026-04-24):** ✅ `lib/filter.mjs` rewritten — weighted `scoreTier0()` replaces simple regex (decision/rejection/hack/scope/maintenance categories, structural scoring on raw JSONL lines, `RELAY_TIER0_THRESHOLD` env var, `MultiEdit` support). `distiller.mjs` passes `sliced` lines for structural scoring. `relay init` seeds `memory.md` from `CLAUDE.md` if present (8 KB cap, skips empty/dir). Install polish: executable bits (`100644→100755`) on `bin/relay.mjs`, `hooks/run-hook.cmd`, `install.sh`, `scripts/installer.mjs`; `install.sh` respects `RELAY_HOME`; `install.ps1` `$Args→$RelayArgs`, `$clone` quoted; `installer.mjs` npm stderr surfaced. Reviewer caught 4 bugs + H1/H4 e2e test assertions fixed. **137 unit (136 pass, 1 skip) + 32 e2e = 169 total.**
-- **Windows CI fix (2026-04-24):** ✅ Two Windows fixes. (1) `scripts/installer.mjs` `inspectLink()` — extracted `stripWinPathPrefix()` helper strips both `\\?\` (Win32 extended) and `\??\` (NT namespace) from `readlinkSync` output; prevents junction idempotency false-positive on Windows Server 2022. (2) `tests/fault-network.test.mjs` test 59 — switched remote URL from `git://localhost:9/nonexistent.git` to `file:///nonexistent-relay-test-remote`; `git://` spawns network helpers on Windows that held temp dir handle → `rmSync` threw `EBUSY`; `file://` fails immediately, no helpers. **169 total tests, CI green on all platforms.**
-- **E2E fixes + CLI polish (2026-04-24):** ✅ G18 fix: `spawnStopHooks` gets `extraEnv` param; G18 passes `RELAY_TURNS_THRESHOLD: '100'` so Windows process-startup stagger can't accumulate to threshold=5 and trigger distiller reset (leaving turns=0). H4 fix: old hook seed hardcoded actual RELAY_ROOT path → test always failed on dev machine; replaced with fictional `C:\Users\olduser\old-relay-checkout`. `relay log [--lines N]`, `relay --version`, `relay --help` / `-h` / `-v` implemented. Unknown-command UX: no-args → help stdout exit 0; unknown command → `relay: unknown command 'X'` + help stderr exit 1. **169 tests, CI should be 32/32.**
-- **Parallel code review + integration (2026-04-24):** ✅ Three-agent review pass. Logic: `sync.mjs` `push()` stages paths separately (broadcast dir absence no longer aborts memory.md push); `_rebase()` also checkouts `.relay/broadcast` from FETCH_HEAD. Reliability: `stop.mjs` — don't set `distiller_running` or reset `turns_since_distill` if spawn produced no PID; `lib/filter.mjs` NaN guard on `RELAY_TIER0_THRESHOLD` parse; `distiller.mjs` lock error handling consolidated (any failure → skip push, conservative). QoL: `relay status` shows human-readable progress (`N/5 turns until next distill`); init hint uses `git add .relay/`; lock hidden when not held; distill + install messages improved. Tests: `tests/transcript.test.mjs` new (17 tests — `lib/transcript.mjs` had zero coverage); 11 more tests across stop/filter/session-start/fault-corruption; D12 + E14 e2e assertions updated to match new messages. **165 unit (164 pass, 1 skip) + 32 e2e = 197 total.**
-- **Docsite polish (2026-04-24):** ✅ Four-agent parallel review pass + final review + full fix sweep across all 17 docs pages. Key fixes: all hackathon framing removed (zero mentions remain); `how-it-works.md` T=0 corrected (wrong `/plugins add relay` → real install flow); `reference/install.md` UserPromptSubmit hook added; `guides/two-system-test.md` UPS cap 1s→1.5s + git add scope + e2e count 27→32; `roadmap/overview.md` all post-ship phases present (197 total); `roadmap/5-broadcast.md` old install command replaced; `architecture.md` UPS hook + state file table + `last-injected-memory.md` added, plugin path clarified (`~/.claude/relay/` clone vs `~/.claude/plugins/relay/` junction); `distiller-prompt.md` current full prompt + past-tense section headers; `reference/distiller-prompt.md` "live hackathon project" → "active software project"; broadcast-headers contradiction in overview resolved. Index.mdx new splash page. No code changes — docs only.
-- **Install QoL + standards (2026-05-06):** ✅ Sparse checkout — `cloneOrUpdate` now uses `--filter=blob:none --sparse` + `git sparse-checkout set` for new clones (excludes `tests/`, `docs-site/`, `.github/`; falls back to full clone on old git). `relay update` migrates existing clones to sparse. `registerCli` switched from `npm install -g .` (copy) to `npm link` (symlink to clone — CLI auto-current after relay update, no stale copy). `doctor()` now checks claude CLI and prints per-issue fix hints via `issueHint()`. `main()` exits 1 if install/update verify fails (was silently exiting 0). "Install complete" message detects current git repo and prints copy-pasteable git commands. `relay init` output now prints exact `git add / commit / push` + teammate install one-liners. `package.json` `files` field added (documents runtime surface). README: `npm install -g` → `npm link`, init block improved. **No test count change — 165 unit + 32 e2e.**
-- **Install file cleanup (2026-05-06):** ✅ `cleanInstall()` deletes `CLAUDE.md`, `README.md`, `install.sh`, `install.ps1` from clone after every clone/update — unnecessary at runtime, CLAUDE.md contains internal project context. Sets `git update-index --skip-worktree` on deleted files so they don't appear dirty. Heal step before dirty check re-applies skip-worktree on upgrade from old installs. `applySparse()` runs in both clone and update paths of `cloneOrUpdate()` (cone mode, always applied after `reset --hard` which clears skip-worktree bits). `installer.mjs` now self-contained: `isMain` inlined, no import from `lib/util.mjs` (required for bootstrap sparse-clone reliability). `install.sh`/`install.ps1` do full bootstrap clone; installer owns sparse + cleanup lifecycle.
+**v0.4.0 — feature-complete.** All 6 chunks shipped (docs site, distiller, plugin skeleton, Stop hook, git sync, broadcast/slash command). Full install/uninstall/doctor CLI. Live sync via UserPromptSubmit. Sparse checkout, npm link, cleanInstall. Code review pass (2026-05-06): 10 bugs fixed (trigger lock ordering, distiller writeWatermark retry, lock TOCTOU, broadcast size cap, push user-file guard, idle trigger field, stale PID cleanup, dynamic filter threshold, markInjection path, resetWatermarkTurns logging).
+
+**Tests:** 166 unit (~15s) — 164 pass, 1 skip (POSIX-only), 1 flaky-under-load. 32 e2e (~25s). See `git log` for full history.
+
+**Known flaky:** `fault-e2e-livesync` (Test 1, Test 5) and `sync.test.mjs` fail under full concurrent suite load due to timing; pass in isolation. Not a regression.
 
 ## Repo layout
 
 ```
-Vibejam/
-├── docs-site/                  # Astro Starlight — team docs site (Chunk 0, done)
-│   ├── src/content/docs/       # markdown content
-│   ├── src/plugins/            # custom rehype + post-build integrations
-│   └── astro.config.mjs        # base path + env overrides
-├── .github/
-│   ├── workflows/docs.yml      # Pages deploy (docs-site/** changes only)
-│   └── workflows/ci.yml        # Unit + e2e CI (ubuntu + macos + windows)
-├── install.sh                  # macOS/Linux one-liner installer shim
-├── install.ps1                 # Windows one-liner installer shim
-├── README.md
-├── .gitignore                  # excludes node_modules/, .claude/, .relay/state/ (incl. ups-state.json), .relay/log, .worktrees/
-├── CLAUDE.md                   # this file
-├── package.json                # name/version/bin/scripts/engines (zero deps)
-├── distiller.mjs               # Chunks 1+3: distiller CLI (Haiku 4.5 default, Tier 0 filter)
-├── lib/
-│   ├── transcript.mjs          # JSONL parse + slicer + prose renderer
-│   ├── memory.mjs              # atomic read/write for memory.md
-│   ├── filter.mjs              # Tier 0 signal filter (hasTier0Signal)
-│   ├── sync.mjs                # Chunk 4: GitSync — pull, push, lock
-│   └── util.mjs                # readStdin, isMain (realpathSync junction-safe)
-├── prompts/
-│   └── distill.md              # distiller system prompt (core IP)
-├── hooks/                      # plugin hooks
-│   ├── hooks.json              # hook manifest (SessionStart + Stop + UserPromptSubmit)
-│   ├── run-hook.cmd            # polyglot bash+cmd dispatcher (self-locates CLAUDE_PLUGIN_ROOT)
-│   ├── session-start.mjs       # injects memory + broadcast as additionalContext
-│   ├── stop.mjs                # watermark + detached distiller spawn (5 turns / 2min idle)
-│   └── user-prompt-submit.mjs  # live sync: pull + diff + inject delta per user turn
-├── lib/
-│   └── diff-memory.mjs         # parseSections, diffMemory, renderDelta, hashMemory (pure, no deps)
-├── bin/
-│   └── relay.mjs               # CLI: init | status | distill | broadcast-skill | install | update | uninstall | doctor
-├── scripts/
-│   ├── installer.mjs           # cross-platform install/update/uninstall/doctor logic (Node, zero deps)
-│   ├── setup.ps1               # DEPRECATED stub — forwards to install.ps1
-│   └── test-e2e.mjs            # 32 e2e tests across 8 groups (A–H)
-├── tests/                      # 165 unit tests (node:test)
-│   ├── installer.test.mjs      # installer pure-function tests (26)
-│   ├── diff-memory.test.mjs    # diff-memory pure-function tests (10)
-│   ├── user-prompt-submit.test.mjs  # UPS hook logic tests (6)
-│   ├── fault-network.test.mjs  # fault injection: network failures
-│   ├── fault-corruption.test.mjs   # fault injection: corrupted state files
-│   ├── fault-concurrency.test.mjs  # fault injection: concurrent distiller races
-│   ├── fault-e2e-livesync.test.mjs # fault injection: live-sync edge cases
-│   ├── stop.test.mjs           # watermark, shouldDistill, trigger-lock
-│   ├── sync.test.mjs           # GitSync — pull, push, lock (bare-repo fixture)
-│   └── ...                     # session-start, distiller, relay-init, broadcast-skill
-└── commands/
-    └── relay-handoff.toml      # /relay-handoff slash command
+bin/relay.mjs                # CLI: all subcommands (755)
+distiller.mjs                # Haiku 4.5, cmd /c claude on Windows, windowsHide:true
+hooks/session-start.mjs      # pull (1.5s/0.5s) + inject memory + broadcast (50KB/file, 200KB total cap)
+hooks/stop.mjs               # watermark + PID-tracked detached distiller spawn
+hooks/user-prompt-submit.mjs # live sync: pull (1.5s) + diff + inject delta
+hooks/run-hook.cmd           # polyglot bash+cmd dispatcher (755)
+hooks/hooks.json             # hook manifest (SessionStart 2s, Stop 5s, UPS 3s)
+commands/relay-handoff.toml  # /relay-handoff slash command
+lib/sync.mjs                 # GitSync: pull/push/lock, user-file guard in push()
+lib/transcript.mjs           # JSONL parse + slice + render
+lib/memory.mjs               # atomic read/write
+lib/filter.mjs               # Tier 0 weighted scoring (scoreTier0 + hasTier0Signal, dynamic threshold)
+lib/diff-memory.mjs          # parseSections, diffMemory, renderDelta, hashMemory
+lib/util.mjs                 # isMain (realpathSync junction-safe), readStdin
+prompts/distill.md           # distiller system prompt
+scripts/installer.mjs        # install/update/uninstall/doctor, BOM-tolerant, npm link (755)
+scripts/test-e2e.mjs         # 32 e2e tests, 8 groups (A–H)
+scripts/setup.ps1            # DEPRECATED stub — forwards to install.ps1
+install.sh                   # macOS/Linux one-liner shim (755)
+install.ps1                  # Windows one-liner shim
+tests/                       # 166 unit tests (node:test)
+docs-site/                   # Astro Starlight docs site
+.github/workflows/           # docs.yml (Pages deploy) + ci.yml (unit + e2e matrix)
 ```
+
+State files (gitignored): `.relay/state/watermark.json` (Stop-owned), `.relay/state/ups-state.json` (UPS-owned), `.relay/state/.lock`, `.relay/log`.
 
 ## Plugin registration (non-obvious — read before touching hooks)
 
 Junction into `~/.claude/plugins/relay` is NOT sufficient. Claude Code only fires hooks for plugins listed in `installed_plugins.json`. For local dev, wire hooks directly in `~/.claude/settings.json`.
 
-**CRITICAL: `${CLAUDE_PLUGIN_ROOT}` does NOT expand in `settings.json`.** It only works inside a plugin's own `hooks/hooks.json`. The installer writes the **absolute path** to the relay clone. Example:
+**CRITICAL: `${CLAUDE_PLUGIN_ROOT}` does NOT expand in `settings.json`.** Only works inside a plugin's `hooks/hooks.json`. The installer writes the absolute path. Example:
 
 ```json
 "hooks": {
@@ -101,16 +61,8 @@ Junction into `~/.claude/plugins/relay` is NOT sufficient. Claude Code only fire
 }
 ```
 
-**`install.sh` / `install.ps1` automates this** (also registers `relay` CLI via `npm link`):
-
+Dev install (no touching real `~/.claude/`):
 ```bash
-# macOS / Linux
-curl -fsSL https://raw.githubusercontent.com/ssm-08/relay/master/install.sh | sh
-
-# Windows
-iwr -useb https://raw.githubusercontent.com/ssm-08/relay/master/install.ps1 | iex
-
-# Dev: use local clone, test without touching real ~/.claude/
 node scripts/installer.mjs install --from-local . --home /tmp/fake-home
 node scripts/installer.mjs doctor --home /tmp/fake-home
 node scripts/installer.mjs uninstall --home /tmp/fake-home
@@ -118,74 +70,91 @@ node scripts/installer.mjs uninstall --home /tmp/fake-home
 
 `run-hook.cmd` is a polyglot bash+cmd file — same file works on both OSes.
 
-## Non-obvious conventions
+## Non-obvious — hooks / plugin
 
-1. **Base path is env-driven.** Astro config reads `RELAY_BASE` (default `/relay`). Workflow sets it from `${{ github.event.repository.name }}` so the site deploys to any repo name. If renaming repo, no code changes needed — CI picks it up.
+1. **Trigger lock release order** (`stop.mjs`). `distill-trigger.lock` must be unlinked AFTER `distiller_running` is written to `watermark.json`. Unlinking before the write opens a window where a concurrent Stop hook passes the lock and spawns a second distiller. Current code does this correctly — don't move the `unlinkSync` earlier.
 
-2. **Root-relative links in markdown omit the base prefix.** Link to `/problem/` not `/relay/problem/`. The `rehype-base-href` plugin prepends the prefix at build time; `astro-base-href-fixup` integration does a post-build pass to fix Starlight's hero-action hrefs that bypass the markdown pipeline. If you add new pages/links, keep to this convention.
+2. **`writeWatermark` retry loop** (`distiller.mjs`). The local `writeWatermark` in distiller.mjs (intentionally not imported from stop.mjs — distiller runs detached) must use the same 3-attempt EPERM/EBUSY retry loop as `writeWatermarkAtomic`. A bare `fs.renameSync` on Windows will EPERM-crash on transient file contention, leaving `distiller_running: true` stuck forever.
 
-3. **Mermaid rendering is client-side via CDN.** `rehype-mermaid-pre.mjs` transforms ` ```mermaid ` fences into `<pre class="mermaid">`; a head script loads `mermaid@11` from jsdelivr and runs on `astro:page-load`. No playwright, no heavy deps. If offline rendering is ever needed, swap in a Node-based mermaid renderer.
+3. **Broadcast size cap** (`session-start.mjs`). `readBroadcastDir` caps at 50 KB/file and 200 KB total. Large skill files (code templates, PDFs) would otherwise inject megabytes into every session. Don't remove the cap.
 
-4. **Workflow `paths:` filter is strict.** Only pushes touching `docs-site/**` or `.github/workflows/docs.yml` trigger the Pages deploy. Empty commits are skipped. To force a redeploy without content changes, use `workflow_dispatch` (Actions tab → Run workflow).
+4. **`push()` user-file guard** (`sync.mjs`). Before committing, `push()` detects staged files outside `.relay/` and temporarily unstages them, commits relay-only changes, then re-stages. Without this, relay would commit and push user code under a `[relay] memory update` message. Don't replace this with a bare `git commit`.
 
-5. **Node 22 pinned in CI.** Node 20 deprecation warning from `actions/setup-node` flagged in early runs. Don't drop below 22. Local dev on any 20+ works.
+5. **Lock steal uses `'wx'` not `'w'`** (`sync.mjs lock()`). When stealing a stale lock (> 60s), the code unlinks first, then opens with `'wx'` (exclusive). Using `'w'` (truncate, non-exclusive) allows two processes to both steal simultaneously — TOCTOU race.
 
-6. **`.claude/` is gitignored.** Per-machine Claude Code state (permissions, session transcripts) must never be committed. Team memory lives in `.relay/memory.md`, not `.claude/`.
+6. **Idle trigger uses `last_turn_at`** (`stop.mjs`). `shouldDistill`'s idle check reads `state.last_turn_at`, NOT `last_distilled_at`. `last_turn_at` is set by every `updateWatermark` call, so idle fires even before the first distillation. `last_distilled_at` is only set after a successful distill.
+
+7. **`RELAY_TIER0_THRESHOLD` is dynamic** (`filter.mjs`). Read via `getThreshold()` at call time, not at module load. Tests can set the env var after importing and get the updated value.
+
+8. **`distiller_pid` must be cleared with `distiller_running`**. Both `writeWatermark(clearRunning:true)` and `resetWatermarkTurns` delete `distiller_pid` alongside `distiller_running`. A stale PID could match a future unrelated process on PID reuse.
+
+## Non-obvious — docs site
+
+1. **Base path is env-driven.** Astro reads `RELAY_BASE` (default `/relay`). CI sets it from `${{ github.event.repository.name }}`. Rename repo → no code change needed.
+
+2. **Root-relative links omit base prefix.** Link to `/problem/` not `/relay/problem/`. `rehype-base-href` prepends at build time; `astro-base-href-fixup` fixes Starlight hero-action hrefs post-build.
+
+3. **Mermaid is CDN client-side.** `rehype-mermaid-pre.mjs` → `<pre class="mermaid">`; head script loads `mermaid@11` from jsdelivr on `astro:page-load`.
+
+4. **Workflow `paths:` filter is strict.** Only `docs-site/**` or `.github/workflows/docs.yml` changes trigger Pages deploy. Force redeploy: `workflow_dispatch`.
+
+5. **Node 22 pinned in CI.** Don't drop below 22. Local dev on 20+ works.
+
+6. **`.claude/` is gitignored.** Team memory lives in `.relay/memory.md`, not `.claude/`.
 
 ## Coding conventions
 
-- **Node.js ESM `.mjs`. Zero runtime dependencies** — stdlib only (`node:fs`, `node:child_process`, `node:path`, `node:readline`, `node:os`). `@anthropic-ai/sdk` is a SDK-fallback-only dep (tree-shakeable out of the preferred path).
-- **Preferred AI call: `claude -p`** (headless Claude Code). Rides the user's existing Claude Code auth; no separate API key. SDK path is the fallback when `claude` CLI is unavailable.
-- **Tier 0 regex filter is mandatory** before any API call. See `docs-site/src/content/docs/cost-model.md` for the exact regex and rationale. ~70% of triggers skip the API entirely.
-- **Hooks never block.** `SessionStart` 2s budget (fetch 1.5s + checkout 0.5s). `UserPromptSubmit` 3s budget (fetch 1.5s + checkout 0.5s). `Stop` spawns distiller detached and returns immediately. On any error: log to `.relay/log` and `process.exit(0)` — never break Claude Code on a Relay failure.
-- **`distiller_running` + PID liveness.** `stop.mjs` stores `distiller_pid` alongside the flag. `shouldDistill` calls `process.kill(pid, 0)` — clears stale flag if process is gone (ESRCH). Prevents stuck-forever on OS kill.
-- **`RELAY_TURNS_THRESHOLD` / `RELAY_IDLE_MS` env vars** override distill trigger thresholds (defaults: 5 turns, 120s). Set before launching Claude Code for faster test cycles. Unset for normal use.
-- **Windows: `cmd /c claude` not `shell:true`.** Distiller spawns Claude via `['cmd', ['/c', 'claude', ...]]` on Windows — avoids DEP0190 (shell+args deprecation) and keeps no-injection-surface rule intact.
-- **Atomic memory writes.** Write to `.relay/memory.md.tmp`, then `rename()`.
-- **Path-scoped git pushes.** `git add .relay/memory.md .relay/broadcast/` — never push main code from within a hook.
-- **`git()` helper uses `spawnSync(array)`** — never shell strings (no injection surface).
+- **Node.js ESM `.mjs`. Zero runtime deps** — stdlib only. `@anthropic-ai/sdk` is fallback-only.
+- **Preferred AI call: `claude -p --bare`** — `--bare` strips global plugins/hooks from subprocess.
+- **Tier 0 filter mandatory** before any API call. ~70% of triggers skip the API entirely.
+- **Hooks never block.** SessionStart 2s, UPS 3s, Stop spawns detached. On error: log + `process.exit(0)`.
+- **Atomic writes everywhere.** Pattern: write to `.pid.timestamp.tmp`, then retry-`renameSync` (3× EPERM/EBUSY loop).
+- **`distiller_running` + PID liveness.** `shouldDistill` calls `process.kill(pid, 0)` — clears stale flag on ESRCH.
+- **Windows: `cmd /c claude` not `shell:true`.** Avoids DEP0190, keeps no-injection-surface rule.
+- **`git()` helper uses `spawnSync(array)`.** Never shell strings.
+- **`push()` scopes commits to `.relay/`.** Unstages non-relay staged files before committing, re-stages after. Don't bypass.
+- **`installer.mjs` self-contained.** `isMain` inlined — no import from `lib/util.mjs`. Required for bootstrap with only `scripts/` sparse-materialized.
+- **`RELAY_TURNS_THRESHOLD` / `RELAY_IDLE_MS`** override distill thresholds (defaults: 5 turns, 120s).
 
 ## Commit style
 
 - Type-prefixed: `docs:`, `ci(pages):`, `feat(distiller):`, `fix(hooks):`, `chore:`.
-- Subject in imperative, under 70 chars.
-- Body explains *why*, not *what* (diff shows what).
-- Trailer: `Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>` when pair-producing with Claude.
+- Subject imperative, under 70 chars. Body explains *why*.
+- Trailer: `Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>` when pair-producing.
 
 ## Local dev flow
 
-Docs site:
-```bash
-cd docs-site
-npm install          # first time
-npm run dev          # http://localhost:4321/relay/ — hot reload
-npm run build        # static HTML in dist/
-```
-
 Plugin tests:
 ```bash
-npm test             # 165 unit tests (~15s)
-npm run test:e2e     # 32 e2e tests (~25s, no Claude API needed)
-node scripts/test-e2e.mjs --only stop   # filter to one group
-node scripts/test-e2e.mjs --verbose     # dump stdout/stderr on failure
+npm test                                    # 166 unit tests (~15s); expect 164 pass, 1 skip, 1 flaky
+npm run test:e2e                            # 32 e2e tests (~25s, no Claude API)
+node scripts/test-e2e.mjs --only stop       # filter to one group
+node scripts/test-e2e.mjs --verbose         # dump stdout/stderr on failure
+node --test tests/fault-e2e-livesync.test.mjs  # run flaky test in isolation to verify it passes
+relay doctor                                # verify hooks wired correctly
+```
+
+Docs site:
+```bash
+cd docs-site && npm install   # first time
+npm run dev                   # http://localhost:4321/relay/
+npm run build                 # static HTML → dist/
 ```
 
 ## Session wrap-up (when user says "ready to clear" / "update context" / "wrap up")
 
-Do all of the following before confirming clear:
-
-1. **CLAUDE.md** — add entry to Current status for anything shipped this session; fix any stale timing/counts/conventions.
-2. **README.md** — update commands table, known issues, install description if anything changed.
-3. **docs-site pages** — update whichever pages are stale: `reference/cli.md`, `reference/hooks.md`, `roadmap/overview.md`, `faq.md`. Add roadmap timeline row if a new post-ship phase shipped.
-4. **`~/.claude/projects/.../memory/relay_project.md`** — rewrite status, test counts, critical details, CLI surface, repo layout to reflect current state.
-5. **`~/.claude/projects/.../memory/MEMORY.md`** — update index descriptions to match.
-6. **New memory files if needed** — save any new feedback, project decisions, or references learned this session.
-7. **Commit + verify** — `git status` clean, `git log --oneline origin/master..HEAD` shows what's unpushed. Tell user to push.
+1. **CLAUDE.md** — update "Current state" block (version, test counts, new bugs fixed). Don't add changelog bullets — just update facts.
+2. **README.md** — update commands table, known issues, install description if changed.
+3. **docs-site pages** — update stale pages: `reference/cli.md`, `reference/hooks.md`, `roadmap/overview.md`, `faq.md`.
+4. **`~/.claude/projects/.../memory/relay_project.md`** — rewrite status, test counts, critical details to reflect current state.
+5. **`~/.claude/projects/.../memory/MEMORY.md`** — update index descriptions.
+6. **New memory files if needed** — feedback, decisions, references learned this session.
+7. **Commit + verify** — `git status` clean, `git log --oneline origin/master..HEAD` shows unpushed. Tell user to push.
 
 Only then confirm "safe to clear."
 
 ## What's out of scope (don't build these yet)
 
-Next planned specs: distillation quality, CLAUDE.md compatibility, reliability (`relay doctor` deep checks), sync robustness, decision traceability. See session context for per-area breakdown.
+Next planned specs: distillation quality, CLAUDE.md compatibility, reliability (`relay doctor` deep checks), sync robustness, decision traceability.
 
-Don't build: cloud sync backend, dashboard UI, MCP RAG server, permissions/auth, Cursor/Windsurf support, real-time per-turn sync, CRDT merge strategies. All designed-for (`RelaySync` interface is pluggable) but out of scope.
+Don't build: cloud sync backend, dashboard UI, MCP RAG server, permissions/auth, Cursor/Windsurf support, real-time per-turn sync, CRDT merge strategies. All designed-for but out of scope.
