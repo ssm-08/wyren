@@ -15,7 +15,7 @@ Relay is a Claude Code plugin for shared team memory across sessions. Transcript
 
 **Tests:** 166 unit (~15s) — 164 pass, 1 skip (POSIX-only), 1 flaky-under-load. 32 e2e (~25s). See `git log` for full history.
 
-**Known flaky:** `fault-e2e-livesync` (Test 1, Test 5) and `sync.test.mjs` fail under full concurrent suite load due to timing; pass in isolation. Not a regression.
+**Known flaky:** `fault-e2e-livesync` (Test 1, Test 5) and `sync.test.mjs` fail under concurrent file load (subprocess + git-op contention); `--test-concurrency=1` serializes file execution and prevents this. CI and `npm test` both use it.
 
 ## Repo layout
 

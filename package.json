@@ -17,7 +17,7 @@
     "distiller.mjs"
   ],
   "scripts": {
-    "test": "node --test tests/*.test.mjs",
+    "test": "node --test --test-concurrency=1 tests/*.test.mjs",
     "test:e2e": "node scripts/test-e2e.mjs"
   },
   "engines": {
