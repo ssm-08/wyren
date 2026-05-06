@@ -55,16 +55,9 @@ for ($i = 0; $i -lt $RelayArgs.Count; $i++) {
 # For standard install, clone only enough to get the installer (sparse),
 # then hand off to installer.mjs which handles the full install lifecycle.
 if (-not $fromLocal -and -not (Test-Path $clone)) {
-    Write-Host "[relay] Bootstrapping relay installer..."
-    & git clone --depth=1 --filter=blob:none --sparse https://github.com/ssm-08/relay "$clone"
-    if ($LASTEXITCODE -ne 0) {
-        # Sparse clone not supported — fall back to full clone
-        & git clone --depth=1 https://github.com/ssm-08/relay "$clone"
-        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    } else {
-        # Bootstrap: only need scripts/ to get installer.mjs — installer.mjs handles the full clone.
-        & git -C "$clone" sparse-checkout set scripts
-    }
+    Write-Host "[relay] Cloning relay into $clone ..."
+    & git clone --depth=1 https://github.com/ssm-08/relay "$clone"
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
 $installerBase = if ($fromLocal) { $fromLocal } else { $clone }
