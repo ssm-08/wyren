@@ -14,10 +14,13 @@ export function writeWatermarkAtomic(watermarkPath, state) {
   const tmp = `${watermarkPath}.${process.pid}.${Date.now()}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(state, null, 2));
   let lastErr;
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 5; i++) {
     try { fs.renameSync(tmp, watermarkPath); return; } catch (e) {
       lastErr = e;
-      if (e.code !== 'EPERM' && e.code !== 'EBUSY') break;
+      if (e.code !== 'EPERM' && e.code !== 'EBUSY' && e.code !== 'EACCES') break;
+      // Staggered busy-wait: reduces concurrent NTFS rename contention on Windows
+      const end = Date.now() + i + 1;
+      while (Date.now() < end) {}
     }
   }
   try { fs.unlinkSync(tmp); } catch {}
