@@ -13,6 +13,10 @@ const REPO_URL = 'https://github.com/ssm-08/relay';
 // Excludes: tests/, docs-site/, .github/ — not needed at runtime.
 const SPARSE_DIRS = ['bin', 'hooks', 'lib', 'prompts', 'commands', '.claude-plugin', 'scripts'];
 
+// Root-level files removed after clone/update — not needed at runtime and
+// may contain internal project context (CLAUDE.md) that shouldn't ship to users.
+const ROOT_FILES_TO_REMOVE = ['CLAUDE.md', 'README.md', 'install.sh', 'install.ps1'];
+
 // --------------------------------------------------------------------------
 // Logging
 // --------------------------------------------------------------------------
@@ -123,6 +127,12 @@ export function validateRelayCheckout(dir) {
   }
 }
 
+function cleanInstall(dest) {
+  for (const f of ROOT_FILES_TO_REMOVE) {
+    try { fs.rmSync(path.join(dest, f), { force: true }); } catch {}
+  }
+}
+
 export function cloneOrUpdate(dest, { ref = 'master', force = false } = {}) {
   const r = reporter('clone');
   if (!fs.existsSync(dest)) {
@@ -152,6 +162,7 @@ export function cloneOrUpdate(dest, { ref = 'master', force = false } = {}) {
       git(['clone', '--depth=1', '--branch', ref, REPO_URL, dest]);
       r.ok(`Cloned (${ref})`);
     }
+    cleanInstall(dest);
     return;
   }
 
@@ -189,6 +200,7 @@ export function cloneOrUpdate(dest, { ref = 'master', force = false } = {}) {
     return;
   }
   git(['reset', '--hard', 'FETCH_HEAD'], dest, { timeout: 5_000 });
+  cleanInstall(dest);
   r.ok(`Updated to latest ${ref}`);
 }
 
