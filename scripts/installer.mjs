@@ -137,8 +137,14 @@ export function validateRelayCheckout(dir) {
 }
 
 function cleanInstall(dest) {
+  const removed = [];
   for (const f of ROOT_FILES_TO_REMOVE) {
-    try { fs.rmSync(path.join(dest, f), { force: true }); } catch {}
+    try { fs.rmSync(path.join(dest, f), { force: true }); removed.push(f); } catch {}
+  }
+  // Mark removed tracked files as skip-worktree so git diff doesn't see them as dirty.
+  // reset --hard clears these bits, so cleanInstall must run after every reset.
+  if (removed.length > 0) {
+    try { git(['update-index', '--skip-worktree', ...removed], dest); } catch {}
   }
 }
 
@@ -177,6 +183,14 @@ export function cloneOrUpdate(dest, { ref = 'master', force = false } = {}) {
     cleanInstall(dest);
     r.ok(`Cloned — runtime files only (tests/ docs-site/ .github/ excluded)`);
     return;
+  }
+
+  // Heal skip-worktree bits that a previous cleanInstall may have set without --skip-worktree
+  // (upgrade path: old installs deleted files but didn't mark them; git sees them as dirty).
+  for (const f of ROOT_FILES_TO_REMOVE) {
+    if (!fs.existsSync(path.join(dest, f))) {
+      try { git(['update-index', '--skip-worktree', f], dest); } catch {}
+    }
   }
 
   // Check dirty — use content diff (not stat-cache status) to avoid false positives
