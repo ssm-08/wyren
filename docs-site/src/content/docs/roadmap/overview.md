@@ -168,3 +168,14 @@ Key changes:
 - 11 additional tests across stop, filter, session-start, and fault-corruption test files.
 
 Test totals: **165 unit (164 pass, 1 skip POSIX-only) + 32 e2e = 197 total.**
+
+## Post-ship — Install file cleanup (2026-05-06) ✅
+
+**Shipped.** Installed clone now contains only runtime files — no internal docs, no installer shims.
+
+- **`cleanInstall()`**: deletes `CLAUDE.md`, `README.md`, `install.sh`, `install.ps1` from clone after every clone or update. These are not needed at runtime; `CLAUDE.md` in particular contains internal project context that should not ship to users.
+- **`git update-index --skip-worktree`**: set on every deleted file so `git diff HEAD` stays clean and `relay update` doesn't refuse with "local changes detected."
+- **Heal step**: before the dirty check in `cloneOrUpdate`, any `ROOT_FILES_TO_REMOVE` missing from disk have skip-worktree applied — handles upgrades from old installs that deleted files without marking them.
+- **`applySparse()`**: runs in both the clone and update paths of `cloneOrUpdate`. Cone mode excludes `tests/`, `docs-site/`, `.github/`. Always called after `git reset --hard` (which clears skip-worktree bits).
+- **`installer.mjs` self-contained**: `isMain` inlined, no import from `lib/util.mjs`. Required for bootstrap reliability when only `scripts/` is sparse-materialized.
+- **Bootstrap shims**: `install.sh` and `install.ps1` do a plain `git clone --depth=1`. Installer owns the full sparse + cleanup lifecycle via the update path of `cloneOrUpdate`.
