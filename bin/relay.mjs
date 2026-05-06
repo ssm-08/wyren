@@ -61,7 +61,13 @@ export function relayInit(targetDir) {
     fs.appendFileSync(gitignorePath, prefix + toAdd.join('\n') + '\n', 'utf8');
   }
 
-  console.log('Relay initialized. Run: git add .relay/ && git commit');
+  console.log('Relay initialized.\n');
+  console.log('  git add .relay/ .gitignore');
+  console.log('  git commit -m "chore: add relay shared memory"');
+  console.log('  git push\n');
+  console.log('Teammates install once per machine:');
+  console.log('  curl -fsSL https://raw.githubusercontent.com/ssm-08/relay/master/install.sh | sh');
+  console.log('  iwr -useb https://raw.githubusercontent.com/ssm-08/relay/master/install.ps1 | iex  # Windows');
   return true;
 }
 

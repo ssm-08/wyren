@@ -6,6 +6,16 @@
   "bin": {
     "relay": "./bin/relay.mjs"
   },
+  "files": [
+    "bin/",
+    "hooks/",
+    "lib/",
+    "prompts/",
+    "commands/",
+    ".claude-plugin/",
+    "scripts/installer.mjs",
+    "distiller.mjs"
+  ],
   "scripts": {
     "test": "node --test tests/*.test.mjs",
     "test:e2e": "node scripts/test-e2e.mjs"

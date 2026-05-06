@@ -9,6 +9,10 @@ import { isMain } from '../lib/util.mjs';
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 const REPO_URL = 'https://github.com/ssm-08/relay';
 
+// Cone-mode sparse-checkout dirs (root-level files always included by cone mode).
+// Excludes: tests/, docs-site/, .github/ — not needed at runtime.
+const SPARSE_DIRS = ['bin', 'hooks', 'lib', 'prompts', 'commands', '.claude-plugin', 'scripts'];
+
 // --------------------------------------------------------------------------
 // Logging
 // --------------------------------------------------------------------------
@@ -122,15 +126,32 @@ export function validateRelayCheckout(dir) {
 export function cloneOrUpdate(dest, { ref = 'master', force = false } = {}) {
   const r = reporter('clone');
   if (!fs.existsSync(dest)) {
-    r.ok(`Cloning ${REPO_URL} → ${dest}`);
-    // macOS first-run may trigger xcode-select; print hint before spawning git
     if (process.platform === 'darwin') {
-      process.stderr.write(
-        '[relay] [clone]  TIP  If macOS shows a Command Line Tools dialog, install it and re-run.\n'
-      );
+      process.stderr.write('[relay] [clone]  TIP  If macOS shows a Command Line Tools dialog, install it and re-run.\n');
     }
-    git(['clone', '--depth=1', '--branch', ref, REPO_URL, dest]);
-    r.ok(`Cloned (${ref})`);
+    process.stderr.write(`[relay] [clone]   OK  Cloning relay (this may take a moment)...\n`);
+
+    // Try sparse checkout: only downloads runtime files, skips tests/ docs-site/ .github/
+    // Requires git 2.25+ with partial-clone protocol support. Falls back to full clone.
+    let cloneOk = false;
+    try {
+      git(['clone', '--depth=1', '--filter=blob:none', '--sparse', '--branch', ref, REPO_URL, dest]);
+      try {
+        git(['sparse-checkout', 'set', ...SPARSE_DIRS], dest);
+        r.ok(`Cloned (sparse — only runtime files installed, tests/ docs-site/ excluded)`);
+      } catch {
+        r.ok(`Cloned (sparse-checkout set failed — full repo installed)`);
+      }
+      cloneOk = true;
+    } catch {
+      // Old git or remote doesn't support partial-clone — clean up and fall back
+      try { fs.rmSync(dest, { recursive: true, force: true }); } catch {}
+    }
+
+    if (!cloneOk) {
+      git(['clone', '--depth=1', '--branch', ref, REPO_URL, dest]);
+      r.ok(`Cloned (${ref})`);
+    }
     return;
   }
 
@@ -473,12 +494,13 @@ export function verifyInstall(paths) {
 // --------------------------------------------------------------------------
 
 export function registerCli(repoDir, r) {
-  // npm install -g . from the repo dir registers the bin shim globally.
+  // npm link registers the bin shim globally via a symlink to the clone — no separate copy.
+  // This means relay update only needs to update the clone; the CLI stays current automatically.
   // Fail-open: if npm isn't found or fails, print a manual hint instead.
-  // npm is a cmd script on Windows — invoke via cmd /c to avoid shell:true + args deprecation
+  // npm is a cmd script on Windows — invoke via cmd /c to avoid shell:true + args deprecation.
   const [npmExe, npmArgs] = process.platform === 'win32'
-    ? ['cmd', ['/c', 'npm', 'install', '-g', '.']]
-    : ['npm', ['install', '-g', '.']];
+    ? ['cmd', ['/c', 'npm', 'link']]
+    : ['npm', ['link']];
   const result = spawnSync(npmExe, npmArgs, {
     cwd: repoDir,
     encoding: 'utf8',
@@ -486,15 +508,15 @@ export function registerCli(repoDir, r) {
     timeout: 30_000,
   });
   if (result.error || result.status !== 0) {
-    const npmErr = (result.stderr || result.stdout || '').trim().slice(0, 300);
+    const npmErr = (result.stderr || result.stdout || '').trim().slice(0, 500);
     r.warn(
-      `Could not register relay CLI globally (npm install -g failed).\n` +
+      `Could not register relay CLI globally (npm link failed).\n` +
       (npmErr ? `  npm: ${npmErr}\n` : '') +
-      `  Run manually: cd "${repoDir}" && npm install -g .\n` +
+      `  Run manually: cd "${repoDir}" && npm link\n` +
       `  Or invoke directly: node "${path.join(repoDir, 'bin', 'relay.mjs')}" <command>`
     );
   } else {
-    r.ok('relay CLI registered globally (relay <command> now works)');
+    r.ok('relay CLI registered globally via npm link (relay <command> now works)');
   }
 }
 
@@ -535,8 +557,32 @@ export function install(opts) {
 
   if (!dryRun) {
     registerCli(repoDir, reporter('cli'));
-    process.stderr.write('\n[relay] Install complete.\n');
-    process.stderr.write('  Next: cd /path/to/your/repo && relay init\n');
+
+    // Detect if the user is already inside a git repo (not the relay clone itself)
+    // to give a specific next-step rather than a placeholder path.
+    let repoHint = '';
+    try {
+      const gitTop = spawnSync('git', ['rev-parse', '--show-toplevel'], {
+        encoding: 'utf8', windowsHide: true, timeout: 3_000,
+      });
+      const top = (gitTop.stdout || '').trim();
+      if (gitTop.status === 0 && top && !top.startsWith(repoDir)) {
+        repoHint = top;
+      }
+    } catch {}
+
+    process.stderr.write('\n[relay] Install complete.\n\n');
+    if (repoHint) {
+      process.stderr.write(`  Detected repo: ${repoHint}\n`);
+      process.stderr.write(`  Run from that directory:\n\n`);
+    } else {
+      process.stderr.write('  Next — cd into your project repo, then:\n\n');
+    }
+    process.stderr.write('    relay init\n');
+    process.stderr.write('    git add .relay/ .gitignore\n');
+    process.stderr.write('    git commit -m "chore: add relay shared memory"\n');
+    process.stderr.write('    git push\n\n');
+    process.stderr.write('  Verify: relay doctor\n');
   }
   return result;
 }
@@ -622,6 +668,16 @@ export function update(opts) {
   }
 
   cloneOrUpdate(paths.clone, { force });
+
+  // Migrate older non-sparse clones: removes tests/ docs-site/ .github/ from the working tree.
+  // Idempotent — safe to run on already-sparse clones.
+  try {
+    git(['sparse-checkout', 'set', ...SPARSE_DIRS], paths.clone);
+    r.ok('Sparse checkout applied (tests/ docs-site/ removed from clone)');
+  } catch {
+    // git < 2.25 or sparse-checkout unavailable — skip migration
+  }
+
   chmodHookDispatcher(paths.clone);
 
   // Re-patch settings in case hooks.json changed
@@ -638,6 +694,20 @@ export function update(opts) {
   } else {
     r.ok('Verified install after update');
   }
+  return result;
+}
+
+function issueHint(issue) {
+  if (issue.includes('Plugin link missing')) return 'relay install';
+  if (issue.includes('relay CLI')) return 'relay install';
+  if (issue.includes('settings.json missing Relay')) return 'relay install';
+  if (issue.includes('settings.json has') && issue.includes('hooks')) return 'relay uninstall && relay install';
+  if (issue.includes('not executable')) {
+    const m = issue.match(/: (.+?) —/);
+    return m ? `chmod +x "${m[1]}"` : 'relay install';
+  }
+  if (issue.includes('settings.json unreadable')) return 'Check settings.json is valid JSON, then: relay install';
+  return 'relay install';
 }
 
 export function doctor(opts) {
@@ -645,14 +715,29 @@ export function doctor(opts) {
   const paths = relayPaths(home);
   const result = verifyInstall(paths);
 
-  if (result.ok) {
+  // Check claude CLI — most common cause of distiller failure on fresh installs
+  const claudeCheck = process.platform === 'win32'
+    ? spawnSync('cmd', ['/c', 'claude', '--version'], { encoding: 'utf8', windowsHide: true, timeout: 3_000 })
+    : spawnSync('claude', ['--version'], { encoding: 'utf8', timeout: 3_000 });
+  const claudeOk = !claudeCheck.error && claudeCheck.status === 0;
+
+  if (result.ok && claudeOk) {
     process.stdout.write('[relay] doctor: all checks passed\n');
   } else {
-    process.stdout.write(`[relay] doctor: ${result.issues.length} issue(s) found:\n`);
-    for (const issue of result.issues) {
-      process.stdout.write(`  - ${issue}\n`);
+    if (!result.ok) {
+      process.stdout.write(`[relay] doctor: ${result.issues.length} issue(s) found:\n`);
+      for (const issue of result.issues) {
+        process.stdout.write(`  - ${issue}\n`);
+        process.stdout.write(`    Fix: ${issueHint(issue)}\n`);
+      }
     }
-    process.stdout.write('  Run: relay install to repair.\n');
+    if (!claudeOk) {
+      process.stdout.write('  ! claude CLI not found — distiller will not run\n');
+      process.stdout.write('    Fix: Install Claude Code from https://claude.ai/download\n');
+    }
+    if (!result.ok) {
+      process.stdout.write('\n  Run: relay install to repair most issues.\n');
+    }
   }
   return result;
 }
@@ -697,7 +782,8 @@ export async function main(argv) {
   try {
     switch (command) {
       case 'install': {
-        install(opts);
+        const installResult = install(opts);
+        if (installResult && !installResult.ok) process.exit(1);
         break;
       }
       case 'uninstall': {
@@ -705,7 +791,8 @@ export async function main(argv) {
         break;
       }
       case 'update': {
-        update(opts);
+        const updateResult = update(opts);
+        if (updateResult && !updateResult.ok) process.exit(1);
         break;
       }
       case 'verify':

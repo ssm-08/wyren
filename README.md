@@ -56,19 +56,19 @@ curl -fsSL https://raw.githubusercontent.com/ssm-08/relay/master/install.sh | sh
 iwr -useb https://raw.githubusercontent.com/ssm-08/relay/master/install.ps1 | iex
 ```
 
-Clones Relay to `~/.claude/relay/`, wires the hooks, and registers `relay` on PATH via `npm install -g`. Idempotent — safe to re-run.
+Clones Relay to `~/.claude/relay/`, wires the hooks, and registers `relay` on PATH via `npm link`. Idempotent — safe to re-run.
 
-## Init (per repo, once)
+## Init (per repo, one teammate, once)
 
 ```bash
 cd your-project
 relay init
-git add .relay .gitignore
-git commit -m "chore: init relay"
+git add .relay/ .gitignore
+git commit -m "chore: add relay shared memory"
 git push
 ```
 
-Teammates just need the plugin installed. They don't run `init` again.
+Teammates install the plugin on their machine (`curl | sh` above), then just `git pull`. They don't run `init` again.
 
 ## Commands
 
