@@ -39,11 +39,17 @@ for _arg in "$@"; do
 done
 
 if [ -z "$FROM_LOCAL" ] && [ ! -d "$CLONE" ]; then
-  echo "[relay] Cloning relay into $CLONE ..." >&2
+  echo "[relay] Bootstrapping relay installer..." >&2
   if [ "$(uname)" = "Darwin" ]; then
     echo "[relay] TIP: If macOS shows a Command Line Tools dialog, install it and re-run." >&2
   fi
-  git clone --depth=1 https://github.com/ssm-08/relay "$CLONE"
+  # Bootstrap: only need scripts/ to get installer.mjs — installer.mjs handles the full clone.
+  if git clone --depth=1 --filter=blob:none --sparse https://github.com/ssm-08/relay "$CLONE" 2>/dev/null; then
+    git -C "$CLONE" sparse-checkout set scripts 2>/dev/null || true
+  else
+    # Sparse clone not supported — fall back to full clone
+    git clone --depth=1 https://github.com/ssm-08/relay "$CLONE"
+  fi
 fi
 
 INSTALLER="${FROM_LOCAL:-$CLONE}/scripts/installer.mjs"
