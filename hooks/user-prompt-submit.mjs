@@ -42,10 +42,8 @@ function writeUpsStateAtomic(upsStatePath, state) {
   throw lastErr;
 }
 
-function markInjection(relayDir, event) {
-  try {
-    fs.appendFileSync(path.join(relayDir, 'log'), `[${new Date().toISOString()}] injection: ${event}\n`);
-  } catch {}
+function markInjection(cwd, event) {
+  appendLog(cwd, `injection: ${event}`);
 }
 
 /**
@@ -156,7 +154,7 @@ async function main() {
 
     if (!delta) { process.exit(0); }
 
-    markInjection(relayDir, 'user-prompt-submit');
+    markInjection(cwd, 'user-prompt-submit');
 
     // Emit additionalContext
     process.stdout.write(JSON.stringify({
