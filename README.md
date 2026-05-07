@@ -44,19 +44,24 @@ tail -f .relay/log
 
 ## Install
 
-**macOS / Linux:**
+```bash
+npm install -g @ssm-08/relay
+relay install
+```
 
+Or via one-liner:
+
+**macOS / Linux:**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ssm-08/relay/master/install.sh | sh
 ```
 
 **Windows (PowerShell):**
-
 ```powershell
 iwr -useb https://raw.githubusercontent.com/ssm-08/relay/master/install.ps1 | iex
 ```
 
-Clones Relay to `~/.claude/relay/`, wires the hooks, and registers `relay` on PATH via `npm link`. Idempotent — safe to re-run.
+Installs via npm, creates a plugin link at `~/.claude/plugins/relay`, and patches `~/.claude/settings.json` with the three hooks. Idempotent — safe to re-run.
 
 ## Init (per repo, one teammate, once)
 
@@ -79,7 +84,7 @@ relay log [--lines N]                 # tail relay log (distillation + injection
 relay distill [--force] [--push]      # run distillation manually
 relay broadcast-skill <file>          # share a skill file with all teammates
 relay install                         # install hooks on a new machine (called by install.sh/ps1)
-relay update                          # pull latest Relay from GitHub
+relay update                          # update Relay via npm + re-wire hooks
 relay uninstall                       # fully remove Relay from this machine
 relay doctor                          # verify install is working
 relay --version                       # print relay version

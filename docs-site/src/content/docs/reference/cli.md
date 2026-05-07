@@ -3,12 +3,12 @@ title: CLI reference
 description: Every bin/relay command and flag — what actually ships.
 ---
 
-The `relay` CLI is part of the plugin. Pure Node, zero runtime dependencies.
+The `relay` CLI is part of the plugin. Pure Node, zero runtime dependencies. Installed globally via `npm install -g @ssm-08/relay`.
 
-`relay install` registers the CLI globally via `npm install -g .` — `relay <command>` works from any directory after install. If for some reason `relay` isn't on PATH (e.g. `npm`'s global bin isn't in your shell's PATH), invoke directly:
+If `relay` isn't on PATH (e.g. npm's global bin directory isn't in your shell's PATH), find the path with `npm bin -g` and add it, or invoke directly:
 
 ```bash
-node ~/.claude/relay/bin/relay.mjs <command>
+node "$(npm root -g)/@ssm-08/relay/bin/relay.mjs" <command>
 ```
 
 ## `relay install`
@@ -21,28 +21,26 @@ relay install [--from-local <path>] [--home <path>] [--dry-run]
 
 | Flag | Effect |
 |---|---|
-| `--from-local <path>` | Use an existing local Relay checkout instead of cloning. Pass `.` from inside the repo. |
+| `--from-local <path>` | Use a local Relay checkout instead of the npm package. Pass `.` from inside the repo. |
 | `--home <path>` | Override `~/.claude/` location. Useful for testing without touching your real install. |
 | `--dry-run` | Print what would happen. No writes. |
-| `--force` | Overwrite a dirty working tree when updating the clone. |
 
 Creates:
-- Junction (Windows) or symlink (macOS) at `~/.claude/plugins/relay` → Relay clone.
-- `SessionStart`, `Stop`, and `UserPromptSubmit` entries in `~/.claude/settings.json` using the absolute path to the Relay clone (not `${CLAUDE_PLUGIN_ROOT}` — that variable only expands inside a plugin's own `hooks.json`, not in `settings.json`).
+- Junction (Windows) or symlink (macOS) at `~/.claude/plugins/relay` → npm package dir.
+- `SessionStart`, `Stop`, and `UserPromptSubmit` entries in `~/.claude/settings.json` using the absolute path to the package (not `${CLAUDE_PLUGIN_ROOT}` — that variable only expands inside a plugin's own `hooks.json`, not in `settings.json`).
 - Backs up existing `settings.json` to `settings.json.relay-backup-<timestamp>`.
-- Registers the `relay` CLI globally via `npm install -g .` so `relay <command>` works from any directory.
 
 Idempotent — safe to re-run. Detects and normalises stale hook entries from previous installs.
 
 ## `relay update`
 
-Pull the latest Relay from GitHub and re-patch settings if the hook shape changed.
+Update Relay to the latest npm version and re-wire hooks.
 
 ```bash
-relay update [--force]
+relay update
 ```
 
-Uses `git fetch + reset --hard FETCH_HEAD` (survives force-pushes). `--force` overrides dirty-tree guard.
+Runs `npm update -g @ssm-08/relay`, re-patches `settings.json`, and verifies the install. For `--from-local` dev installs, update your checkout manually and re-run `relay install --from-local <path>`.
 
 ## `relay uninstall`
 
@@ -55,8 +53,7 @@ relay uninstall [--dry-run]
 Removes:
 - Plugin link at `~/.claude/plugins/relay`
 - Relay hook entries from `settings.json` (foreign entries preserved)
-- Global `relay` CLI registration (`npm uninstall -g relay`)
-- Relay clone at `~/.claude/relay/`
+- Global `relay` CLI registration (`npm uninstall -g @ssm-08/relay`)
 
 After uninstall, `relay` is gone from PATH. Open a new terminal to confirm.
 

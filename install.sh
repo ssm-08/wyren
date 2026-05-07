@@ -18,16 +18,13 @@ if [ "$NODE_MAJOR" -lt 20 ]; then
   exit 2
 fi
 
-# git check
-if ! command -v git >/dev/null 2>&1; then
-  echo "[relay] ERROR: git not found on PATH. Install from https://git-scm.com/" >&2
+# npm check
+if ! command -v npm >/dev/null 2>&1; then
+  echo "[relay] ERROR: npm not found on PATH. Install from https://nodejs.org/" >&2
   exit 2
 fi
 
-CLAUDE_HOME="${RELAY_HOME:-${CLAUDE_HOME:-$HOME/.claude}}"
-CLONE="$CLAUDE_HOME/relay"
-
-# If --from-local is provided, skip clone
+# Parse --from-local (dev installs only)
 FROM_LOCAL=""
 _prev=""
 for _arg in "$@"; do
@@ -38,13 +35,13 @@ for _arg in "$@"; do
   _prev="$_arg"
 done
 
-if [ -z "$FROM_LOCAL" ] && [ ! -d "$CLONE" ]; then
-  echo "[relay] Cloning relay into $CLONE ..." >&2
-  if [ "$(uname)" = "Darwin" ]; then
-    echo "[relay] TIP: If macOS shows a Command Line Tools dialog, install it and re-run." >&2
-  fi
-  git clone --depth=1 https://github.com/ssm-08/relay "$CLONE"
+if [ -n "$FROM_LOCAL" ]; then
+  # Dev install: run installer directly from local checkout
+  exec node "${FROM_LOCAL}/scripts/installer.mjs" install "$@"
 fi
 
-INSTALLER="${FROM_LOCAL:-$CLONE}/scripts/installer.mjs"
-exec node "$INSTALLER" install "$@"
+# Standard install: npm global install, then wire hooks
+echo "[relay] Installing @ssm-08/relay globally..." >&2
+npm install -g @ssm-08/relay
+
+exec relay install "$@"

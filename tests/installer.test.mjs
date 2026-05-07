@@ -43,7 +43,6 @@ test('resolveHome falls back to os.homedir()/.claude', () => {
 
 test('relayPaths returns expected sub-paths', () => {
   const p = relayPaths('/home/test/.claude');
-  assert.equal(p.clone, path.join('/home/test/.claude', 'relay'));
   assert.equal(p.plugin, path.join('/home/test/.claude', 'plugins', 'relay'));
   assert.equal(p.settings, path.join('/home/test/.claude', 'settings.json'));
 });

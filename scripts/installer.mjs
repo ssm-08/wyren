@@ -16,15 +16,8 @@ function isMain(metaUrl) {
     return path.resolve(process.argv[1]) === path.resolve(url.fileURLToPath(metaUrl));
   }
 }
-const REPO_URL = 'https://github.com/ssm-08/relay';
 
-// Cone-mode sparse-checkout dirs (root-level files always included by cone mode).
-// Excludes: tests/, docs-site/, .github/ — not needed at runtime.
-const SPARSE_DIRS = ['bin', 'hooks', 'lib', 'prompts', 'commands', '.claude-plugin', 'scripts'];
-
-// Root-level files removed after clone/update — not needed at runtime and
-// may contain internal project context (CLAUDE.md) that shouldn't ship to users.
-const ROOT_FILES_TO_REMOVE = ['CLAUDE.md', 'README.md', 'install.sh', 'install.ps1'];
+const NPM_PACKAGE = '@ssm-08/relay';
 
 // --------------------------------------------------------------------------
 // Logging
@@ -54,7 +47,6 @@ export function resolveHome(env = process.env) {
 export function relayPaths(home) {
   return {
     home,
-    clone: path.join(home, 'relay'),
     plugin: path.join(home, 'plugins', 'relay'),
     settings: path.join(home, 'settings.json'),
   };
@@ -69,7 +61,6 @@ class PreflightError extends Error {}
 export function preflight() {
   const r = reporter('preflight');
 
-  // Node version — check via process.versions (already running in the right Node)
   const [major] = process.versions.node.split('.').map(Number);
   if (major < 20) {
     throw new PreflightError(
@@ -79,7 +70,7 @@ export function preflight() {
   }
   r.ok(`Node v${process.versions.node}`);
 
-  // git
+  // git is required by relay's sync mechanism at runtime
   const gitResult = spawnSync('git', ['--version'], { encoding: 'utf8', windowsHide: true });
   if (gitResult.error || gitResult.status !== 0) {
     throw new PreflightError(
@@ -88,8 +79,6 @@ export function preflight() {
   }
   r.ok((gitResult.stdout || '').trim());
 
-  // claude CLI — warn only. Use cmd /c on Windows to avoid DEP0190 (shell+args deprecation).
-  // windowsHide: true prevents cmd window flash on Windows.
   const claudeResult = process.platform === 'win32'
     ? spawnSync('cmd', ['/c', 'claude', '--version'], { encoding: 'utf8', windowsHide: true })
     : spawnSync('claude', ['--version'], { encoding: 'utf8' });
@@ -98,26 +87,6 @@ export function preflight() {
   } else {
     r.ok(`claude ${(claudeResult.stdout || '').trim()}`);
   }
-}
-
-// --------------------------------------------------------------------------
-// Git helper (mirrors lib/sync.mjs pattern, kept local to avoid coupling)
-// --------------------------------------------------------------------------
-
-function git(args, cwd, { timeout = 10_000 } = {}) {
-  const r = spawnSync('git', args, {
-    cwd,
-    encoding: 'utf8',
-    timeout,
-    windowsHide: true,
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
-  if (r.error) throw r.error;
-  if (r.status !== 0) {
-    const msg = (r.stderr || '').trim() || `git exit ${r.status}`;
-    throw Object.assign(new Error(msg), { status: r.status });
-  }
-  return (r.stdout || '').trim();
 }
 
 // --------------------------------------------------------------------------
@@ -136,120 +105,22 @@ export function validateRelayCheckout(dir) {
   }
 }
 
-function cleanInstall(dest) {
-  const removed = [];
-  for (const f of ROOT_FILES_TO_REMOVE) {
-    try { fs.rmSync(path.join(dest, f), { force: true }); removed.push(f); } catch {}
-  }
-  // Mark removed tracked files as skip-worktree so git diff doesn't see them as dirty.
-  // reset --hard clears these bits, so cleanInstall must run after every reset.
-  if (removed.length > 0) {
-    try { git(['update-index', '--skip-worktree', ...removed], dest); } catch {}
-  }
-}
-
-// Apply sparse-checkout to working tree: removes tests/, docs-site/, .github/ etc.
-// Called after every clone and every reset --hard (which clears skip-worktree bits).
-// Silent on failure — git < 2.25 or old clones without partial-clone support.
-function applySparse(dest) {
-  try { git(['sparse-checkout', 'set', ...SPARSE_DIRS], dest); } catch {}
-}
-
-export function cloneOrUpdate(dest, { ref = 'master', force = false } = {}) {
-  const r = reporter('clone');
-  if (!fs.existsSync(dest)) {
-    if (process.platform === 'darwin') {
-      process.stderr.write('[relay] [clone]  TIP  If macOS shows a Command Line Tools dialog, install it and re-run.\n');
-    }
-    process.stderr.write(`[relay] [clone]   OK  Cloning relay (this may take a moment)...\n`);
-
-    // Try sparse checkout: only downloads runtime files, skips tests/ docs-site/ .github/
-    // Requires git 2.25+ with partial-clone protocol support. Falls back to full clone.
-    let cloneOk = false;
-    try {
-      git(['clone', '--depth=1', '--filter=blob:none', '--sparse', '--branch', ref, REPO_URL, dest]);
-      cloneOk = true;
-    } catch {
-      // Old git or remote doesn't support partial-clone — clean up and fall back
-      try { fs.rmSync(dest, { recursive: true, force: true }); } catch {}
-    }
-
-    if (!cloneOk) {
-      git(['clone', '--depth=1', '--branch', ref, REPO_URL, dest]);
-    }
-    // Always apply sparse after clone (sparse or full) — limits working tree to runtime dirs.
-    // On git < 2.25 this is a no-op; cleanInstall handles root files regardless.
-    applySparse(dest);
-    cleanInstall(dest);
-    r.ok(`Cloned — runtime files only (tests/ docs-site/ .github/ excluded)`);
-    return;
-  }
-
-  // Heal skip-worktree bits that a previous cleanInstall may have set without --skip-worktree
-  // (upgrade path: old installs deleted files but didn't mark them; git sees them as dirty).
-  for (const f of ROOT_FILES_TO_REMOVE) {
-    if (!fs.existsSync(path.join(dest, f))) {
-      try { git(['update-index', '--skip-worktree', f], dest); } catch {}
-    }
-  }
-
-  // Check dirty — use content diff (not stat-cache status) to avoid false positives
-  // from LF→CRLF stat noise on Windows after npm touches files.
-  // git diff --quiet exits 0 (clean) or 1 (dirty); untracked files checked separately.
-  let dirty = false;
-  try {
-    try {
-      git(['diff', '--quiet', 'HEAD'], dest, { timeout: 5_000 });
-    } catch (e) {
-      if (e.status === 1) dirty = true;
-      else throw e;
-    }
-    if (!dirty) {
-      const untracked = git(['ls-files', '--others', '--exclude-standard'], dest, { timeout: 5_000 });
-      if (untracked.length > 0) dirty = true;
-    }
-  } catch {}
-
-  if (dirty && !force) {
-    throw new Error(
-      `Clone at ${dest} has local changes. Commit or stash them, or pass --force to overwrite.\n` +
-      'Your edits are safe — stash them first, then re-run.'
-    );
-  }
-
-  r.ok(`Updating ${dest}`);
-  // Separate fetch from reset: if fetch fails (network), warn + proceed with existing.
-  // If fetch succeeds but reset fails, that's unexpected — throw so caller knows update failed.
-  try {
-    git(['fetch', '--depth=1', 'origin', ref], dest, { timeout: 15_000 });
-  } catch (e) {
-    r.warn(`Fetch failed: ${e.message} — proceeding with existing clone`);
-    return;
-  }
-  // reset --hard clears skip-worktree bits — re-apply sparse immediately after.
-  git(['reset', '--hard', 'FETCH_HEAD'], dest, { timeout: 5_000 });
-  applySparse(dest);
-  cleanInstall(dest);
-  r.ok(`Updated to latest ${ref}`);
-}
-
-export function resolveRepoDir({ fromLocal, clone, force }) {
+// Resolve the directory where relay source files live.
+// - --from-local: user-provided path (dev/local checkout)
+// - default: package root derived from __dirname (works for npm global install)
+export function resolvePackageDir(fromLocal) {
   if (fromLocal) {
     const abs = path.resolve(fromLocal);
     validateRelayCheckout(abs);
     return abs;
   }
-  cloneOrUpdate(clone, { force });
-  return clone;
+  return path.resolve(path.join(__dirname, '..'));
 }
 
 // --------------------------------------------------------------------------
 // Symlink / junction
 // --------------------------------------------------------------------------
 
-// Strip Windows path prefixes from readlinkSync output:
-// \\?\ = Win32 extended path prefix
-// \??\ = NT namespace prefix (returned on Windows Server / older Node builds)
 function stripWinPathPrefix(target) {
   return target.replace(/^(?:\\\\[?]|\\[?][?])\\/, '');
 }
@@ -263,8 +134,6 @@ export function inspectLink(p) {
       return { kind: 'symlink', target };
     }
     if (stat.isDirectory()) {
-      // Could be a junction (Windows) — junctions look like directories in lstat
-      // Try readlink; if it succeeds it's a reparse point
       try {
         let target = fs.readlinkSync(p);
         target = stripWinPathPrefix(target);
@@ -317,7 +186,6 @@ export function removeLink(p) {
   const info = inspectLink(p);
   if (info.kind === 'missing') return;
   if (process.platform === 'win32' && info.kind === 'junction') {
-    // Node <22: fs.unlinkSync fails on junctions; rmdirSync works
     fs.rmdirSync(p);
   } else {
     fs.unlinkSync(p);
@@ -337,8 +205,6 @@ function isRelayHookEntry(entry) {
   );
 }
 
-// ${CLAUDE_PLUGIN_ROOT} only expands in plugin hooks.json, NOT in settings.json.
-// Use the absolute path to the relay repo so hooks work when wired via settings.json.
 function buildHookEntries(repoDir) {
   const dispatcher = path.join(repoDir, 'hooks', 'run-hook.cmd');
   const q = `"${dispatcher}"`;
@@ -359,7 +225,6 @@ function buildHookEntries(repoDir) {
 }
 
 function stripJsoncComments(src) {
-  // Remove // line comments (not inside strings) and /* */ block comments
   let out = '';
   let i = 0;
   let inString = false;
@@ -383,48 +248,40 @@ function stripJsoncComments(src) {
     }
     out += src[i++];
   }
-  // Remove trailing commas before } or ]
   return out.replace(/,(\s*[}\]])/g, '$1');
 }
 
 export function readSettings(p) {
   if (!fs.existsSync(p)) return {};
-  // Strip UTF-8 BOM (﻿) — Windows tools (PowerShell, VS Code) sometimes write it
   const raw = fs.readFileSync(p, 'utf8').replace(/^﻿/, '');
-  // Try strict JSON first
   try { return JSON.parse(raw); } catch {}
-  // Try JSONC
   try { return JSON.parse(stripJsoncComments(raw)); } catch (e2) {
     throw new Error(`Failed to parse ${p}: ${e2.message}`);
   }
 }
 
 export function patchSettingsInMemory(settings, { mode, repoDir = '' }) {
-  const out = JSON.parse(JSON.stringify(settings)); // deep clone
+  const out = JSON.parse(JSON.stringify(settings));
 
   if (!out.hooks || typeof out.hooks !== 'object') out.hooks = {};
   const hooks = out.hooks;
 
   for (const event of ['SessionStart', 'Stop', 'UserPromptSubmit']) {
-    // Coerce to array
     let current = hooks[event];
     if (!current) current = [];
     else if (!Array.isArray(current)) current = [current];
 
-    // Filter out stale relay entries
     const filtered = current.filter((entry) => !isRelayHookEntry(entry));
 
     if (mode === 'install') {
       const fresh = buildHookEntries(repoDir);
       hooks[event] = [...filtered, fresh[event]];
     } else {
-      // uninstall
       hooks[event] = filtered;
       if (filtered.length === 0) delete hooks[event];
     }
   }
 
-  // Clean up empty hooks object
   if (mode === 'uninstall' && Object.keys(hooks).length === 0) {
     delete out.hooks;
   }
@@ -436,7 +293,6 @@ export function writeSettingsAtomic(p, obj, { backup = true } = {}) {
   const dir = path.dirname(p);
   fs.mkdirSync(dir, { recursive: true });
 
-  // Backup existing — keep only the most recent, prune older ones
   if (backup && fs.existsSync(p)) {
     const base = path.basename(p);
     const old = fs.readdirSync(dir)
@@ -472,32 +328,29 @@ export function chmodHookDispatcher(repoDir) {
 export function verifyInstall(paths) {
   const issues = [];
 
-  // Plugin link must exist and point to a directory containing relay CLI
   const info = inspectLink(paths.plugin);
   if (info.kind === 'missing') {
     issues.push(`Plugin link missing: ${paths.plugin}`);
   }
 
-  // relay CLI responds — resolve from actual link target (handles --from-local)
-  const linkedDir = (info.target && info.kind !== 'missing')
-    ? info.target
-    : paths.clone;
-  const relayBin = path.join(linkedDir, 'bin', 'relay.mjs');
-  if (fs.existsSync(relayBin)) {
-    const r = spawnSync('node', [relayBin, 'status'], {
-      encoding: 'utf8',
-      timeout: 5_000,
-      windowsHide: true,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-    if (r.status !== 0) {
-      issues.push(`relay CLI failed: ${(r.stderr || '').trim()}`);
+  const linkedDir = (info.target && info.kind !== 'missing') ? info.target : null;
+  if (linkedDir) {
+    const relayBin = path.join(linkedDir, 'bin', 'relay.mjs');
+    if (fs.existsSync(relayBin)) {
+      const r = spawnSync('node', [relayBin, 'status'], {
+        encoding: 'utf8',
+        timeout: 5_000,
+        windowsHide: true,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      if (r.status !== 0) {
+        issues.push(`relay CLI failed: ${(r.stderr || '').trim()}`);
+      }
+    } else {
+      issues.push(`relay CLI not found at: ${relayBin}`);
     }
-  } else {
-    issues.push(`relay CLI not found at: ${relayBin}`);
   }
 
-  // settings.json has exactly one relay entry per event
   try {
     const settings = readSettings(paths.settings);
     const hooksObj = settings.hooks || {};
@@ -514,9 +367,7 @@ export function verifyInstall(paths) {
     issues.push(`settings.json unreadable: ${e.message}`);
   }
 
-  // POSIX: hook dispatcher must be executable. run-hook.cmd is a polyglot bash+cmd file.
-  // Use linkedDir (the actual install source) not paths.clone, which may differ with --from-local.
-  if (process.platform !== 'win32') {
+  if (process.platform !== 'win32' && linkedDir) {
     const dispatcher = path.join(linkedDir, 'hooks', 'run-hook.cmd');
     if (fs.existsSync(dispatcher)) {
       try {
@@ -531,14 +382,10 @@ export function verifyInstall(paths) {
 }
 
 // --------------------------------------------------------------------------
-// CLI registration — npm link / npm install -g so `relay` is on PATH
+// CLI registration — for --from-local dev installs only
 // --------------------------------------------------------------------------
 
 export function registerCli(repoDir, r) {
-  // npm link registers the bin shim globally via a symlink to the clone — no separate copy.
-  // This means relay update only needs to update the clone; the CLI stays current automatically.
-  // Fail-open: if npm isn't found or fails, print a manual hint instead.
-  // npm is a cmd script on Windows — invoke via cmd /c to avoid shell:true + args deprecation.
   const [npmExe, npmArgs] = process.platform === 'win32'
     ? ['cmd', ['/c', 'npm', 'link']]
     : ['npm', ['link']];
@@ -566,15 +413,15 @@ export function registerCli(repoDir, r) {
 // --------------------------------------------------------------------------
 
 export function install(opts) {
-  const { home, fromLocal, force, dryRun } = opts;
+  const { home, fromLocal, dryRun } = opts;
   const r = reporter('install');
   const paths = relayPaths(home);
 
   r.ok(`Home: ${home}`);
   preflight();
 
-  const repoDir = resolveRepoDir({ fromLocal, clone: paths.clone, force });
-  r.ok(`Repo: ${repoDir}`);
+  const repoDir = resolvePackageDir(fromLocal);
+  r.ok(`${fromLocal ? 'Repo (local)' : 'Repo'}: ${repoDir}`);
 
   chmodHookDispatcher(repoDir);
 
@@ -596,11 +443,13 @@ export function install(opts) {
     r.ok('Verified install');
   }
 
-  if (!dryRun) {
+  // For --from-local dev installs, wire the CLI via npm link.
+  // npm global installs already have relay on PATH — skip.
+  if (!dryRun && fromLocal) {
     registerCli(repoDir, reporter('cli'));
+  }
 
-    // Detect if the user is already inside a git repo (not the relay clone itself)
-    // to give a specific next-step rather than a placeholder path.
+  if (!dryRun) {
     let repoHint = '';
     try {
       const gitTop = spawnSync('git', ['rev-parse', '--show-toplevel'], {
@@ -644,28 +493,18 @@ export function uninstall(opts) {
       r.ok(`Removed relay entries from settings.json`);
     }
 
-    // Deregister global CLI — fail-open, relay may not have been globally installed
+    // Deregister global CLI — fail-open
     const [npmExe, npmArgs] = process.platform === 'win32'
-      ? ['cmd', ['/c', 'npm', 'uninstall', '-g', 'relay']]
-      : ['npm', ['uninstall', '-g', 'relay']];
+      ? ['cmd', ['/c', 'npm', 'uninstall', '-g', NPM_PACKAGE]]
+      : ['npm', ['uninstall', '-g', NPM_PACKAGE]];
     const npmResult = spawnSync(npmExe, npmArgs, { encoding: 'utf8', windowsHide: true, timeout: 15_000 });
     if (!npmResult.error && npmResult.status === 0) {
       r.ok('relay CLI deregistered from global PATH');
     } else {
-      r.warn('Could not deregister relay CLI globally — remove manually: npm uninstall -g relay');
+      r.warn(`Could not deregister relay CLI — remove manually: npm uninstall -g ${NPM_PACKAGE}`);
     }
 
-    // Delete the relay clone — only the standard install location, never a --from-local path
-    if (fs.existsSync(paths.clone)) {
-      try {
-        fs.rmSync(paths.clone, { recursive: true, force: true });
-        r.ok(`Deleted clone: ${paths.clone}`);
-      } catch (e) {
-        r.warn(`Could not delete clone at ${paths.clone}: ${e.message}`);
-      }
-    }
-
-    // Clean up settings backup files left by installs
+    // Clean up settings backup files
     const settingsDir = path.dirname(paths.settings);
     const settingsBase = path.basename(paths.settings);
     try {
@@ -677,47 +516,53 @@ export function uninstall(opts) {
       if (backups.length > 0) r.ok(`Removed ${backups.length} settings backup(s)`);
     } catch {}
   } else {
-    r.ok('[dry-run] would remove link + strip settings entries + npm uninstall -g relay + delete clone + remove backups');
+    r.ok(`[dry-run] would remove link + strip settings entries + npm uninstall -g ${NPM_PACKAGE} + remove backups`);
   }
 }
 
 export function update(opts) {
-  const { home, force } = opts;
+  const { home } = opts;
   const r = reporter('update');
   const paths = relayPaths(home);
 
-  // Detect --from-local install: plugin link exists but points outside paths.clone.
-  // relay update only knows how to update the standard clone — local checkouts are
-  // user-managed. Tell them to pull manually and re-install.
   const linkInfo = inspectLink(paths.plugin);
-  if (linkInfo.kind !== 'missing' && linkInfo.target) {
-    const linkTarget = path.resolve(linkInfo.target);
-    if (linkTarget !== path.resolve(paths.clone)) {
-      throw new Error(
-        `Local install detected — plugin points to: ${linkTarget}\n` +
-        `  relay update only works for standard (cloned) installs.\n` +
-        `  Pull your local checkout manually, then re-run:\n` +
-        `    relay install --from-local "${linkTarget}"`
-      );
-    }
+  if (linkInfo.kind === 'missing') {
+    throw new Error('Relay not installed. Run: relay install');
   }
 
-  if (!fs.existsSync(paths.clone)) {
+  // Detect --from-local install: link target does not pass through node_modules
+  const isNpmInstall = linkInfo.target && linkInfo.target.includes('node_modules');
+  if (!isNpmInstall) {
     throw new Error(
-      `Relay not installed at ${paths.clone}. Run: relay install`
+      `Local install detected — plugin points to: ${linkInfo.target}\n` +
+      `  relay update only works for npm installs.\n` +
+      `  Pull your local checkout manually, then re-run:\n` +
+      `    relay install --from-local "${linkInfo.target}"`
     );
   }
 
-  cloneOrUpdate(paths.clone, { force });
-  chmodHookDispatcher(paths.clone);
+  r.ok(`Updating ${NPM_PACKAGE} via npm...`);
+  const [npmExe, npmArgs] = process.platform === 'win32'
+    ? ['cmd', ['/c', 'npm', 'update', '-g', NPM_PACKAGE]]
+    : ['npm', ['update', '-g', NPM_PACKAGE]];
+  const npmResult = spawnSync(npmExe, npmArgs, {
+    encoding: 'utf8',
+    windowsHide: true,
+    timeout: 60_000,
+    stdio: 'inherit',
+  });
+  if (npmResult.error || npmResult.status !== 0) {
+    throw new Error(`npm update failed. Try manually: npm update -g ${NPM_PACKAGE}`);
+  }
 
-  // Re-patch settings in case hooks.json changed
+  // Re-derive repoDir from __dirname — path is stable across npm updates for global installs
+  const repoDir = path.resolve(path.join(__dirname, '..'));
+  chmodHookDispatcher(repoDir);
+
   const settings = readSettings(paths.settings);
-  const patched = patchSettingsInMemory(settings, { mode: 'install', repoDir: paths.clone });
+  const patched = patchSettingsInMemory(settings, { mode: 'install', repoDir });
   writeSettingsAtomic(paths.settings, patched);
   r.ok('settings.json refreshed');
-
-  registerCli(paths.clone, reporter('cli'));
 
   const result = verifyInstall(paths);
   if (!result.ok) {
@@ -746,7 +591,6 @@ export function doctor(opts) {
   const paths = relayPaths(home);
   const result = verifyInstall(paths);
 
-  // Check claude CLI — most common cause of distiller failure on fresh installs
   const claudeCheck = process.platform === 'win32'
     ? spawnSync('cmd', ['/c', 'claude', '--version'], { encoding: 'utf8', windowsHide: true, timeout: 3_000 })
     : spawnSync('claude', ['--version'], { encoding: 'utf8', timeout: 3_000 });
@@ -835,9 +679,8 @@ export async function main(argv) {
       default:
         process.stderr.write(
           'Usage: node scripts/installer.mjs <install|uninstall|update|doctor>\n' +
-          '  --from-local <path>  Use local relay checkout instead of cloning\n' +
+          '  --from-local <path>  Use local relay checkout (dev only)\n' +
           '  --home <path>        Override ~/.claude/ location (for testing)\n' +
-          '  --force              Overwrite dirty working tree during update\n' +
           '  --dry-run            Preview actions without making changes\n'
         );
         process.exit(1);

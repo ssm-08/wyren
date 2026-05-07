@@ -11,7 +11,7 @@ Relay is a Claude Code plugin for shared team memory across sessions. Transcript
 
 ## Current state
 
-**v0.4.0 — feature-complete.** All 6 chunks shipped (docs site, distiller, plugin skeleton, Stop hook, git sync, broadcast/slash command). Full install/uninstall/doctor CLI. Live sync via UserPromptSubmit. Sparse checkout, npm link, cleanInstall. Code review pass (2026-05-06): 10 bugs fixed (trigger lock ordering, distiller writeWatermark retry, lock TOCTOU, broadcast size cap, push user-file guard, idle trigger field, stale PID cleanup, dynamic filter threshold, markInjection path, resetWatermarkTurns logging). Simplify pass (2026-05-06): 4 quality fixes (filter threshold double-read, stringly-typed sentinel in resetWatermarkTurns, markInjection log prefix, merged duplicate git diff calls in push).
+**v0.4.0 — feature-complete + npm published.** All 6 chunks shipped. Full install/uninstall/doctor CLI. Live sync via UserPromptSubmit. Published to npm as `@ssm-08/relay` (2026-05-07). Install flow: `npm install -g @ssm-08/relay && relay install`. Code review pass (2026-05-06): 10 bugs fixed. Simplify pass (2026-05-06): 4 quality fixes. npm publish pass (2026-05-07): installer.mjs stripped of git-clone machinery (~150 lines removed); repoDir derived from `__dirname`; `relay update` now runs `npm update -g @ssm-08/relay`; install.sh/ps1 rewritten to use npm.
 
 **Tests:** 166 unit (~15s) — 164 pass, 1 skip (POSIX-only), 1 flaky-under-load. 32 e2e (~25s). See `git log` for full history.
 

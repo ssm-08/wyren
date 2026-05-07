@@ -66,8 +66,7 @@ export function relayInit(targetDir) {
   console.log('  git commit -m "chore: add relay shared memory"');
   console.log('  git push\n');
   console.log('Teammates install once per machine:');
-  console.log('  curl -fsSL https://raw.githubusercontent.com/ssm-08/relay/master/install.sh | sh');
-  console.log('  iwr -useb https://raw.githubusercontent.com/ssm-08/relay/master/install.ps1 | iex  # Windows');
+  console.log('  npm install -g @ssm-08/relay && relay install');
   return true;
 }
 

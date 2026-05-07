@@ -13,6 +13,13 @@ description: One-liner install. Two minutes. One shared brain.
 
 Every teammate runs once on their machine:
 
+```bash
+npm install -g @ssm-08/relay
+relay install
+```
+
+Or via one-liner:
+
 **macOS / Linux:**
 
 ```bash
@@ -25,7 +32,7 @@ curl -fsSL https://raw.githubusercontent.com/ssm-08/relay/master/install.sh | sh
 iwr -useb https://raw.githubusercontent.com/ssm-08/relay/master/install.ps1 | iex
 ```
 
-This clones Relay to `~/.claude/relay/`, creates a plugin link, and patches `~/.claude/settings.json` with the `SessionStart`, `Stop`, and `UserPromptSubmit` hooks.
+This installs Relay globally via npm, creates a plugin link at `~/.claude/plugins/relay`, and patches `~/.claude/settings.json` with the `SessionStart`, `Stop`, and `UserPromptSubmit` hooks.
 
 :::note
 The installer preserves any existing entries in `settings.json`. It backs up your file before writing.
@@ -124,7 +131,7 @@ relay status
 relay update
 ```
 
-Pulls the latest Relay from GitHub, re-patches `settings.json` if the hook shape changed, and verifies the install.
+Runs `npm update -g @ssm-08/relay`, re-patches `settings.json` if the hook shape changed, and verifies the install.
 
 ## Uninstalling
 
@@ -134,7 +141,7 @@ From the machine:
 relay uninstall
 ```
 
-Removes: plugin link, Relay entries from `settings.json`, global `relay` CLI registration, and the `~/.claude/relay/` clone.
+Removes: plugin link, Relay entries from `settings.json`, and global `relay` CLI registration (`npm uninstall -g @ssm-08/relay`).
 
 From a repo you want to stop tracking:
 
@@ -162,15 +169,7 @@ See [FAQ](/faq/) for common issues.
 
 ### `relay` command not found
 
-Add an alias:
-
-```bash
-# bash/zsh
-alias relay='node ~/.claude/relay/bin/relay.mjs'
-
-# PowerShell
-Set-Alias relay "$env:USERPROFILE\.claude\relay\bin\relay.mjs"
-```
+npm's global bin directory may not be on your PATH. Find it with `npm bin -g` and add it to your shell profile. Or reinstall: `npm install -g @ssm-08/relay`.
 
 ### settings.json comments were removed
 
