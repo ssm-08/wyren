@@ -100,7 +100,7 @@ function spawnUPS(targetCwd) {
 /**
  * Spawn stop.mjs hook as a subprocess with the given cwd.
  */
-function spawnStop(targetCwd) {
+function spawnStop(targetCwd, { extraEnv = {} } = {}) {
   return new Promise((resolve) => {
     const input = JSON.stringify({
       session_id: `test-${process.pid}-${Math.random().toString(36).slice(2)}`,
@@ -113,7 +113,7 @@ function spawnStop(targetCwd) {
       cwd: RELAY_ROOT,
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
-      env: { ...process.env, RELAY_SKIP_PULL: '1' },
+      env: { ...process.env, RELAY_SKIP_PULL: '1', ...extraEnv },
     });
 
     let stdout = '';
@@ -528,8 +528,10 @@ test('Test 8 (race eliminated): UPS writes ups-state.json, Stop writes watermark
   });
 
   // Hammer both hooks concurrently: 10 UPS + 10 Stop
+  // RELAY_TURNS_THRESHOLD=100: prevents distillation from firing (which would reset
+  // turns_since_distill to 0) even if processes run sequentially on a slow CI runner.
   const upsPromises = Array.from({ length: 10 }, () => spawnUPS(dir));
-  const stopPromises = Array.from({ length: 10 }, () => spawnStop(dir));
+  const stopPromises = Array.from({ length: 10 }, () => spawnStop(dir, { extraEnv: { RELAY_TURNS_THRESHOLD: '100' } }));
   const results = await Promise.all([...upsPromises, ...stopPromises]);
 
   const nonZero = results.filter((r) => r.code !== 0);
