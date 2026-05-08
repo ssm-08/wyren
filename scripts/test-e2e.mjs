@@ -85,7 +85,7 @@ function runNode(args, { cwd, stdin = '', env = {} } = {}) {
     cwd: cwd || WYREN_ROOT,
     input: stdin,
     encoding: 'utf8',
-    env: { ...process.env, WYREN_SKIP_PULL: '1', ...env },
+    env: { ...process.env, WYREN_SKIP_PULL: '1', WYREN_SKIP_CLI_REGISTER: '1', ...env },
     timeout: 15000,
   });
 }

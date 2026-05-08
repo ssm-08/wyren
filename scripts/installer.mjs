@@ -80,8 +80,8 @@ export function preflight() {
   r.ok((gitResult.stdout || '').trim());
 
   const claudeResult = process.platform === 'win32'
-    ? spawnSync('cmd', ['/c', 'claude', '--version'], { encoding: 'utf8', windowsHide: true })
-    : spawnSync('claude', ['--version'], { encoding: 'utf8' });
+    ? spawnSync('cmd', ['/c', 'claude', '--version'], { encoding: 'utf8', windowsHide: true, timeout: 5_000 })
+    : spawnSync('claude', ['--version'], { encoding: 'utf8', timeout: 5_000 });
   if (claudeResult.error || claudeResult.status !== 0) {
     r.warn('claude CLI not found — distiller will fail at runtime. Install Claude Code first.');
   } else {
@@ -445,7 +445,8 @@ export function install(opts) {
 
   // For --from-local dev installs, wire the CLI via npm link.
   // npm global installs already have wyren on PATH — skip.
-  if (!dryRun && fromLocal) {
+  // WYREN_SKIP_CLI_REGISTER=1 lets e2e tests skip the slow global npm mutation.
+  if (!dryRun && fromLocal && !process.env.WYREN_SKIP_CLI_REGISTER) {
     registerCli(repoDir, reporter('cli'));
   }
 
