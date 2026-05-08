@@ -6,14 +6,32 @@ import { readStdin, isMain } from '../lib/util.mjs';
 import { GitSync } from '../lib/sync.mjs';
 
 // Returns { content: string, skillFiles: string[] }
+function isInsideDir(child, parent) {
+  const rel = path.relative(parent, child);
+  return rel === '' || (!!rel && !rel.startsWith('..') && !path.isAbsolute(rel));
+}
+
+function truncateUtf8(s, maxBytes) {
+  const buf = Buffer.from(s, 'utf8');
+  if (buf.length <= maxBytes) return s;
+  return buf.subarray(0, maxBytes).toString('utf8').replace(/�$/, '');
+}
+
 export function readBroadcastDir(broadcastDir) {
   if (!fs.existsSync(broadcastDir)) return { content: '', skillFiles: [] };
   const files = [];
+  let rootReal;
+  try { rootReal = fs.realpathSync(broadcastDir); } catch { return { content: '', skillFiles: [] }; }
   function walk(dir) {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
+      if (entry.isSymbolicLink()) continue;
       if (entry.isDirectory()) walk(full);
-      else if (entry.name !== '.gitkeep') files.push(full);
+      else if (entry.isFile() && entry.name !== '.gitkeep') {
+        let real;
+        try { real = fs.realpathSync(full); } catch { continue; }
+        if (isInsideDir(real, rootReal)) files.push(full);
+      }
     }
   }
   walk(broadcastDir);
@@ -33,7 +51,7 @@ export function readBroadcastDir(broadcastDir) {
     const name = path.relative(broadcastDir, f).replace(/\\/g, '/');
     let body = fs.readFileSync(f, 'utf8');
     if (Buffer.byteLength(body, 'utf8') > MAX_FILE_BYTES) {
-      body = body.slice(0, MAX_FILE_BYTES) + '\n<!-- wyren: truncated — file exceeds 50 KB -->';
+      body = truncateUtf8(body, MAX_FILE_BYTES) + '\n<!-- wyren: truncated — file exceeds 50 KB -->';
     }
     const entry = `## broadcast: ${name}\n\n${body.trim()}`;
     const entryBytes = Buffer.byteLength(entry, 'utf8');

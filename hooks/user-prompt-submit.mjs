@@ -148,24 +148,27 @@ async function main() {
 
     const { delta, newUpsState, newSnapshot } = result;
 
-    // Write state updates — only to UPS-owned files; never touch watermark.json
     fs.mkdirSync(stateDir, { recursive: true });
+
+    if (delta) {
+      // Emit before marking the delta as delivered. If the hook is killed between
+      // stdout and state persistence, the user may see the delta again later, but
+      // we avoid the worse failure mode of recording an unseen update as injected.
+      process.stdout.write(JSON.stringify({
+        hookSpecificOutput: {
+          hookEventName: 'UserPromptSubmit',
+          additionalContext: delta,
+        },
+      }) + '\n');
+    }
+
+    // Write state updates only after successful output; never touch watermark.json.
     writeUpsStateAtomic(upsStatePath, newUpsState);
     if (newSnapshot !== null) {
       writeMemoryAtomic(snapshotPath, newSnapshot);
     }
 
-    if (!delta) { process.exit(0); }
-
-    markInjection(cwd, 'user-prompt-submit');
-
-    // Emit additionalContext
-    process.stdout.write(JSON.stringify({
-      hookSpecificOutput: {
-        hookEventName: 'UserPromptSubmit',
-        additionalContext: delta,
-      },
-    }) + '\n');
+    if (delta) markInjection(cwd, 'user-prompt-submit');
   } catch (e) {
     // Fail-open: log + exit 0, never break the session
     try { if (cwd) appendLog(cwd, `error: ${e && e.message ? e.message : e}`); } catch {}

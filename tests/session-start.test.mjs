@@ -148,3 +148,35 @@ test('buildContext no acknowledgment when broadcast has no skills', () => {
     fs.rmSync(dir, { recursive: true });
   }
 });
+
+test('readBroadcastDir skips symlinks to avoid leaking files outside broadcast dir', { skip: process.platform === 'win32' }, () => {
+  const dir = makeTmpDir();
+  try {
+    const secret = path.join(dir, 'secret.txt');
+    const broadcast = path.join(dir, 'broadcast');
+    fs.mkdirSync(broadcast, { recursive: true });
+    fs.writeFileSync(secret, 'DO NOT LEAK', 'utf8');
+    fs.symlinkSync(secret, path.join(broadcast, 'leak.md'));
+    fs.writeFileSync(path.join(broadcast, 'safe.md'), 'safe content', 'utf8');
+
+    const { content } = readBroadcastDir(broadcast);
+    assert.ok(content.includes('safe content'), `safe file should be included: ${content}`);
+    assert.ok(!content.includes('DO NOT LEAK'), `symlink target content must not be included: ${content}`);
+    assert.ok(!content.includes('leak.md'), `symlink entry must not be listed: ${content}`);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('readBroadcastDir truncates multi-byte content by UTF-8 byte limit', () => {
+  const dir = makeTmpDir();
+  try {
+    const body = '😀'.repeat(20_000);
+    fs.writeFileSync(path.join(dir, 'emoji.md'), body, 'utf8');
+    const { content } = readBroadcastDir(dir);
+    assert.ok(content.includes('wyren: truncated'), 'large multi-byte file should be truncated');
+    assert.ok(Buffer.byteLength(content, 'utf8') < 55_000, 'truncated content should stay near file byte cap');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

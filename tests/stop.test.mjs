@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
-import { updateWatermark, shouldDistill } from '../hooks/stop.mjs';
+import { updateWatermark, shouldDistill, claimTriggerLock } from '../hooks/stop.mjs';
 
 function makeTmpDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'wyren-test-'));
@@ -158,7 +158,7 @@ test('shouldDistill: live distiller_pid → returns false (process still running
   assert.equal(shouldDistill(state), false, 'live PID: distiller_running must be honored');
 });
 
-test('trigger lock prevents double-spawn: second openSync(wx) throws EEXIST', () => {
+test('trigger lock prevents double-spawn: second claim throws LOCKED', () => {
   // Simulates C2 fix: two concurrent Stop hooks race on distill-trigger.lock.
   // First wins; second sees EEXIST and skips spawn.
   const dir = makeTmpDir();
@@ -166,16 +166,33 @@ test('trigger lock prevents double-spawn: second openSync(wx) throws EEXIST', ()
   fs.mkdirSync(path.join(wyrenDir, 'state'), { recursive: true });
   const triggerLock = path.join(wyrenDir, 'state', 'distill-trigger.lock');
   try {
-    // First hook claims the lock
-    fs.closeSync(fs.openSync(triggerLock, 'wx'));
-    // Second hook should fail
+    const release = claimTriggerLock(triggerLock);
     assert.throws(
-      () => fs.closeSync(fs.openSync(triggerLock, 'wx')),
-      { code: 'EEXIST' },
-      'Second openSync(wx) must throw EEXIST'
+      () => claimTriggerLock(triggerLock),
+      (e) => e.message === 'LOCKED',
+      'Second fresh trigger lock claim must throw LOCKED'
     );
+    release();
   } finally {
     try { fs.unlinkSync(triggerLock); } catch {}
     fs.rmSync(dir, { recursive: true });
+  }
+});
+
+test('trigger lock steals stale lock', () => {
+  const dir = makeTmpDir();
+  const wyrenDir = path.join(dir, '.wyren');
+  fs.mkdirSync(path.join(wyrenDir, 'state'), { recursive: true });
+  const triggerLock = path.join(wyrenDir, 'state', 'distill-trigger.lock');
+  try {
+    fs.writeFileSync(triggerLock, 'stale', 'utf8');
+    const staleMs = Date.now() - 90_000;
+    fs.utimesSync(triggerLock, new Date(staleMs), new Date(staleMs));
+    const release = claimTriggerLock(triggerLock);
+    assert.ok(fs.existsSync(triggerLock), 'stale trigger lock should be replaced');
+    release();
+    assert.ok(!fs.existsSync(triggerLock), 'release should remove replacement lock');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 });
