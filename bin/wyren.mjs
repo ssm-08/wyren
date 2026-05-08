@@ -254,8 +254,14 @@ export function wyrenBroadcastSkill(targetDir, filePath) {
     return null;
   }
 
-  if (!fs.existsSync(filePath)) {
+  let sourceStat;
+  try { sourceStat = fs.statSync(filePath); } catch {}
+  if (!sourceStat) {
     console.error(`File not found: ${filePath}`);
+    return null;
+  }
+  if (!sourceStat.isFile()) {
+    console.error(`Not a file: ${filePath}`);
     return null;
   }
 

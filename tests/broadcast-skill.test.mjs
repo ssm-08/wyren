@@ -31,6 +31,27 @@ test('wyrenBroadcastSkill returns null when source file not found', () => {
   }
 });
 
+
+test('wyrenBroadcastSkill returns null when source path is a directory', () => {
+  const dir = makeTmpDir();
+  try {
+    fs.mkdirSync(path.join(dir, '.wyren'), { recursive: true });
+    const srcDir = path.join(dir, 'not-a-file.md');
+    fs.mkdirSync(srcDir);
+
+    const result = wyrenBroadcastSkill(dir, srcDir);
+
+    assert.equal(result, null);
+    assert.equal(
+      fs.existsSync(path.join(dir, '.wyren', 'broadcast', 'skills', 'not-a-file.md')),
+      false,
+      'directory source should not create a destination entry'
+    );
+  } finally {
+    fs.rmSync(dir, { recursive: true });
+  }
+});
+
 test('wyrenBroadcastSkill returns null when filePath missing', () => {
   const dir = makeTmpDir();
   try {
