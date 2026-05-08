@@ -167,7 +167,7 @@ Key changes:
 - **`tests/transcript.test.mjs`**: new file — 17 tests covering `lib/transcript.mjs` (previously zero coverage).
 - 11 additional tests across stop, filter, session-start, and fault-corruption test files.
 
-Test totals: **165 unit (164 pass, 1 skip POSIX-only) + 32 e2e = 197 total.**
+Test totals: **166 unit (164 pass, 1 skip POSIX-only, 1 flaky-under-load) + 32 e2e.**
 
 ## Post-ship — Install file cleanup (2026-05-06) ✅
 

@@ -10,6 +10,9 @@
     "url": "git+https://github.com/ssm-08/wyren.git"
   },
   "homepage": "https://ssm-08.github.io/wyren/",
+  "bugs": {
+    "url": "https://github.com/ssm-08/wyren/issues"
+  },
   "keywords": [
     "claude",
     "claude-code",

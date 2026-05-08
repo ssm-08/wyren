@@ -62,11 +62,14 @@ export function wyrenInit(targetDir) {
   }
 
   console.log('Wyren initialized.\n');
-  console.log('  git add .wyren/ .gitignore');
-  console.log('  git commit -m "chore: add wyren shared memory"');
-  console.log('  git push\n');
-  console.log('Teammates install once per machine:');
-  console.log('  npm install -g @ssm-08/wyren && wyren install');
+  console.log('Next steps:\n');
+  console.log('  1. Commit and push:');
+  console.log('       git add .wyren/ .gitignore');
+  console.log('       git commit -m "chore: add wyren shared memory"');
+  console.log('       git push\n');
+  console.log('  2. Teammates install once per machine:');
+  console.log('       npm install -g @ssm-08/wyren && wyren install\n');
+  console.log('  3. Open Claude Code in this repo — memory injects automatically.\n');
   return true;
 }
 
@@ -189,7 +192,12 @@ export async function wyrenDistill(targetDir, argv) {
   }
 
   if (!transcriptPath) {
-    console.error('No transcript found. Start a Claude Code session in this repo first, or pass --transcript <path>.');
+    console.error(
+    'No transcript found.\n' +
+    '  Option A: Start a Claude Code session in this repo first (creates a transcript automatically).\n' +
+    '  Option B: Pass --transcript <path> to point to a specific JSONL file.\n' +
+    '  Check wyren status for the last known transcript path.'
+  );
     process.exit(1);
   }
 
@@ -270,7 +278,7 @@ const HELP_TEXT =
   `  status            Show memory, watermark, and sync state\n` +
   `  log               Show distiller log [--lines <n>] (default 50)\n` +
   `  distill           Run distiller manually [--transcript <path>] [--force] [--dry-run] [--push]\n` +
-  `  broadcast-skill   Broadcast a skill file to all teammates [<file>]\n` +
+  `  broadcast-skill <file>   Copy a skill file to .wyren/broadcast/skills/ and push to teammates\n` +
   `  install           Install wyren hooks on this machine [--from-local <path>] [--home <path>]\n` +
   `  update            Update wyren to latest version\n` +
   `  uninstall         Remove wyren hooks from this machine [--yes]\n` +

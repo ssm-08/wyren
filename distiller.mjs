@@ -74,7 +74,11 @@ function runClaude(prompt, model) {
         stdio: ['pipe', 'pipe', 'pipe'],
       });
     } catch (e) {
-      return reject(new Error(`failed to spawn claude: ${e.message}. Is claude CLI on PATH?`));
+      return reject(new Error(
+        `failed to spawn claude: ${e.message}.\n` +
+        `  Install Claude Code: https://claude.ai/code\n` +
+        `  Then authenticate: claude auth login`
+      ));
     }
 
     let stdout = '';
@@ -91,7 +95,11 @@ function runClaude(prompt, model) {
     proc.stderr.on('data', (c) => (stderr += c.toString()));
     proc.on('error', (e) => {
       clearTimeout(timer);
-      reject(new Error(`claude spawn error: ${e.message}. Is claude CLI on PATH?`));
+      reject(new Error(
+        `claude spawn error: ${e.message}.\n` +
+        `  Install Claude Code: https://claude.ai/code\n` +
+        `  Then authenticate: claude auth login`
+      ));
     });
     proc.on('close', (code) => {
       clearTimeout(timer);
@@ -146,12 +154,13 @@ async function main() {
   const outPath = args.out;
   const since = args.since && args.since !== 'true' ? args.since : '';
   const cwd = args.cwd && args.cwd !== 'true' ? args.cwd : '';
+  // Model defaults to Haiku 4.5. To override, pass --model to distiller directly (wyren distill
+  // does not yet expose WYREN_MODEL env var; that's a planned follow-up).
   const model = args.model && args.model !== 'true' ? args.model : 'claude-haiku-4-5-20251001';
   const dryRun = !!args['dry-run'];
   const force = !!args['force'];
 
   // --limit applies to raw lines before --since slice; useful for A/B testing only.
-  // Chunk 3 wiring uses --since and omits --limit.
   const limit = args.limit && args.limit !== 'true' ? parseInt(args.limit, 10) : 0;
 
   if (!fs.existsSync(transcriptPath)) {

@@ -89,21 +89,15 @@ Each Claude Code session has its own UUID and transcript. Wyren handles them ind
 
 The only coordination point is git pushes, which are serialized by the advisory lock.
 
-## Why not just use `CLAUDE.md` and be done with it?
-
-`CLAUDE.md` is static. It requires a human to remember to write it, at the moment they have least time to do so.
-
-Wyren is `CLAUDE.md` that writes itself, and syncs itself, and keeps itself honest. And it captures reasoning — rejected paths, live workarounds — that nobody would think to write into `CLAUDE.md` even if they had the time.
-
-You can still use `CLAUDE.md` alongside Wyren. They compose cleanly. Wyren's broadcast mechanism even lets teams share a single canonical `CLAUDE.md` via `.wyren/broadcast/CLAUDE.md`.
-
 ## Known limitations
 
 1. **Distiller needs signal to work.** Pure research sessions (read, read, read) produce almost nothing in memory. That's intentional — noise is worse than nothing.
 2. **Tier 0 filter may miss purely conversational decisions.** The filter uses weighted scoring across decision/rejection/hack/scope/maintenance categories plus structural signals (session length, edit count). Most real work sessions pass automatically. Edge case: pure design discussions with no signal words ("let's go with dark mode") may not trigger. Fix: use explicit language ("we decided to use dark mode") or run `wyren distill --force --push` manually.
 3. **Resolved-but-unmentioned workarounds linger.** Fix: say it's fixed, or hand-edit.
 4. **Mid-session sync has one-prompt lag.** The `UserPromptSubmit` hook pulls A's latest memory and injects the delta at the start of each of B's turns. B doesn't need to restart — the update arrives on B's next message after A's distiller pushes. Typical lag: a few seconds to one full turn. UPS pull is capped at 1.5s; visible as a short pause before Claude responds.
-5. **`claude -p` required for zero-billing path.** Otherwise set `ANTHROPIC_API_KEY`.
+5. **Distillation requires Claude Code authentication.** Wyren calls `claude -p` using your
+   existing Claude Code login — no separate API key. Run `claude auth login` if distillation
+   is being skipped silently. Check `.wyren/log` for the error.
 
 ## Where do I report bugs?
 

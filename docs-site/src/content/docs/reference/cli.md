@@ -157,7 +157,7 @@ wyren --version   # or: wyren -v
 Reads `version` from `package.json` in the Wyren installation. Example output:
 
 ```
-wyren 0.4.0
+wyren 0.4.1
 ```
 
 ## `wyren --help`

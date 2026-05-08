@@ -1,5 +1,9 @@
 # Wyren
 
+[![CI](https://github.com/ssm-08/wyren/actions/workflows/ci.yml/badge.svg)](https://github.com/ssm-08/wyren/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/%40ssm-08%2Fwyren)](https://www.npmjs.com/package/@ssm-08/wyren)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
+
 Shared brain for teams using Claude Code. One memory, every session warm.
 
 > **Git made code collaboration possible. Wyren does the same for the AI working alongside your team.**
@@ -42,6 +46,12 @@ Watch the writing happen live:
 tail -f .wyren/log
 ```
 
+## Prerequisites
+
+- [Claude Code](https://claude.ai/code) installed and authenticated (`claude auth login`)
+- Node.js 20+ and Git on PATH (Node comes bundled with recent Claude Code installs)
+- A git remote for the repo you want to track (GitHub, GitLab, or self-hosted)
+
 ## Install
 
 ```bash
@@ -77,21 +87,20 @@ Teammates install the plugin on their machine (`curl | sh` above), then just `gi
 
 ## Commands
 
-```bash
-wyren init                            # bootstrap this repo (.wyren/, .gitignore entries)
-wyren status                          # memory size, last distillation, last injection, sync state
-wyren log [--lines N]                 # tail wyren log (distillation + injection events)
-wyren distill [--force] [--push]      # run distillation manually
-wyren broadcast-skill <file>          # share a skill file with all teammates
-wyren install                         # install hooks on a new machine (called by install.sh/ps1)
-wyren update                          # update Wyren via npm + re-wire hooks
-wyren uninstall                       # fully remove Wyren from this machine
-wyren doctor                          # verify install is working
-wyren --version                       # print wyren version
-wyren --help                          # show usage
-
-/wyren-handoff                        # slash command: write a handoff note and push
-```
+| Command | What it does |
+|---|---|
+| `wyren init` | Bootstrap this repo — creates `.wyren/`, seeds `memory.md`, updates `.gitignore`. One teammate, once. |
+| `wyren status` | Shows memory file size, when distillation last ran, and git sync state. Run this if memory seems stale. |
+| `wyren log [--lines N]` | Tail the Wyren log. Use this to watch distillation and injection events. |
+| `wyren distill [--force] [--push]` | Run distillation manually. `--force` skips the signal filter. `--push` commits and pushes the result. Useful after a long session. |
+| `wyren broadcast-skill <file>` | Copy skill file to `.wyren/broadcast/skills/` and push to teammates. |
+| `wyren install` | Wire hooks on this machine. Called automatically by the one-liners; re-run after a manual npm install. |
+| `wyren update` | Update Wyren via npm and re-wire hooks. |
+| `wyren uninstall` | Fully remove Wyren from this machine — unhooks, unlinks, uninstalls from npm. |
+| `wyren doctor` | Verify the install is healthy. Run this first if something seems wrong. |
+| `wyren --version` | Print installed version. |
+| `wyren --help` | Show usage. |
+| `/wyren-handoff` | Slash command (inside Claude Code): write a handoff note and push it verbatim to `memory.md`. |
 
 ## Dev install (from local clone)
 
@@ -139,15 +148,15 @@ node scripts/installer.mjs uninstall --home /tmp/fake-home
 └── docs-site/                      # full documentation (Astro Starlight)
 ```
 
-## Known issues
+## Current limitations
 
-1. **Auth required.** Wyren calls AI using your existing Claude Code login — no separate API key. If you're not signed in (`claude auth login`), distillation is skipped. Memory injection still works; only writes are blocked.
+1. **Distillation requires Claude Code authentication.** Wyren calls the `claude` CLI using your existing Claude Code session — no separate API key. Memory reads and injection work offline; distillation and git push require network access. Run `claude auth login` if distillation is being skipped silently. Check `.wyren/log` for the error.
 
-2. **Push conflicts.** If two teammates distill at the same moment and both try to push, the second one retries automatically with the latest version. In practice it resolves within one session without losing anything.
+2. **Concurrent pushes retry automatically.** If two teammates distill at the same moment, the second push retries with `pull --rebase`. Resolves within one session without data loss.
 
-3. **Claude Code transcript format.** Wyren reads Claude Code's session files directly. If a future Claude Code update changes that format, distillation may skip some turns until Wyren is updated. Check `.wyren/log` if memory stops updating.
+3. **Transcript format is Claude Code-specific.** Wyren reads Claude Code's JSONL session files directly. If a future Claude Code update changes that format, distillation may skip some turns until Wyren is updated. Monitor `.wyren/log` if memory stops updating after a Claude Code upgrade.
 
-4. **Tier 0 filter may miss purely conversational decisions.** The filter uses weighted scoring across signal categories (decisions, rejections, hacks, scope changes, maintenance flags) plus structural signals (session length, edit count). Most real work sessions pass. Edge case: design choices with no signal words (e.g. "let's go with dark mode") may not trigger. Workaround: use explicit language or run `wyren distill --force --push` manually.
+4. **Tier 0 filter may miss purely conversational decisions.** The filter uses weighted scoring across signal categories (decisions, rejections, hacks, scope changes, maintenance flags) plus structural signals (session length, edit count). Most real work sessions pass automatically. Edge case: design discussions with no signal words (e.g. "let's go with dark mode") may not trigger. Fix: use explicit language or run `wyren distill --force --push` manually.
 
 ## Docs
 
@@ -155,6 +164,7 @@ Full documentation, architecture diagrams, cost model, and demo walkthrough:
 
 **[ssm-08.github.io/wyren](https://ssm-08.github.io/wyren/)**
 
+- [Install guide](https://ssm-08.github.io/wyren/reference/install/) — step-by-step install for all platforms
 - [The problem](https://ssm-08.github.io/wyren/problem/) — why existing tools fall short
 - [How it works](https://ssm-08.github.io/wyren/how-it-works/) — full Alice/Bob walkthrough
 - [Architecture](https://ssm-08.github.io/wyren/architecture/) — system diagrams and data flow
