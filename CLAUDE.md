@@ -11,7 +11,7 @@ Wyren is a Claude Code plugin for shared team memory across sessions. Transcript
 
 ## Current state
 
-**v0.4.0 — feature-complete + npm published.** All 6 chunks shipped. Full install/uninstall/doctor CLI. Live sync via UserPromptSubmit. Published to npm as `@ssm-08/wyren` (2026-05-07). Install flow: `npm install -g @ssm-08/wyren && wyren install`. Code review pass (2026-05-06): 10 bugs fixed. Simplify pass (2026-05-06): 4 quality fixes. npm publish pass (2026-05-07): installer.mjs stripped of git-clone machinery (~150 lines removed); repoDir derived from `__dirname`; `wyren update` now runs `npm update -g @ssm-08/wyren`; install.sh/ps1 rewritten to use npm.
+**v0.4.0 — feature-complete + npm published.** All 6 chunks shipped. Full install/uninstall/doctor CLI. Live sync via UserPromptSubmit. Published to npm as `wyren` (2026-05-07). Install flow: `npm install -g wyren && wyren install`. Code review pass (2026-05-06): 10 bugs fixed. Simplify pass (2026-05-06): 4 quality fixes. npm publish pass (2026-05-07): installer.mjs stripped of git-clone machinery (~150 lines removed); repoDir derived from `__dirname`; `wyren update` now runs `npm update -g wyren`; install.sh/ps1 rewritten to use npm.
 
 **Tests:** 166 unit (~15s) — 164 pass, 1 skip (POSIX-only), 1 flaky-under-load. 32 e2e (~25s). See `git log` for full history.
 

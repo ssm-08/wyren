@@ -66,7 +66,7 @@ export function wyrenInit(targetDir) {
   console.log('  git commit -m "chore: add wyren shared memory"');
   console.log('  git push\n');
   console.log('Teammates install once per machine:');
-  console.log('  npm install -g @ssm-08/wyren && wyren install');
+  console.log('  npm install -g wyren && wyren install');
   return true;
 }
 

@@ -3,12 +3,12 @@ title: CLI reference
 description: Every bin/wyren command and flag — what actually ships.
 ---
 
-The `wyren` CLI is part of the plugin. Pure Node, zero runtime dependencies. Installed globally via `npm install -g @ssm-08/wyren`.
+The `wyren` CLI is part of the plugin. Pure Node, zero runtime dependencies. Installed globally via `npm install -g wyren`.
 
 If `wyren` isn't on PATH (e.g. npm's global bin directory isn't in your shell's PATH), find the path with `npm bin -g` and add it, or invoke directly:
 
 ```bash
-node "$(npm root -g)/@ssm-08/wyren/bin/wyren.mjs" <command>
+node "$(npm root -g)/wyren/bin/wyren.mjs" <command>
 ```
 
 ## `wyren install`
@@ -40,7 +40,7 @@ Update Wyren to the latest npm version and re-wire hooks.
 wyren update
 ```
 
-Runs `npm update -g @ssm-08/wyren`, re-patches `settings.json`, and verifies the install. For `--from-local` dev installs, update your checkout manually and re-run `wyren install --from-local <path>`.
+Runs `npm update -g wyren`, re-patches `settings.json`, and verifies the install. For `--from-local` dev installs, update your checkout manually and re-run `wyren install --from-local <path>`.
 
 ## `wyren uninstall`
 
@@ -53,7 +53,7 @@ wyren uninstall [--dry-run]
 Removes:
 - Plugin link at `~/.claude/plugins/wyren`
 - Wyren hook entries from `settings.json` (foreign entries preserved)
-- Global `wyren` CLI registration (`npm uninstall -g @ssm-08/wyren`)
+- Global `wyren` CLI registration (`npm uninstall -g wyren`)
 
 After uninstall, `wyren` is gone from PATH. Open a new terminal to confirm.
 

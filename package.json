@@ -1,5 +1,5 @@
 {
-  "name": "@ssm-08/wyren",
+  "name": "wyren",
   "version": "0.4.1",
   "type": "module",
   "description": "Shared team memory across Claude Code sessions",
