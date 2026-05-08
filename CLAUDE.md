@@ -1,17 +1,17 @@
-# Relay — Project Context
+# Wyren — Project Context
 
-Relay is a Claude Code plugin for shared team memory across sessions. Transcripts are distilled in the background; `memory.md` is synced via git and injected as hidden context at every `SessionStart` and on each user turn (`UserPromptSubmit`).
+Wyren is a Claude Code plugin for shared team memory across sessions. Transcripts are distilled in the background; `memory.md` is synced via git and injected as hidden context at every `SessionStart` and on each user turn (`UserPromptSubmit`).
 
 **Audience:** future Claude Code sessions on this repo. Terse; depth lives in the docs site.
 
 ## Canonical references
 
-- **Docs site:** `docs-site/` → `https://ssm-08.github.io/relay/`
-- **GitHub:** `https://github.com/ssm-08/relay` (branch `master`)
+- **Docs site:** `docs-site/` → `https://ssm-08.github.io/wyren/`
+- **GitHub:** `https://github.com/ssm-08/wyren` (branch `master`)
 
 ## Current state
 
-**v0.4.0 — feature-complete + npm published.** All 6 chunks shipped. Full install/uninstall/doctor CLI. Live sync via UserPromptSubmit. Published to npm as `@ssm-08/relay` (2026-05-07). Install flow: `npm install -g @ssm-08/relay && relay install`. Code review pass (2026-05-06): 10 bugs fixed. Simplify pass (2026-05-06): 4 quality fixes. npm publish pass (2026-05-07): installer.mjs stripped of git-clone machinery (~150 lines removed); repoDir derived from `__dirname`; `relay update` now runs `npm update -g @ssm-08/relay`; install.sh/ps1 rewritten to use npm.
+**v0.4.0 — feature-complete + npm published.** All 6 chunks shipped. Full install/uninstall/doctor CLI. Live sync via UserPromptSubmit. Published to npm as `@ssm-08/wyren` (2026-05-07). Install flow: `npm install -g @ssm-08/wyren && wyren install`. Code review pass (2026-05-06): 10 bugs fixed. Simplify pass (2026-05-06): 4 quality fixes. npm publish pass (2026-05-07): installer.mjs stripped of git-clone machinery (~150 lines removed); repoDir derived from `__dirname`; `wyren update` now runs `npm update -g @ssm-08/wyren`; install.sh/ps1 rewritten to use npm.
 
 **Tests:** 166 unit (~15s) — 164 pass, 1 skip (POSIX-only), 1 flaky-under-load. 32 e2e (~25s). See `git log` for full history.
 
@@ -20,14 +20,14 @@ Relay is a Claude Code plugin for shared team memory across sessions. Transcript
 ## Repo layout
 
 ```
-bin/relay.mjs                # CLI: all subcommands (755)
+bin/wyren.mjs                # CLI: all subcommands (755)
 distiller.mjs                # Haiku 4.5, cmd /c claude on Windows, windowsHide:true
 hooks/session-start.mjs      # pull (1.5s/0.5s) + inject memory + broadcast (50KB/file, 200KB total cap)
 hooks/stop.mjs               # watermark + PID-tracked detached distiller spawn
 hooks/user-prompt-submit.mjs # live sync: pull (1.5s) + diff + inject delta
 hooks/run-hook.cmd           # polyglot bash+cmd dispatcher (755)
 hooks/hooks.json             # hook manifest (SessionStart 2s, Stop 5s, UPS 3s)
-commands/relay-handoff.toml  # /relay-handoff slash command
+commands/wyren-handoff.toml  # /wyren-handoff slash command
 lib/sync.mjs                 # GitSync: pull/push/lock, user-file guard in push()
 lib/transcript.mjs           # JSONL parse + slice + render
 lib/memory.mjs               # atomic read/write
@@ -45,19 +45,19 @@ docs-site/                   # Astro Starlight docs site
 .github/workflows/           # docs.yml (Pages deploy) + ci.yml (unit + e2e matrix)
 ```
 
-State files (gitignored): `.relay/state/watermark.json` (Stop-owned), `.relay/state/ups-state.json` (UPS-owned), `.relay/state/.lock`, `.relay/log`.
+State files (gitignored): `.wyren/state/watermark.json` (Stop-owned), `.wyren/state/ups-state.json` (UPS-owned), `.wyren/state/.lock`, `.wyren/log`.
 
 ## Plugin registration (non-obvious — read before touching hooks)
 
-Junction into `~/.claude/plugins/relay` is NOT sufficient. Claude Code only fires hooks for plugins listed in `installed_plugins.json`. For local dev, wire hooks directly in `~/.claude/settings.json`.
+Junction into `~/.claude/plugins/wyren` is NOT sufficient. Claude Code only fires hooks for plugins listed in `installed_plugins.json`. For local dev, wire hooks directly in `~/.claude/settings.json`.
 
 **CRITICAL: `${CLAUDE_PLUGIN_ROOT}` does NOT expand in `settings.json`.** Only works inside a plugin's `hooks/hooks.json`. The installer writes the absolute path. Example:
 
 ```json
 "hooks": {
-  "SessionStart": [{"matcher": "", "hooks": [{"type": "command", "command": "\"C:\\Users\\you\\.claude\\relay\\hooks\\run-hook.cmd\" session-start", "timeout": 2, "statusMessage": "Loading relay memory..."}]}],
-  "Stop": [{"matcher": "", "hooks": [{"type": "command", "command": "\"C:\\Users\\you\\.claude\\relay\\hooks\\run-hook.cmd\" stop", "timeout": 5}]}],
-  "UserPromptSubmit": [{"matcher": "", "hooks": [{"type": "command", "command": "\"C:\\Users\\you\\.claude\\relay\\hooks\\run-hook.cmd\" user-prompt-submit", "timeout": 3}]}]
+  "SessionStart": [{"matcher": "", "hooks": [{"type": "command", "command": "\"C:\\Users\\you\\.claude\\wyren\\hooks\\run-hook.cmd\" session-start", "timeout": 2, "statusMessage": "Loading wyren memory..."}]}],
+  "Stop": [{"matcher": "", "hooks": [{"type": "command", "command": "\"C:\\Users\\you\\.claude\\wyren\\hooks\\run-hook.cmd\" stop", "timeout": 5}]}],
+  "UserPromptSubmit": [{"matcher": "", "hooks": [{"type": "command", "command": "\"C:\\Users\\you\\.claude\\wyren\\hooks\\run-hook.cmd\" user-prompt-submit", "timeout": 3}]}]
 }
 ```
 
@@ -78,21 +78,21 @@ node scripts/installer.mjs uninstall --home /tmp/fake-home
 
 3. **Broadcast size cap** (`session-start.mjs`). `readBroadcastDir` caps at 50 KB/file and 200 KB total. Large skill files (code templates, PDFs) would otherwise inject megabytes into every session. Don't remove the cap.
 
-4. **`push()` user-file guard** (`sync.mjs`). Before committing, `push()` detects staged files outside `.relay/` and temporarily unstages them, commits relay-only changes, then re-stages. Without this, relay would commit and push user code under a `[relay] memory update` message. Don't replace this with a bare `git commit`.
+4. **`push()` user-file guard** (`sync.mjs`). Before committing, `push()` detects staged files outside `.wyren/` and temporarily unstages them, commits wyren-only changes, then re-stages. Without this, wyren would commit and push user code under a `[wyren] memory update` message. Don't replace this with a bare `git commit`.
 
 5. **Lock steal uses `'wx'` not `'w'`** (`sync.mjs lock()`). When stealing a stale lock (> 60s), the code unlinks first, then opens with `'wx'` (exclusive). Using `'w'` (truncate, non-exclusive) allows two processes to both steal simultaneously — TOCTOU race.
 
 6. **Idle trigger uses `last_turn_at`** (`stop.mjs`). `shouldDistill`'s idle check reads `state.last_turn_at`, NOT `last_distilled_at`. `last_turn_at` is set by every `updateWatermark` call, so idle fires even before the first distillation. `last_distilled_at` is only set after a successful distill.
 
-7. **`RELAY_TIER0_THRESHOLD` is dynamic** (`filter.mjs`). Read via `getThreshold()` at call time, not at module load. Tests can set the env var after importing and get the updated value.
+7. **`WYREN_TIER0_THRESHOLD` is dynamic** (`filter.mjs`). Read via `getThreshold()` at call time, not at module load. Tests can set the env var after importing and get the updated value.
 
 8. **`distiller_pid` must be cleared with `distiller_running`**. Both `writeWatermark(clearRunning:true)` and `resetWatermarkTurns` delete `distiller_pid` alongside `distiller_running`. A stale PID could match a future unrelated process on PID reuse.
 
 ## Non-obvious — docs site
 
-1. **Base path is env-driven.** Astro reads `RELAY_BASE` (default `/relay`). CI sets it from `${{ github.event.repository.name }}`. Rename repo → no code change needed.
+1. **Base path is env-driven.** Astro reads `WYREN_BASE` (default `/wyren`). CI sets it from `${{ github.event.repository.name }}`. Rename repo → no code change needed.
 
-2. **Root-relative links omit base prefix.** Link to `/problem/` not `/relay/problem/`. `rehype-base-href` prepends at build time; `astro-base-href-fixup` fixes Starlight hero-action hrefs post-build.
+2. **Root-relative links omit base prefix.** Link to `/problem/` not `/wyren/problem/`. `rehype-base-href` prepends at build time; `astro-base-href-fixup` fixes Starlight hero-action hrefs post-build.
 
 3. **Mermaid is CDN client-side.** `rehype-mermaid-pre.mjs` → `<pre class="mermaid">`; head script loads `mermaid@11` from jsdelivr on `astro:page-load`.
 
@@ -100,7 +100,7 @@ node scripts/installer.mjs uninstall --home /tmp/fake-home
 
 5. **Node 22 pinned in CI.** Don't drop below 22. Local dev on 20+ works.
 
-6. **`.claude/` is gitignored.** Team memory lives in `.relay/memory.md`, not `.claude/`.
+6. **`.claude/` is gitignored.** Team memory lives in `.wyren/memory.md`, not `.claude/`.
 
 ## Coding conventions
 
@@ -112,9 +112,9 @@ node scripts/installer.mjs uninstall --home /tmp/fake-home
 - **`distiller_running` + PID liveness.** `shouldDistill` calls `process.kill(pid, 0)` — clears stale flag on ESRCH.
 - **Windows: `cmd /c claude` not `shell:true`.** Avoids DEP0190, keeps no-injection-surface rule.
 - **`git()` helper uses `spawnSync(array)`.** Never shell strings.
-- **`push()` scopes commits to `.relay/`.** Unstages non-relay staged files before committing, re-stages after. Don't bypass.
+- **`push()` scopes commits to `.wyren/`.** Unstages non-wyren staged files before committing, re-stages after. Don't bypass.
 - **`installer.mjs` self-contained.** `isMain` inlined — no import from `lib/util.mjs`. Required for bootstrap with only `scripts/` sparse-materialized.
-- **`RELAY_TURNS_THRESHOLD` / `RELAY_IDLE_MS`** override distill thresholds (defaults: 5 turns, 120s).
+- **`WYREN_TURNS_THRESHOLD` / `WYREN_IDLE_MS`** override distill thresholds (defaults: 5 turns, 120s).
 
 ## Commit style
 
@@ -131,13 +131,13 @@ npm run test:e2e                            # 32 e2e tests (~25s, no Claude API)
 node scripts/test-e2e.mjs --only stop       # filter to one group
 node scripts/test-e2e.mjs --verbose         # dump stdout/stderr on failure
 node --test tests/fault-e2e-livesync.test.mjs  # run flaky test in isolation to verify it passes
-relay doctor                                # verify hooks wired correctly
+wyren doctor                                # verify hooks wired correctly
 ```
 
 Docs site:
 ```bash
 cd docs-site && npm install   # first time
-npm run dev                   # http://localhost:4321/relay/
+npm run dev                   # http://localhost:4321/wyren/
 npm run build                 # static HTML → dist/
 ```
 
@@ -146,7 +146,7 @@ npm run build                 # static HTML → dist/
 1. **CLAUDE.md** — update "Current state" block (version, test counts, new bugs fixed). Don't add changelog bullets — just update facts.
 2. **README.md** — update commands table, known issues, install description if changed.
 3. **docs-site pages** — update stale pages: `reference/cli.md`, `reference/hooks.md`, `roadmap/overview.md`, `faq.md`.
-4. **`~/.claude/projects/.../memory/relay_project.md`** — rewrite status, test counts, critical details to reflect current state.
+4. **`~/.claude/projects/.../memory/wyren_project.md`** — rewrite status, test counts, critical details to reflect current state.
 5. **`~/.claude/projects/.../memory/MEMORY.md`** — update index descriptions.
 6. **New memory files if needed** — feedback, decisions, references learned this session.
 7. **Commit + verify** — `git status` clean, `git log --oneline origin/master..HEAD` shows unpushed. Tell user to push.
@@ -155,6 +155,6 @@ Only then confirm "safe to clear."
 
 ## What's out of scope (don't build these yet)
 
-Next planned specs: distillation quality, CLAUDE.md compatibility, reliability (`relay doctor` deep checks), sync robustness, decision traceability.
+Next planned specs: distillation quality, CLAUDE.md compatibility, reliability (`wyren doctor` deep checks), sync robustness, decision traceability.
 
 Don't build: cloud sync backend, dashboard UI, MCP RAG server, permissions/auth, Cursor/Windsurf support, real-time per-turn sync, CRDT merge strategies. All designed-for but out of scope.

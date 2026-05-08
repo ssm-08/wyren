@@ -35,14 +35,14 @@ jobs:
       - name: Run e2e tests
         run: node scripts/test-e2e.mjs
         env:
-          RELAY_SKIP_PULL: '1'
+          WYREN_SKIP_PULL: '1'
       - name: Smoke install (from-local)
         run: |
           node scripts/installer.mjs install --from-local . --home "$RUNNER_TEMP/fake-home"
           node scripts/installer.mjs doctor --home "$RUNNER_TEMP/fake-home"
           node scripts/installer.mjs install --from-local . --home "$RUNNER_TEMP/fake-home"
           node scripts/installer.mjs uninstall --home "$RUNNER_TEMP/fake-home"
-          test ! -e "$RUNNER_TEMP/fake-home/plugins/relay" && echo "PASS: link removed" || (echo "FAIL: link still exists" && exit 1)
+          test ! -e "$RUNNER_TEMP/fake-home/plugins/wyren" && echo "PASS: link removed" || (echo "FAIL: link still exists" && exit 1)
 
   e2e-windows:
     name: E2E (Windows)
@@ -57,7 +57,7 @@ jobs:
       - name: Run e2e tests
         run: node scripts/test-e2e.mjs
         env:
-          RELAY_SKIP_PULL: '1'
+          WYREN_SKIP_PULL: '1'
       - name: Smoke install (from-local)
         shell: pwsh
         run: |
@@ -66,7 +66,7 @@ jobs:
           node scripts/installer.mjs doctor --home $fakeHome
           node scripts/installer.mjs install --from-local . --home $fakeHome
           node scripts/installer.mjs uninstall --home $fakeHome
-          if (Test-Path (Join-Path $fakeHome "plugins\relay")) {
+          if (Test-Path (Join-Path $fakeHome "plugins\wyren")) {
             Write-Error "FAIL: plugin link still exists after uninstall"
             exit 1
           }

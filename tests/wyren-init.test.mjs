@@ -4,79 +4,79 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
-import { relayInit } from '../bin/relay.mjs';
+import { wyrenInit } from '../bin/wyren.mjs';
 
 function makeTmpDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'relay-test-'));
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'wyren-test-'));
 }
 
-test('relayInit creates .relay/memory.md', () => {
+test('wyrenInit creates .wyren/memory.md', () => {
   const dir = makeTmpDir();
   try {
-    relayInit(dir);
-    const memPath = path.join(dir, '.relay', 'memory.md');
-    assert.ok(fs.existsSync(memPath), '.relay/memory.md should exist');
+    wyrenInit(dir);
+    const memPath = path.join(dir, '.wyren', 'memory.md');
+    assert.ok(fs.existsSync(memPath), '.wyren/memory.md should exist');
     const content = fs.readFileSync(memPath, 'utf8');
-    assert.ok(content.includes('Relay Memory'), 'memory.md should have Relay Memory heading');
+    assert.ok(content.includes('Wyren Memory'), 'memory.md should have Wyren Memory heading');
   } finally {
     fs.rmSync(dir, { recursive: true });
   }
 });
 
-test('relayInit creates .relay/broadcast/ directory', () => {
+test('wyrenInit creates .wyren/broadcast/ directory', () => {
   const dir = makeTmpDir();
   try {
-    relayInit(dir);
-    assert.ok(fs.existsSync(path.join(dir, '.relay', 'broadcast')), '.relay/broadcast/ should exist');
+    wyrenInit(dir);
+    assert.ok(fs.existsSync(path.join(dir, '.wyren', 'broadcast')), '.wyren/broadcast/ should exist');
   } finally {
     fs.rmSync(dir, { recursive: true });
   }
 });
 
-test('relayInit appends .relay/state/ and .relay/log to .gitignore', () => {
+test('wyrenInit appends .wyren/state/ and .wyren/log to .gitignore', () => {
   const dir = makeTmpDir();
   try {
     fs.writeFileSync(path.join(dir, '.gitignore'), 'node_modules/\n', 'utf8');
-    relayInit(dir);
+    wyrenInit(dir);
     const gitignore = fs.readFileSync(path.join(dir, '.gitignore'), 'utf8');
-    assert.ok(gitignore.includes('.relay/state/'), '.gitignore should include .relay/state/');
-    assert.ok(gitignore.includes('.relay/log'), '.gitignore should include .relay/log');
+    assert.ok(gitignore.includes('.wyren/state/'), '.gitignore should include .wyren/state/');
+    assert.ok(gitignore.includes('.wyren/log'), '.gitignore should include .wyren/log');
     assert.ok(gitignore.includes('node_modules/'), 'Original .gitignore content preserved');
   } finally {
     fs.rmSync(dir, { recursive: true });
   }
 });
 
-test('relayInit creates .gitignore if it does not exist', () => {
+test('wyrenInit creates .gitignore if it does not exist', () => {
   const dir = makeTmpDir();
   try {
-    relayInit(dir);
+    wyrenInit(dir);
     const gitignorePath = path.join(dir, '.gitignore');
     assert.ok(fs.existsSync(gitignorePath), '.gitignore should be created');
     const content = fs.readFileSync(gitignorePath, 'utf8');
-    assert.ok(content.includes('.relay/state/'));
+    assert.ok(content.includes('.wyren/state/'));
   } finally {
     fs.rmSync(dir, { recursive: true });
   }
 });
 
-test('relayInit returns false and is a no-op when already initialized', () => {
+test('wyrenInit returns false and is a no-op when already initialized', () => {
   const dir = makeTmpDir();
   try {
-    relayInit(dir);
-    const result = relayInit(dir);
+    wyrenInit(dir);
+    const result = wyrenInit(dir);
     assert.equal(result, false, 'Second call should return false');
   } finally {
     fs.rmSync(dir, { recursive: true });
   }
 });
 
-test('relayInit seeds memory.md from CLAUDE.md when present', () => {
+test('wyrenInit seeds memory.md from CLAUDE.md when present', () => {
   const dir = makeTmpDir();
   try {
     fs.writeFileSync(path.join(dir, 'CLAUDE.md'), '# My Project\n\nKey decision: use ESM.\n', 'utf8');
-    relayInit(dir);
-    const content = fs.readFileSync(path.join(dir, '.relay', 'memory.md'), 'utf8');
+    wyrenInit(dir);
+    const content = fs.readFileSync(path.join(dir, '.wyren', 'memory.md'), 'utf8');
     assert.ok(content.includes('Seeded from CLAUDE.md'), 'memory.md should have seeded section');
     assert.ok(content.includes('Key decision: use ESM.'), 'memory.md should contain CLAUDE.md content');
   } finally {
@@ -84,12 +84,12 @@ test('relayInit seeds memory.md from CLAUDE.md when present', () => {
   }
 });
 
-test('relayInit truncates CLAUDE.md seed at 8000 chars', () => {
+test('wyrenInit truncates CLAUDE.md seed at 8000 chars', () => {
   const dir = makeTmpDir();
   try {
     fs.writeFileSync(path.join(dir, 'CLAUDE.md'), 'x'.repeat(9000), 'utf8');
-    relayInit(dir);
-    const content = fs.readFileSync(path.join(dir, '.relay', 'memory.md'), 'utf8');
+    wyrenInit(dir);
+    const content = fs.readFileSync(path.join(dir, '.wyren', 'memory.md'), 'utf8');
     assert.ok(content.includes('<!-- truncated -->'), 'long CLAUDE.md should be truncated');
     assert.ok(content.length < 9500, 'memory.md should not contain full 9000-char content');
   } finally {
@@ -97,16 +97,16 @@ test('relayInit truncates CLAUDE.md seed at 8000 chars', () => {
   }
 });
 
-test('relayInit does not duplicate .gitignore entries on repeated calls', () => {
+test('wyrenInit does not duplicate .gitignore entries on repeated calls', () => {
   const dir = makeTmpDir();
   try {
-    // Pre-seed .gitignore with relay entries, create .relay/ manually
-    fs.writeFileSync(path.join(dir, '.gitignore'), '.relay/state/\n.relay/log\n', 'utf8');
-    fs.mkdirSync(path.join(dir, '.relay'));
-    relayInit(dir);  // returns false (already initialized), .gitignore untouched
+    // Pre-seed .gitignore with wyren entries, create .wyren/ manually
+    fs.writeFileSync(path.join(dir, '.gitignore'), '.wyren/state/\n.wyren/log\n', 'utf8');
+    fs.mkdirSync(path.join(dir, '.wyren'));
+    wyrenInit(dir);  // returns false (already initialized), .gitignore untouched
     const gitignore = fs.readFileSync(path.join(dir, '.gitignore'), 'utf8');
-    const stateCount = (gitignore.match(/\.relay\/state\//g) || []).length;
-    assert.equal(stateCount, 1, '.relay/state/ should appear exactly once');
+    const stateCount = (gitignore.match(/\.wyren\/state\//g) || []).length;
+    assert.equal(stateCount, 1, '.wyren/state/ should appear exactly once');
   } finally {
     fs.rmSync(dir, { recursive: true });
   }

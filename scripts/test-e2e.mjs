@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Relay end-to-end smoke test — exercises the full hook pipeline via real subprocesses.
+ * Wyren end-to-end smoke test — exercises the full hook pipeline via real subprocesses.
  * Runs offline: distiller uses --dry-run or Tier-0 early exit, no Claude API call.
  *
  * Usage:
@@ -16,7 +16,7 @@ import url from 'node:url';
 import { spawnSync, spawn } from 'node:child_process';
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
-const RELAY_ROOT = path.resolve(__dirname, '..');
+const WYREN_ROOT = path.resolve(__dirname, '..');
 
 // ---------------------------------------------------------------------------
 // CLI flags
@@ -30,7 +30,7 @@ const ONLY = onlyIdx >= 0 ? argv[onlyIdx + 1] : null;
 // Helpers
 // ---------------------------------------------------------------------------
 function makeTmpDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'relay-e2e-'));
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'wyren-e2e-'));
 }
 
 function rmDir(dir) {
@@ -39,32 +39,32 @@ function rmDir(dir) {
 
 function initGit(dir) {
   spawnSync('git', ['init', '-q'], { cwd: dir });
-  spawnSync('git', ['config', 'user.email', 'test@relay'], { cwd: dir });
-  spawnSync('git', ['config', 'user.name', 'relay-test'], { cwd: dir });
+  spawnSync('git', ['config', 'user.email', 'test@wyren'], { cwd: dir });
+  spawnSync('git', ['config', 'user.name', 'wyren-test'], { cwd: dir });
 }
 
-function seedRelay(dir, { memory = null, skills = {} } = {}) {
-  const relayDir = path.join(dir, '.relay');
-  fs.mkdirSync(path.join(relayDir, 'state'), { recursive: true });
-  fs.mkdirSync(path.join(relayDir, 'broadcast', 'skills'), { recursive: true });
-  fs.writeFileSync(path.join(relayDir, 'broadcast', '.gitkeep'), '');
-  fs.writeFileSync(path.join(relayDir, 'broadcast', 'skills', '.gitkeep'), '');
+function seedWyren(dir, { memory = null, skills = {} } = {}) {
+  const wyrenDir = path.join(dir, '.wyren');
+  fs.mkdirSync(path.join(wyrenDir, 'state'), { recursive: true });
+  fs.mkdirSync(path.join(wyrenDir, 'broadcast', 'skills'), { recursive: true });
+  fs.writeFileSync(path.join(wyrenDir, 'broadcast', '.gitkeep'), '');
+  fs.writeFileSync(path.join(wyrenDir, 'broadcast', 'skills', '.gitkeep'), '');
   if (memory !== null) {
-    fs.writeFileSync(path.join(relayDir, 'memory.md'), memory, 'utf8');
+    fs.writeFileSync(path.join(wyrenDir, 'memory.md'), memory, 'utf8');
   }
   for (const [name, content] of Object.entries(skills)) {
-    fs.writeFileSync(path.join(relayDir, 'broadcast', 'skills', name), content, 'utf8');
+    fs.writeFileSync(path.join(wyrenDir, 'broadcast', 'skills', name), content, 'utf8');
   }
 }
 
 function writeWatermark(dir, state) {
-  const p = path.join(dir, '.relay', 'state', 'watermark.json');
+  const p = path.join(dir, '.wyren', 'state', 'watermark.json');
   fs.mkdirSync(path.dirname(p), { recursive: true });
   fs.writeFileSync(p, JSON.stringify(state, null, 2), 'utf8');
 }
 
 function readWatermark(dir) {
-  const p = path.join(dir, '.relay', 'state', 'watermark.json');
+  const p = path.join(dir, '.wyren', 'state', 'watermark.json');
   try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return null; }
 }
 
@@ -82,17 +82,17 @@ function hookInput(event, cwd, extra = {}) {
 
 function runNode(args, { cwd, stdin = '', env = {} } = {}) {
   return spawnSync('node', args, {
-    cwd: cwd || RELAY_ROOT,
+    cwd: cwd || WYREN_ROOT,
     input: stdin,
     encoding: 'utf8',
-    env: { ...process.env, RELAY_SKIP_PULL: '1', ...env },
+    env: { ...process.env, WYREN_SKIP_PULL: '1', ...env },
     timeout: 15000,
   });
 }
 
 function runHook(hookFile, event, cwd, { extra = {}, env = {} } = {}) {
   return runNode(
-    [path.join(RELAY_ROOT, 'hooks', hookFile)],
+    [path.join(WYREN_ROOT, 'hooks', hookFile)],
     { cwd, stdin: hookInput(event, cwd, extra), env }
   );
 }
@@ -170,29 +170,29 @@ async function run() {
 }
 
 // ---------------------------------------------------------------------------
-// Group A — relay init
+// Group A — wyren init
 // ---------------------------------------------------------------------------
 
-test('A1: relay init creates .relay skeleton', async (dir) => {
+test('A1: wyren init creates .wyren skeleton', async (dir) => {
   initGit(dir);
-  const r = runNode([path.join(RELAY_ROOT, 'bin', 'relay.mjs'), 'init'], { cwd: dir });
+  const r = runNode([path.join(WYREN_ROOT, 'bin', 'wyren.mjs'), 'init'], { cwd: dir });
   assert(r.status === 0, `exit ${r.status}: ${r.stderr}`);
-  assert(fs.existsSync(path.join(dir, '.relay', 'memory.md')), 'memory.md missing');
-  assert(fs.existsSync(path.join(dir, '.relay', 'broadcast', 'skills', '.gitkeep')), 'skills/.gitkeep missing');
+  assert(fs.existsSync(path.join(dir, '.wyren', 'memory.md')), 'memory.md missing');
+  assert(fs.existsSync(path.join(dir, '.wyren', 'broadcast', 'skills', '.gitkeep')), 'skills/.gitkeep missing');
   const gitignore = fs.readFileSync(path.join(dir, '.gitignore'), 'utf8');
-  assertIncludes(gitignore, '.relay/state/', '.gitignore');
-  assertIncludes(gitignore, '.relay/log', '.gitignore');
+  assertIncludes(gitignore, '.wyren/state/', '.gitignore');
+  assertIncludes(gitignore, '.wyren/log', '.gitignore');
 });
 
-test('A2: relay init is idempotent', async (dir) => {
+test('A2: wyren init is idempotent', async (dir) => {
   initGit(dir);
-  const relayMjs = path.join(RELAY_ROOT, 'bin', 'relay.mjs');
-  runNode([relayMjs, 'init'], { cwd: dir });
-  const mtime1 = fs.statSync(path.join(dir, '.relay', 'memory.md')).mtimeMs;
-  const r2 = runNode([relayMjs, 'init'], { cwd: dir });
+  const wyrenMjs = path.join(WYREN_ROOT, 'bin', 'wyren.mjs');
+  runNode([wyrenMjs, 'init'], { cwd: dir });
+  const mtime1 = fs.statSync(path.join(dir, '.wyren', 'memory.md')).mtimeMs;
+  const r2 = runNode([wyrenMjs, 'init'], { cwd: dir });
   assert(r2.status === 0, `second init exit ${r2.status}`);
   assertIncludes(r2.stdout, 'already initialized', 'second init output');
-  const mtime2 = fs.statSync(path.join(dir, '.relay', 'memory.md')).mtimeMs;
+  const mtime2 = fs.statSync(path.join(dir, '.wyren', 'memory.md')).mtimeMs;
   assert(mtime1 === mtime2, 'memory.md mtime changed on second init');
 });
 
@@ -202,7 +202,7 @@ test('A2: relay init is idempotent', async (dir) => {
 
 test('B3: session-start with no memory → empty stdout', async (dir) => {
   initGit(dir);
-  seedRelay(dir);
+  seedWyren(dir);
   const r = runHook('session-start.mjs', 'SessionStart', dir);
   assert(r.status === 0, `exit ${r.status}: ${r.stderr}`);
   assert(!r.stdout || r.stdout.trim() === '', `expected empty stdout, got: ${r.stdout.slice(0, 200)}`);
@@ -211,36 +211,36 @@ test('B3: session-start with no memory → empty stdout', async (dir) => {
 test('B4: session-start with memory → injects additionalContext', async (dir) => {
   initGit(dir);
   const MEMORY = '## Decision\nUse atomic writes everywhere.';
-  seedRelay(dir, { memory: MEMORY });
+  seedWyren(dir, { memory: MEMORY });
   const r = runHook('session-start.mjs', 'SessionStart', dir);
   assert(r.status === 0, `exit ${r.status}: ${r.stderr}`);
   const out = JSON.parse(r.stdout.trim());
   const ctx = out.hookSpecificOutput.additionalContext;
   assertIncludes(ctx, 'atomic writes', 'additionalContext');
-  assertIncludes(ctx, '# Relay Memory', 'additionalContext header');
+  assertIncludes(ctx, '# Wyren Memory', 'additionalContext header');
 });
 
 test('B5: session-start with broadcast skill → injects + ack line', async (dir) => {
   initGit(dir);
   const MEMORY = '## Team context\nUse spawnSync arrays.';
   const SKILL = '## my-skill\nDo things this way.';
-  seedRelay(dir, { memory: MEMORY, skills: { 'my-skill.md': SKILL } });
+  seedWyren(dir, { memory: MEMORY, skills: { 'my-skill.md': SKILL } });
   const r = runHook('session-start.mjs', 'SessionStart', dir);
   assert(r.status === 0, `exit ${r.status}: ${r.stderr}`);
   const out = JSON.parse(r.stdout.trim());
   const ctx = out.hookSpecificOutput.additionalContext;
-  assertIncludes(ctx, '# Relay Broadcast', 'broadcast section');
+  assertIncludes(ctx, '# Wyren Broadcast', 'broadcast section');
   assertIncludes(ctx, 'Do things this way', 'skill content');
   assertIncludes(ctx, 'Loaded 1 team skill(s)', 'ack instruction');
 });
 
-test('B6: RELAY_SKIP_PULL skips git pull without hanging', async (dir) => {
+test('B6: WYREN_SKIP_PULL skips git pull without hanging', async (dir) => {
   initGit(dir);
-  seedRelay(dir, { memory: '## test\nsome memory' });
-  // Set bogus remote — without RELAY_SKIP_PULL this would attempt network
+  seedWyren(dir, { memory: '## test\nsome memory' });
+  // Set bogus remote — without WYREN_SKIP_PULL this would attempt network
   spawnSync('git', ['remote', 'add', 'origin', 'https://bogus.invalid/repo.git'], { cwd: dir });
   const r = runHook('session-start.mjs', 'SessionStart', dir, {
-    env: { RELAY_SKIP_PULL: '1' },
+    env: { WYREN_SKIP_PULL: '1' },
   });
   assert(r.status === 0, `exit ${r.status}: ${r.stderr}`);
   // Should complete fast (no network) and return memory
@@ -254,7 +254,7 @@ test('B6: RELAY_SKIP_PULL skips git pull without hanging', async (dir) => {
 
 test('C7: stop hook increments watermark', async (dir) => {
   initGit(dir);
-  seedRelay(dir);
+  seedWyren(dir);
   writeWatermark(dir, { turns_since_distill: 0 });
   const r = runHook('stop.mjs', 'Stop', dir);
   assert(r.status === 0, `exit ${r.status}: ${r.stderr}`);
@@ -269,7 +269,7 @@ test('C7: stop hook increments watermark', async (dir) => {
 
 test('C8: stop hook at threshold spawns distiller and resets turns', async (dir) => {
   initGit(dir);
-  seedRelay(dir);
+  seedWyren(dir);
   // Write a real transcript so stop.mjs has a valid path
   const transcriptPath = writeTranscript(dir, [
     { role: 'user', text: 'hello' },
@@ -289,13 +289,13 @@ test('C8: stop hook at threshold spawns distiller and resets turns', async (dir)
 
 test('C9: trigger lock prevents double-distill spawn', async (dir) => {
   initGit(dir);
-  seedRelay(dir);
+  seedWyren(dir);
   const transcriptPath = writeTranscript(dir, [
     { role: 'user', text: 'hello' },
   ]);
   writeWatermark(dir, { turns_since_distill: 5 });
   // Pre-create trigger lock — simulates another Stop hook already won the race
-  const lockPath = path.join(dir, '.relay', 'state', 'distill-trigger.lock');
+  const lockPath = path.join(dir, '.wyren', 'state', 'distill-trigger.lock');
   fs.writeFileSync(lockPath, '');
   const r = runHook('stop.mjs', 'Stop', dir, {
     extra: { transcript_path: transcriptPath },
@@ -309,9 +309,9 @@ test('C9: trigger lock prevents double-distill spawn', async (dir) => {
 
 test('C10: stop hook handles malformed stdin → exits 0', async (dir) => {
   initGit(dir);
-  seedRelay(dir);
+  seedWyren(dir);
   const r = runNode(
-    [path.join(RELAY_ROOT, 'hooks', 'stop.mjs')],
+    [path.join(WYREN_ROOT, 'hooks', 'stop.mjs')],
     { cwd: dir, stdin: 'NOT JSON AT ALL' }
   );
   assert(r.status === 0, `exit ${r.status} — should fail open`);
@@ -323,15 +323,15 @@ test('C10: stop hook handles malformed stdin → exits 0', async (dir) => {
 
 test('D11: distiller --dry-run with tool_use signal → exits 0, prompt on stdout', async (dir) => {
   initGit(dir);
-  seedRelay(dir, { memory: '## existing\nOld memory.' });
+  seedWyren(dir, { memory: '## existing\nOld memory.' });
   const transcriptPath = writeTranscript(dir, [
     { role: 'user', text: 'Please edit the file.' },
     { role: 'assistant', text: 'Done.', tools: [{ name: 'Edit', input: { path: 'foo.txt' } }] },
   ]);
-  const memPath = path.join(dir, '.relay', 'memory.md');
-  const outPath = path.join(dir, '.relay', 'memory.out.md');
+  const memPath = path.join(dir, '.wyren', 'memory.md');
+  const outPath = path.join(dir, '.wyren', 'memory.out.md');
   const r = runNode([
-    path.join(RELAY_ROOT, 'distiller.mjs'),
+    path.join(WYREN_ROOT, 'distiller.mjs'),
     '--transcript', transcriptPath,
     '--memory', memPath,
     '--out', outPath,
@@ -348,17 +348,17 @@ test('D11: distiller --dry-run with tool_use signal → exits 0, prompt on stdou
 
 test('D12: distiller Tier-0 filter skips no-signal transcript without API call', async (dir) => {
   initGit(dir);
-  seedRelay(dir, { memory: '## original\nOriginal content.' });
+  seedWyren(dir, { memory: '## original\nOriginal content.' });
   const transcriptPath = writeTranscript(dir, [
     { role: 'user', text: 'How are you?' },
     { role: 'assistant', text: 'I am well, thank you.' },
   ]);
-  const memPath = path.join(dir, '.relay', 'memory.md');
-  const outPath = path.join(dir, '.relay', 'memory.out.md');
+  const memPath = path.join(dir, '.wyren', 'memory.md');
+  const outPath = path.join(dir, '.wyren', 'memory.out.md');
   const origMtime = fs.statSync(memPath).mtimeMs;
   // No --dry-run, no --force → hits Tier-0 check before any Claude call
   const r = runNode([
-    path.join(RELAY_ROOT, 'distiller.mjs'),
+    path.join(WYREN_ROOT, 'distiller.mjs'),
     '--transcript', transcriptPath,
     '--memory', memPath,
     '--out', outPath,
@@ -372,18 +372,18 @@ test('D12: distiller Tier-0 filter skips no-signal transcript without API call',
 
 test('D13: distiller --since slices transcript correctly', async (dir) => {
   initGit(dir);
-  seedRelay(dir, { memory: '## mem\nOld.' });
+  seedWyren(dir, { memory: '## mem\nOld.' });
   const transcriptPath = writeTranscript(dir, [
     { role: 'user', text: 'Turn one content here decided.' },
     { role: 'assistant', text: 'Response one.', tools: [{ name: 'Write', input: {} }] },
     { role: 'user', text: 'Turn three content.' },
     { role: 'assistant', text: 'Response three.', tools: [{ name: 'Edit', input: {} }] },
   ]);
-  const memPath = path.join(dir, '.relay', 'memory.md');
-  const outPath = path.join(dir, '.relay', 'memory.out.md');
+  const memPath = path.join(dir, '.wyren', 'memory.md');
+  const outPath = path.join(dir, '.wyren', 'memory.out.md');
   // --since uuid-0 means skip turn 0 (index 0), include turns 1+
   const r = runNode([
-    path.join(RELAY_ROOT, 'distiller.mjs'),
+    path.join(WYREN_ROOT, 'distiller.mjs'),
     '--transcript', transcriptPath,
     '--memory', memPath,
     '--out', outPath,
@@ -401,20 +401,20 @@ test('D13: distiller --since slices transcript correctly', async (dir) => {
 // Group E — CLI
 // ---------------------------------------------------------------------------
 
-test('E14: relay status prints expected fields in initialized repo', async (dir) => {
+test('E14: wyren status prints expected fields in initialized repo', async (dir) => {
   initGit(dir);
-  seedRelay(dir, { memory: '## Status test\nSome memory content.' });
-  const r = runNode([path.join(RELAY_ROOT, 'bin', 'relay.mjs'), 'status'], { cwd: dir });
+  seedWyren(dir, { memory: '## Status test\nSome memory content.' });
+  const r = runNode([path.join(WYREN_ROOT, 'bin', 'wyren.mjs'), 'status'], { cwd: dir });
   assert(r.status === 0, `exit ${r.status}: ${r.stderr}`);
   assertIncludes(r.stdout, 'Memory:', 'Memory label');
   assertIncludes(r.stdout, 'Progress:', 'Progress label');
   assertIncludes(r.stdout, 'Remote:', 'Remote label');
 });
 
-test('E15: relay status handles missing .relay/ gracefully', async (dir) => {
+test('E15: wyren status handles missing .wyren/ gracefully', async (dir) => {
   initGit(dir);
-  // No seedRelay — plain git repo
-  const r = runNode([path.join(RELAY_ROOT, 'bin', 'relay.mjs'), 'status'], { cwd: dir });
+  // No seedWyren — plain git repo
+  const r = runNode([path.join(WYREN_ROOT, 'bin', 'wyren.mjs'), 'status'], { cwd: dir });
   assert(r.status === 0, `exit ${r.status}: ${r.stderr}`);
   assertIncludes(r.stdout, 'not initialized', 'not initialized message');
 });
@@ -425,8 +425,8 @@ test('E15: relay status handles missing .relay/ gracefully', async (dir) => {
 
 test('F16: run-hook.cmd session-start routes correctly', async (dir) => {
   initGit(dir);
-  seedRelay(dir, { memory: '## Dispatcher test\nVia dispatcher.' });
-  const dispatcher = path.join(RELAY_ROOT, 'hooks', 'run-hook.cmd');
+  seedWyren(dir, { memory: '## Dispatcher test\nVia dispatcher.' });
+  const dispatcher = path.join(WYREN_ROOT, 'hooks', 'run-hook.cmd');
   // On Windows, invoke via cmd.exe; on other platforms skip gracefully
   if (process.platform !== 'win32') {
     console.log('  (skipped on non-Windows)');
@@ -435,7 +435,7 @@ test('F16: run-hook.cmd session-start routes correctly', async (dir) => {
   const r = spawnSync('cmd.exe', ['/c', dispatcher, 'session-start'], {
     input: hookInput('SessionStart', dir),
     encoding: 'utf8',
-    env: { ...process.env, RELAY_SKIP_PULL: '1' },
+    env: { ...process.env, WYREN_SKIP_PULL: '1' },
     timeout: 15000,
   });
   assert(r.status === 0, `exit ${r.status}: ${r.stderr}`);
@@ -445,9 +445,9 @@ test('F16: run-hook.cmd session-start routes correctly', async (dir) => {
 
 test('F17: run-hook.cmd stop routes correctly', async (dir) => {
   initGit(dir);
-  seedRelay(dir);
+  seedWyren(dir);
   writeWatermark(dir, { turns_since_distill: 0 });
-  const dispatcher = path.join(RELAY_ROOT, 'hooks', 'run-hook.cmd');
+  const dispatcher = path.join(WYREN_ROOT, 'hooks', 'run-hook.cmd');
   if (process.platform !== 'win32') {
     console.log('  (skipped on non-Windows)');
     return;
@@ -455,7 +455,7 @@ test('F17: run-hook.cmd stop routes correctly', async (dir) => {
   const r = spawnSync('cmd.exe', ['/c', dispatcher, 'stop'], {
     input: hookInput('Stop', dir),
     encoding: 'utf8',
-    env: { ...process.env, RELAY_SKIP_PULL: '1' },
+    env: { ...process.env, WYREN_SKIP_PULL: '1' },
     timeout: 15000,
   });
   assert(r.status === 0, `exit ${r.status}: ${r.stderr}`);
@@ -467,15 +467,15 @@ test('F17: run-hook.cmd stop routes correctly', async (dir) => {
 // Group G — Stress / concurrency
 // ---------------------------------------------------------------------------
 
-/** Spawn N concurrent stop hooks against the same .relay/ dir.
+/** Spawn N concurrent stop hooks against the same .wyren/ dir.
  *  Returns array of exit codes once all settle. */
 function spawnStopHooks(n, dir, transcriptPath, extraEnv = {}) {
-  const hookPath = path.join(RELAY_ROOT, 'hooks', 'stop.mjs');
+  const hookPath = path.join(WYREN_ROOT, 'hooks', 'stop.mjs');
   const input = hookInput('Stop', dir, { transcript_path: transcriptPath });
   const procs = [];
   for (let i = 0; i < n; i++) {
     const p = spawn('node', [hookPath], {
-      env: { ...process.env, RELAY_SKIP_PULL: '1', ...extraEnv },
+      env: { ...process.env, WYREN_SKIP_PULL: '1', ...extraEnv },
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     p.stdin.end(input, 'utf8');
@@ -489,7 +489,7 @@ function spawnStopHooks(n, dir, transcriptPath, extraEnv = {}) {
 
 test('G18: concurrent stop hooks — no watermark corruption (10 simultaneous)', async (dir) => {
   initGit(dir);
-  seedRelay(dir);
+  seedWyren(dir);
   writeWatermark(dir, { turns_since_distill: 0 });
   const transcriptPath = writeTranscript(dir, [
     { role: 'user', text: 'hello' },
@@ -499,7 +499,7 @@ test('G18: concurrent stop hooks — no watermark corruption (10 simultaneous)',
   // Set threshold above N so no hook triggers the distiller reset (which would zero turns).
   // On Windows, process startup stagger means hooks can run near-sequentially — without a
   // high threshold the watermark reaches 5, distiller resets it to 0, and the test fails.
-  const codes = await spawnStopHooks(N, dir, transcriptPath, { RELAY_TURNS_THRESHOLD: '100' });
+  const codes = await spawnStopHooks(N, dir, transcriptPath, { WYREN_TURNS_THRESHOLD: '100' });
 
   // All hooks exit 0 (fail-open)
   const nonZero = codes.filter((c) => c !== 0);
@@ -518,7 +518,7 @@ test('G18: concurrent stop hooks — no watermark corruption (10 simultaneous)',
 
 test('G19: concurrent stop hooks — trigger lock fires at most once', async (dir) => {
   initGit(dir);
-  seedRelay(dir);
+  seedWyren(dir);
   // Pre-seed turns=4 so ONE hook crossing the threshold triggers distiller
   writeWatermark(dir, { turns_since_distill: 4 });
   const transcriptPath = writeTranscript(dir, [
@@ -546,7 +546,7 @@ test('G19: concurrent stop hooks — trigger lock fires at most once', async (di
 
 test('G20: stop hook stress — 50 sequential turns increment correctly', async (dir) => {
   initGit(dir);
-  seedRelay(dir);
+  seedWyren(dir);
   writeWatermark(dir, { turns_since_distill: 0 });
   const transcriptPath = writeTranscript(dir, [{ role: 'user', text: 'hello' }]);
   const N = 50;
@@ -559,7 +559,7 @@ test('G20: stop hook stress — 50 sequential turns increment correctly', async 
       writeWatermark(dir, { turns_since_distill: 0, distiller_running: false });
     }
     const r = runNode(
-      [path.join(RELAY_ROOT, 'hooks', 'stop.mjs')],
+      [path.join(WYREN_ROOT, 'hooks', 'stop.mjs')],
       { cwd: dir, stdin: hookInput('Stop', dir, { transcript_path: transcriptPath }) }
     );
     assert(r.status === 0, `hook ${i} exited ${r.status}: ${r.stderr}`);
@@ -573,7 +573,7 @@ test('G20: stop hook stress — 50 sequential turns increment correctly', async 
 
 test('G21: large transcript — distiller --dry-run handles 200 turns without OOM', async (dir) => {
   initGit(dir);
-  seedRelay(dir, { memory: '## existing\nOld context.' });
+  seedWyren(dir, { memory: '## existing\nOld context.' });
 
   // Build 200-turn transcript with mixed tool use and plain text
   const turns = [];
@@ -586,11 +586,11 @@ test('G21: large transcript — distiller --dry-run handles 200 turns without OO
     });
   }
   const transcriptPath = writeTranscript(dir, turns);
-  const memPath = path.join(dir, '.relay', 'memory.md');
-  const outPath = path.join(dir, '.relay', 'memory.out.md');
+  const memPath = path.join(dir, '.wyren', 'memory.md');
+  const outPath = path.join(dir, '.wyren', 'memory.out.md');
 
   const r = runNode([
-    path.join(RELAY_ROOT, 'distiller.mjs'),
+    path.join(WYREN_ROOT, 'distiller.mjs'),
     '--transcript', transcriptPath,
     '--memory', memPath,
     '--out', outPath,
@@ -622,7 +622,7 @@ function readInstallerSettings(fakeHome) {
   return JSON.parse(fs.readFileSync(p, 'utf8'));
 }
 
-function countRelayHooks(settings, event) {
+function countWyrenHooks(settings, event) {
   const entries = (settings.hooks || {})[event];
   if (!Array.isArray(entries)) return 0;
   return entries.filter((e) =>
@@ -633,35 +633,35 @@ function countRelayHooks(settings, event) {
 test('H1: fresh install into fake HOME creates link + settings', async (dir) => {
   const fakeHome = makeHomeDirs(path.join(dir, 'fake-home'));
   const r = runNode([
-    path.join(RELAY_ROOT, 'scripts', 'installer.mjs'),
+    path.join(WYREN_ROOT, 'scripts', 'installer.mjs'),
     'install',
-    '--from-local', RELAY_ROOT,
+    '--from-local', WYREN_ROOT,
     '--home', fakeHome,
   ]);
   assert(r.status === 0, `exit ${r.status}: ${r.stderr.slice(0, 400)}`);
 
   // Plugin link exists
-  const pluginPath = path.join(fakeHome, 'plugins', 'relay');
+  const pluginPath = path.join(fakeHome, 'plugins', 'wyren');
   const stat = fs.lstatSync(pluginPath);
   assert(stat.isDirectory() || stat.isSymbolicLink(), 'plugin link/junction should exist');
 
-  // settings.json has exactly one Relay entry per event
+  // settings.json has exactly one Wyren entry per event
   const settings = readInstallerSettings(fakeHome);
-  assert(countRelayHooks(settings, 'SessionStart') === 1, 'Should have 1 SessionStart hook');
-  assert(countRelayHooks(settings, 'Stop') === 1, 'Should have 1 Stop hook');
+  assert(countWyrenHooks(settings, 'SessionStart') === 1, 'Should have 1 SessionStart hook');
+  assert(countWyrenHooks(settings, 'Stop') === 1, 'Should have 1 Stop hook');
 
   // Command uses absolute path to run-hook.cmd (CLAUDE_PLUGIN_ROOT does not expand in settings.json)
   const cmd = settings.hooks.SessionStart[0].hooks[0].command;
-  const expectedDispatcher = path.join(RELAY_ROOT, 'hooks', 'run-hook.cmd');
-  assert(cmd.includes(expectedDispatcher), `Command should reference run-hook.cmd at relay root: ${cmd}`);
+  const expectedDispatcher = path.join(WYREN_ROOT, 'hooks', 'run-hook.cmd');
+  assert(cmd.includes(expectedDispatcher), `Command should reference run-hook.cmd at wyren root: ${cmd}`);
 });
 
 test('H2: idempotent re-install — no duplicate entries', async (dir) => {
   const fakeHome = makeHomeDirs(path.join(dir, 'fake-home'));
   const args = [
-    path.join(RELAY_ROOT, 'scripts', 'installer.mjs'),
+    path.join(WYREN_ROOT, 'scripts', 'installer.mjs'),
     'install',
-    '--from-local', RELAY_ROOT,
+    '--from-local', WYREN_ROOT,
     '--home', fakeHome,
   ];
   const r1 = runNode(args);
@@ -671,11 +671,11 @@ test('H2: idempotent re-install — no duplicate entries', async (dir) => {
   assert(r2.status === 0, `second install: exit ${r2.status}: ${r2.stderr.slice(0, 400)}`);
 
   const settings = readInstallerSettings(fakeHome);
-  assert(countRelayHooks(settings, 'SessionStart') === 1, 'Still exactly 1 SessionStart hook');
-  assert(countRelayHooks(settings, 'Stop') === 1, 'Still exactly 1 Stop hook');
+  assert(countWyrenHooks(settings, 'SessionStart') === 1, 'Still exactly 1 SessionStart hook');
+  assert(countWyrenHooks(settings, 'Stop') === 1, 'Still exactly 1 Stop hook');
 });
 
-test('H3: uninstall removes link + relay settings entries, foreign entries kept', async (dir) => {
+test('H3: uninstall removes link + wyren settings entries, foreign entries kept', async (dir) => {
   const fakeHome = makeHomeDirs(path.join(dir, 'fake-home'));
 
   // Seed a foreign hook entry
@@ -685,24 +685,24 @@ test('H3: uninstall removes link + relay settings entries, foreign entries kept'
 
   // Install
   runNode([
-    path.join(RELAY_ROOT, 'scripts', 'installer.mjs'),
-    'install', '--from-local', RELAY_ROOT, '--home', fakeHome,
+    path.join(WYREN_ROOT, 'scripts', 'installer.mjs'),
+    'install', '--from-local', WYREN_ROOT, '--home', fakeHome,
   ]);
 
   // Uninstall
   const r = runNode([
-    path.join(RELAY_ROOT, 'scripts', 'installer.mjs'),
+    path.join(WYREN_ROOT, 'scripts', 'installer.mjs'),
     'uninstall', '--home', fakeHome,
   ]);
   assert(r.status === 0, `uninstall exit ${r.status}: ${r.stderr.slice(0, 400)}`);
 
   // Plugin link removed
-  const pluginPath = path.join(fakeHome, 'plugins', 'relay');
+  const pluginPath = path.join(fakeHome, 'plugins', 'wyren');
   assert(!fs.existsSync(pluginPath), 'Plugin link should be removed');
 
-  // Foreign entry preserved, relay entries gone
+  // Foreign entry preserved, wyren entries gone
   const settings = readInstallerSettings(fakeHome);
-  assert(countRelayHooks(settings, 'SessionStart') === 0, 'Relay SessionStart should be removed');
+  assert(countWyrenHooks(settings, 'SessionStart') === 0, 'Wyren SessionStart should be removed');
   const sessionEntries = (settings.hooks || {}).SessionStart || [];
   assert(sessionEntries.some((e) => e.hooks && e.hooks[0].command === 'echo foreign'),
     'Foreign entry should be preserved');
@@ -712,15 +712,15 @@ test('H4: migrate-from-setup.ps1 — old absolute-path hook replaced with canoni
   const fakeHome = makeHomeDirs(path.join(dir, 'fake-home'));
 
   // Seed settings.json with setup.ps1-style absolute-path hook pointing to a DIFFERENT
-  // (fictional) relay install — simulates a teammate's machine or a moved checkout.
-  const OLD_RELAY_PATH = 'C:\\Users\\olduser\\old-relay-checkout';
+  // (fictional) wyren install — simulates a teammate's machine or a moved checkout.
+  const OLD_WYREN_PATH = 'C:\\Users\\olduser\\old-wyren-checkout';
   const oldWindowsHook = {
     matcher: '',
     hooks: [{
       type: 'command',
-      command: `"${OLD_RELAY_PATH}\\hooks\\run-hook.cmd" session-start`,
+      command: `"${OLD_WYREN_PATH}\\hooks\\run-hook.cmd" session-start`,
       timeout: 2,
-      statusMessage: 'Loading relay memory...',
+      statusMessage: 'Loading wyren memory...',
     }],
   };
   const oldSettings = { hooks: { SessionStart: [oldWindowsHook], Stop: [] } };
@@ -728,31 +728,31 @@ test('H4: migrate-from-setup.ps1 — old absolute-path hook replaced with canoni
 
   // Install
   const r = runNode([
-    path.join(RELAY_ROOT, 'scripts', 'installer.mjs'),
-    'install', '--from-local', RELAY_ROOT, '--home', fakeHome,
+    path.join(WYREN_ROOT, 'scripts', 'installer.mjs'),
+    'install', '--from-local', WYREN_ROOT, '--home', fakeHome,
   ]);
   assert(r.status === 0, `exit ${r.status}: ${r.stderr.slice(0, 400)}`);
 
-  // Should have exactly 1 entry with the current relay root (old fictional path gone)
+  // Should have exactly 1 entry with the current wyren root (old fictional path gone)
   const settings = readInstallerSettings(fakeHome);
-  assert(countRelayHooks(settings, 'SessionStart') === 1, 'Exactly 1 SessionStart hook after migration');
+  assert(countWyrenHooks(settings, 'SessionStart') === 1, 'Exactly 1 SessionStart hook after migration');
   const cmd = settings.hooks.SessionStart[0].hooks[0].command;
-  const expectedDispatcher = path.join(RELAY_ROOT, 'hooks', 'run-hook.cmd');
-  assert(cmd.includes(expectedDispatcher), `Should use current relay root path: ${cmd}`);
-  assert(!cmd.toLowerCase().includes('olduser\\old-relay-checkout'), 'Should not retain old user absolute path');
+  const expectedDispatcher = path.join(WYREN_ROOT, 'hooks', 'run-hook.cmd');
+  assert(cmd.includes(expectedDispatcher), `Should use current wyren root path: ${cmd}`);
+  assert(!cmd.toLowerCase().includes('olduser\\old-wyren-checkout'), 'Should not retain old user absolute path');
 });
 
-test('H5: relay doctor on broken install exits non-zero and names the issue', async (dir) => {
+test('H5: wyren doctor on broken install exits non-zero and names the issue', async (dir) => {
   const fakeHome = makeHomeDirs(path.join(dir, 'fake-home'));
 
   // Install first
   runNode([
-    path.join(RELAY_ROOT, 'scripts', 'installer.mjs'),
-    'install', '--from-local', RELAY_ROOT, '--home', fakeHome,
+    path.join(WYREN_ROOT, 'scripts', 'installer.mjs'),
+    'install', '--from-local', WYREN_ROOT, '--home', fakeHome,
   ]);
 
   // Manually break the install by removing the plugin link
-  const pluginPath = path.join(fakeHome, 'plugins', 'relay');
+  const pluginPath = path.join(fakeHome, 'plugins', 'wyren');
   try {
     if (process.platform === 'win32') {
       // Junction removal
@@ -764,24 +764,24 @@ test('H5: relay doctor on broken install exits non-zero and names the issue', as
   } catch {}
 
   const r = runNode([
-    path.join(RELAY_ROOT, 'scripts', 'installer.mjs'),
+    path.join(WYREN_ROOT, 'scripts', 'installer.mjs'),
     'doctor', '--home', fakeHome,
   ]);
   assert(r.status !== 0, 'Doctor should exit non-zero on broken install');
   assertIncludes(r.stdout, 'issue', 'Should report issues in stdout');
 });
 
-test('H6: --from-local with non-relay directory bails with actionable error', async (dir) => {
+test('H6: --from-local with non-wyren directory bails with actionable error', async (dir) => {
   const fakeHome = makeHomeDirs(path.join(dir, 'fake-home'));
-  const notRelay = path.join(dir, 'not-a-relay-dir');
-  fs.mkdirSync(notRelay);
+  const notWyren = path.join(dir, 'not-a-wyren-dir');
+  fs.mkdirSync(notWyren);
 
   const r = runNode([
-    path.join(RELAY_ROOT, 'scripts', 'installer.mjs'),
-    'install', '--from-local', notRelay, '--home', fakeHome,
+    path.join(WYREN_ROOT, 'scripts', 'installer.mjs'),
+    'install', '--from-local', notWyren, '--home', fakeHome,
   ]);
-  assert(r.status !== 0, 'Should fail for invalid relay checkout');
-  assertIncludes(r.stderr, 'Not a valid Relay checkout', 'Should name the problem');
+  assert(r.status !== 0, 'Should fail for invalid wyren checkout');
+  assertIncludes(r.stderr, 'Not a valid Wyren checkout', 'Should name the problem');
 });
 
 // ---------------------------------------------------------------------------
@@ -799,29 +799,29 @@ function hookUPSInput(cwd) {
 
 // UPS hook owns ups-state.json (separate from watermark.json owned by stop.mjs)
 function writeUpsState(dir, state) {
-  const p = path.join(dir, '.relay', 'state', 'ups-state.json');
+  const p = path.join(dir, '.wyren', 'state', 'ups-state.json');
   fs.mkdirSync(path.dirname(p), { recursive: true });
   fs.writeFileSync(p, JSON.stringify(state, null, 2), 'utf8');
 }
 
 function readUpsState(dir) {
-  const p = path.join(dir, '.relay', 'state', 'ups-state.json');
+  const p = path.join(dir, '.wyren', 'state', 'ups-state.json');
   try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return null; }
 }
 
 test('I1: UPS hook fires, memory.md unchanged mtime → empty stdout, watermark.json untouched', async (dir) => {
   initGit(dir);
-  seedRelay(dir, { memory: '## Decisions\n- Use SQLite [session a, turn 1]\n' });
+  seedWyren(dir, { memory: '## Decisions\n- Use SQLite [session a, turn 1]\n' });
 
   // Write ups-state with matching mtime (fast-path)
-  const memPath = path.join(dir, '.relay', 'memory.md');
+  const memPath = path.join(dir, '.wyren', 'memory.md');
   const mtime = fs.statSync(memPath).mtimeMs;
   writeUpsState(dir, { last_injected_mtime: mtime, last_injected_hash: 'abc123def456' });
   // Write watermark with stop.mjs-owned keys — hook must not touch them
   writeWatermark(dir, { turns_since_distill: 2 });
 
-  const r = runNode([path.join(RELAY_ROOT, 'hooks', 'user-prompt-submit.mjs')], {
-    cwd: dir, stdin: hookUPSInput(dir), env: { RELAY_SKIP_PULL: '1' },
+  const r = runNode([path.join(WYREN_ROOT, 'hooks', 'user-prompt-submit.mjs')], {
+    cwd: dir, stdin: hookUPSInput(dir), env: { WYREN_SKIP_PULL: '1' },
   });
 
   assert(r.status === 0, `exit ${r.status}: ${r.stderr}`);
@@ -833,10 +833,10 @@ test('I1: UPS hook fires, memory.md unchanged mtime → empty stdout, watermark.
 
 test('I2: first UPS run (no ups-state) → seeded, no additionalContext in stdout', async (dir) => {
   initGit(dir);
-  seedRelay(dir, { memory: '## Decisions\n- Use SQLite [session a, turn 1]\n' });
+  seedWyren(dir, { memory: '## Decisions\n- Use SQLite [session a, turn 1]\n' });
 
-  const r = runNode([path.join(RELAY_ROOT, 'hooks', 'user-prompt-submit.mjs')], {
-    cwd: dir, stdin: hookUPSInput(dir), env: { RELAY_SKIP_PULL: '1' },
+  const r = runNode([path.join(WYREN_ROOT, 'hooks', 'user-prompt-submit.mjs')], {
+    cwd: dir, stdin: hookUPSInput(dir), env: { WYREN_SKIP_PULL: '1' },
   });
 
   assert(r.status === 0, `exit ${r.status}: ${r.stderr}`);
@@ -850,7 +850,7 @@ test('I2: first UPS run (no ups-state) → seeded, no additionalContext in stdou
 test('I3: memory.md mtime changed but hash same → mtime updated, no injection', async (dir) => {
   initGit(dir);
   const memory = '## Decisions\n- Use SQLite [session a, turn 1]\n';
-  seedRelay(dir, { memory });
+  seedWyren(dir, { memory });
 
   const { hashMemory } = await import('../lib/diff-memory.mjs');
   const hash = hashMemory(memory);
@@ -858,8 +858,8 @@ test('I3: memory.md mtime changed but hash same → mtime updated, no injection'
   // Seed ups-state with stale mtime but correct hash
   writeUpsState(dir, { last_injected_mtime: 1, last_injected_hash: hash });
 
-  const r = runNode([path.join(RELAY_ROOT, 'hooks', 'user-prompt-submit.mjs')], {
-    cwd: dir, stdin: hookUPSInput(dir), env: { RELAY_SKIP_PULL: '1' },
+  const r = runNode([path.join(WYREN_ROOT, 'hooks', 'user-prompt-submit.mjs')], {
+    cwd: dir, stdin: hookUPSInput(dir), env: { WYREN_SKIP_PULL: '1' },
   });
 
   assert(r.status === 0, `exit ${r.status}: ${r.stderr}`);
@@ -873,17 +873,17 @@ test('I4: real content delta → stdout contains additionalContext with new bull
   initGit(dir);
   const oldMem = '## Decisions\n- Use SQLite [session a, turn 1]\n';
   const newMem = oldMem + '- Add rate limiting [session b, turn 2]\n';
-  seedRelay(dir, { memory: newMem });
+  seedWyren(dir, { memory: newMem });
 
-  const stateDir = path.join(dir, '.relay', 'state');
+  const stateDir = path.join(dir, '.wyren', 'state');
   fs.mkdirSync(stateDir, { recursive: true });
   fs.writeFileSync(path.join(stateDir, 'last-injected-memory.md'), oldMem, 'utf8');
 
   const { hashMemory } = await import('../lib/diff-memory.mjs');
   writeUpsState(dir, { last_injected_mtime: 1, last_injected_hash: hashMemory(oldMem) });
 
-  const r = runNode([path.join(RELAY_ROOT, 'hooks', 'user-prompt-submit.mjs')], {
-    cwd: dir, stdin: hookUPSInput(dir), env: { RELAY_SKIP_PULL: '1' },
+  const r = runNode([path.join(WYREN_ROOT, 'hooks', 'user-prompt-submit.mjs')], {
+    cwd: dir, stdin: hookUPSInput(dir), env: { WYREN_SKIP_PULL: '1' },
   });
 
   assert(r.status === 0, `exit ${r.status}: ${r.stderr}`);
@@ -892,20 +892,20 @@ test('I4: real content delta → stdout contains additionalContext with new bull
   const output = JSON.parse(r.stdout.trim());
   const ctx = output.hookSpecificOutput.additionalContext;
   assert(ctx.includes('Add rate limiting'), 'additionalContext has new bullet');
-  assert(ctx.includes('Relay live update'), 'additionalContext has header');
+  assert(ctx.includes('Wyren live update'), 'additionalContext has header');
 });
 
 test('I5: corrupt snapshot → hook exits 0, no crash', async (dir) => {
   initGit(dir);
-  seedRelay(dir, { memory: '## Decisions\n- Use SQLite [session a, turn 1]\n' });
+  seedWyren(dir, { memory: '## Decisions\n- Use SQLite [session a, turn 1]\n' });
 
-  const stateDir = path.join(dir, '.relay', 'state');
+  const stateDir = path.join(dir, '.wyren', 'state');
   fs.mkdirSync(stateDir, { recursive: true });
   fs.writeFileSync(path.join(stateDir, 'last-injected-memory.md'), Buffer.from([0xff, 0xfe, 0x00]));
   writeUpsState(dir, { last_injected_mtime: 1, last_injected_hash: 'stale000aaaa' });
 
-  const r = runNode([path.join(RELAY_ROOT, 'hooks', 'user-prompt-submit.mjs')], {
-    cwd: dir, stdin: hookUPSInput(dir), env: { RELAY_SKIP_PULL: '1' },
+  const r = runNode([path.join(WYREN_ROOT, 'hooks', 'user-prompt-submit.mjs')], {
+    cwd: dir, stdin: hookUPSInput(dir), env: { WYREN_SKIP_PULL: '1' },
   });
 
   assert(r.status === 0, 'hook should exit 0 even with corrupt snapshot');

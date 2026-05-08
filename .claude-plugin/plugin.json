@@ -1,5 +1,5 @@
 {
-  "name": "relay",
+  "name": "wyren",
   "description": "Shared team memory across Claude Code sessions via git-synced memory.md",
   "version": "0.4.0",
   "hooks": "hooks/hooks.json",
@@ -7,7 +7,7 @@
     "name": "ssm-08",
     "url": "https://github.com/ssm-08"
   },
-  "homepage": "https://github.com/ssm-08/relay",
-  "repository": "https://github.com/ssm-08/relay",
+  "homepage": "https://github.com/ssm-08/wyren",
+  "repository": "https://github.com/ssm-08/wyren",
   "license": "UNLICENSED"
 }

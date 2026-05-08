@@ -33,7 +33,7 @@ export function readBroadcastDir(broadcastDir) {
     const name = path.relative(broadcastDir, f).replace(/\\/g, '/');
     let body = fs.readFileSync(f, 'utf8');
     if (Buffer.byteLength(body, 'utf8') > MAX_FILE_BYTES) {
-      body = body.slice(0, MAX_FILE_BYTES) + '\n<!-- relay: truncated — file exceeds 50 KB -->';
+      body = body.slice(0, MAX_FILE_BYTES) + '\n<!-- wyren: truncated — file exceeds 50 KB -->';
     }
     const entry = `## broadcast: ${name}\n\n${body.trim()}`;
     const entryBytes = Buffer.byteLength(entry, 'utf8');
@@ -47,23 +47,23 @@ export function readBroadcastDir(broadcastDir) {
 }
 
 export function buildContext(cwd) {
-  const relayDir = path.join(cwd, '.relay');
-  if (!fs.existsSync(relayDir)) return '';
+  const wyrenDir = path.join(cwd, '.wyren');
+  if (!fs.existsSync(wyrenDir)) return '';
 
-  const memory = readMemory(path.join(relayDir, 'memory.md'));
-  const { content: broadcast, skillFiles } = readBroadcastDir(path.join(relayDir, 'broadcast'));
+  const memory = readMemory(path.join(wyrenDir, 'memory.md'));
+  const { content: broadcast, skillFiles } = readBroadcastDir(path.join(wyrenDir, 'broadcast'));
 
   const parts = [];
-  if (memory.trim()) parts.push(`# Relay Memory\n\n${memory.trim()}`);
+  if (memory.trim()) parts.push(`# Wyren Memory\n\n${memory.trim()}`);
   if (broadcast.trim()) {
-    let broadcastSection = `# Relay Broadcast\n\n${broadcast.trim()}`;
+    let broadcastSection = `# Wyren Broadcast\n\n${broadcast.trim()}`;
     if (skillFiles.length > 0) {
       const count = skillFiles.length;
       const names = skillFiles
         .map((f) => '`' + path.basename(f, path.extname(f)) + '`')
         .join(', ');
       broadcastSection +=
-        `\n\n_Relay: ${count} team skill(s) loaded — ${names}.` +
+        `\n\n_Wyren: ${count} team skill(s) loaded — ${names}.` +
         ` Acknowledge in your first response with one line: "Loaded ${count} team skill(s): ${names}."_`;
     }
     parts.push(broadcastSection);
@@ -74,7 +74,7 @@ export function buildContext(cwd) {
 
 function appendLog(cwd, msg) {
   try {
-    const logPath = path.join(cwd, '.relay', 'log');
+    const logPath = path.join(cwd, '.wyren', 'log');
     fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${msg}\n`);
   } catch {}
 }
@@ -85,8 +85,8 @@ async function main() {
     const input = JSON.parse(raw);
     const { cwd } = input;
 
-    // Pull latest .relay/ from remote before reading memory (fail-open, 3s cap inside pull)
-    if (fs.existsSync(path.join(cwd, '.relay'))) {
+    // Pull latest .wyren/ from remote before reading memory (fail-open, 3s cap inside pull)
+    if (fs.existsSync(path.join(cwd, '.wyren'))) {
       try { new GitSync().pull(cwd, { fetchTimeoutMs: 1500, checkoutTimeoutMs: 500 }); } catch {}
     }
 
@@ -102,7 +102,7 @@ async function main() {
       }) + '\n'
     );
   } catch (e) {
-    process.stderr.write(`[relay] session-start error: ${e.message}\n`);
+    process.stderr.write(`[wyren] session-start error: ${e.message}\n`);
     process.exit(0);
   }
 }

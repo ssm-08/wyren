@@ -14,8 +14,8 @@ description: One-liner install. Two minutes. One shared brain.
 Every teammate runs once on their machine:
 
 ```bash
-npm install -g @ssm-08/relay
-relay install
+npm install -g @ssm-08/wyren
+wyren install
 ```
 
 Or via one-liner:
@@ -23,16 +23,16 @@ Or via one-liner:
 **macOS / Linux:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ssm-08/relay/master/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/ssm-08/wyren/master/install.sh | sh
 ```
 
 **Windows (PowerShell):**
 
 ```powershell
-iwr -useb https://raw.githubusercontent.com/ssm-08/relay/master/install.ps1 | iex
+iwr -useb https://raw.githubusercontent.com/ssm-08/wyren/master/install.ps1 | iex
 ```
 
-This installs Relay globally via npm, creates a plugin link at `~/.claude/plugins/relay`, and patches `~/.claude/settings.json` with the `SessionStart`, `Stop`, and `UserPromptSubmit` hooks.
+This installs Wyren globally via npm, creates a plugin link at `~/.claude/plugins/wyren`, and patches `~/.claude/settings.json` with the `SessionStart`, `Stop`, and `UserPromptSubmit` hooks.
 
 :::note
 The installer preserves any existing entries in `settings.json`. It backs up your file before writing.
@@ -40,10 +40,10 @@ The installer preserves any existing entries in `settings.json`. It backs up you
 
 ### Developer / local install
 
-If you already have the repo cloned (e.g. you're contributing to Relay), pass `--from-local`:
+If you already have the repo cloned (e.g. you're contributing to Wyren), pass `--from-local`:
 
 ```bash
-# macOS / Linux — from the relay repo root
+# macOS / Linux — from the wyren repo root
 ./install.sh --from-local .
 
 # Windows
@@ -71,13 +71,13 @@ One teammate, once per repo:
 
 ```bash
 cd <your-repo>
-relay init
+wyren init
 ```
 
 This creates:
 
 ```
-.relay/
+.wyren/
 ├── memory.md               # git-tracked, empty stub
 ├── broadcast/              # git-tracked (.gitkeep)
 │   └── skills/             # git-tracked (.gitkeep)
@@ -87,15 +87,15 @@ This creates:
 And appends to `.gitignore`:
 
 ```
-.relay/state/
-.relay/log
+.wyren/state/
+.wyren/log
 ```
 
 ## Step 3 — Commit and push
 
 ```bash
-git add .relay .gitignore
-git commit -m "Add Relay shared memory"
+git add .wyren .gitignore
+git commit -m "Add Wyren shared memory"
 git push
 ```
 
@@ -110,70 +110,70 @@ That's it. Next time anyone opens Claude Code in this repo, the `SessionStart` h
 ## Verifying the install
 
 ```bash
-relay doctor
+wyren doctor
 ```
 
 Expected output when everything is wired correctly:
 
 ```
-[relay] doctor: all checks passed
+[wyren] doctor: all checks passed
 ```
 
 Or check full state:
 
 ```bash
-relay status
+wyren status
 ```
 
 ## Updating
 
 ```bash
-relay update
+wyren update
 ```
 
-Runs `npm update -g @ssm-08/relay`, re-patches `settings.json` if the hook shape changed, and verifies the install.
+Runs `npm update -g @ssm-08/wyren`, re-patches `settings.json` if the hook shape changed, and verifies the install.
 
 ## Uninstalling
 
 From the machine:
 
 ```bash
-relay uninstall
+wyren uninstall
 ```
 
-Removes: plugin link, Relay entries from `settings.json`, and global `relay` CLI registration (`npm uninstall -g @ssm-08/relay`).
+Removes: plugin link, Wyren entries from `settings.json`, and global `wyren` CLI registration (`npm uninstall -g @ssm-08/wyren`).
 
 From a repo you want to stop tracking:
 
 ```bash
-rm -rf .relay
-# remove .relay/state/ and .relay/log lines from .gitignore
-git commit -am "remove Relay"
+rm -rf .wyren
+# remove .wyren/state/ and .wyren/log lines from .gitignore
+git commit -am "remove Wyren"
 ```
 
 ## Environment variables
 
 | Var | Default | Purpose |
 |---|---|---|
-| `RELAY_SKIP_PULL` | unset | If set, `GitSync.pull()` returns immediately. Use for offline/local-only demos or slow-network environments. |
-| `RELAY_TURNS_THRESHOLD` | `5` | Turn count that triggers automatic distillation. Set to `1` for faster test cycles. |
-| `RELAY_IDLE_MS` | `120000` | Idle-time distillation trigger in ms (default 2 min). |
-| `RELAY_TIER0_THRESHOLD` | `3` | Minimum score to pass the Tier 0 filter. Lower = more API calls; higher = fewer. |
+| `WYREN_SKIP_PULL` | unset | If set, `GitSync.pull()` returns immediately. Use for offline/local-only demos or slow-network environments. |
+| `WYREN_TURNS_THRESHOLD` | `5` | Turn count that triggers automatic distillation. Set to `1` for faster test cycles. |
+| `WYREN_IDLE_MS` | `120000` | Idle-time distillation trigger in ms (default 2 min). |
+| `WYREN_TIER0_THRESHOLD` | `3` | Minimum score to pass the Tier 0 filter. Lower = more API calls; higher = fewer. |
 | `CLAUDE_PLUGIN_ROOT` | set by Claude Code | Where the hook dispatcher looks up `distiller.mjs`. Don't set this yourself. |
-| `RELAY_HOME` | `~/.claude/` | Override the Relay home directory (useful for testing). Takes precedence over `CLAUDE_HOME`. |
-| `CLAUDE_HOME` | `~/.claude/` | Alternative home override. Used when `RELAY_HOME` is not set. |
+| `WYREN_HOME` | `~/.claude/` | Override the Wyren home directory (useful for testing). Takes precedence over `CLAUDE_HOME`. |
+| `CLAUDE_HOME` | `~/.claude/` | Alternative home override. Used when `WYREN_HOME` is not set. |
 
 ## Troubleshooting
 
 See [FAQ](/faq/) for common issues.
 
-### `relay` command not found
+### `wyren` command not found
 
-npm's global bin directory may not be on your PATH. Find it with `npm bin -g` and add it to your shell profile. Or reinstall: `npm install -g @ssm-08/relay`.
+npm's global bin directory may not be on your PATH. Find it with `npm bin -g` and add it to your shell profile. Or reinstall: `npm install -g @ssm-08/wyren`.
 
 ### settings.json comments were removed
 
-The installer writes clean JSON. If you had hand-written comments in `settings.json`, they were stripped on install. A timestamped backup was created at `~/.claude/settings.json.relay-backup-<timestamp>`.
+The installer writes clean JSON. If you had hand-written comments in `settings.json`, they were stripped on install. A timestamped backup was created at `~/.claude/settings.json.wyren-backup-<timestamp>`.
 
 ### macOS: "Command Line Tools" dialog on first install
 

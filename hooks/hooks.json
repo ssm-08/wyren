@@ -8,7 +8,7 @@
             "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" session-start",
             "timeout": 2,
-            "statusMessage": "Loading relay memory..."
+            "statusMessage": "Loading wyren memory..."
           }
         ]
       }

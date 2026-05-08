@@ -5,7 +5,7 @@ description: System diagrams, data flow, and component breakdown.
 
 ## Overview
 
-Three hooks wire Relay into Claude Code. All three are fail-open: any error logs to `.relay/log` and exits 0 — Relay never breaks a session.
+Three hooks wire Wyren into Claude Code. All three are fail-open: any error logs to `.wyren/log` and exits 0 — Wyren never breaks a session.
 
 ```mermaid
 flowchart LR
@@ -16,7 +16,7 @@ flowchart LR
         AUPS[user-prompt-submit.mjs]
         AStop[stop.mjs]
         AD[distiller.mjs]
-        AMD[".relay/memory.md"]
+        AMD[".wyren/memory.md"]
 
         AC -- "SessionStart" --> AS
         AC -- "UserPromptSubmit" --> AUPS
@@ -35,7 +35,7 @@ flowchart LR
         BC[Claude Code]
         BS[session-start.mjs]
         BUPS[user-prompt-submit.mjs]
-        BMD[".relay/memory.md"]
+        BMD[".wyren/memory.md"]
 
         BC -- "SessionStart" --> BS
         BC -- "UserPromptSubmit" --> BUPS
@@ -57,14 +57,14 @@ sequenceDiagram
     participant CC as Claude Code
     participant SS as session-start.mjs
     participant Git as git remote
-    participant FS as .relay/
+    participant FS as .wyren/
 
     CC->>SS: fires SessionStart (stdin JSON)
-    SS->>Git: git fetch + checkout .relay/ from FETCH_HEAD
-    Git-->>SS: updated .relay/
+    SS->>Git: git fetch + checkout .wyren/ from FETCH_HEAD
+    Git-->>SS: updated .wyren/
     SS->>FS: read memory.md + broadcast/
     FS-->>SS: markdown content
-    SS-->>CC: {additionalContext: "# Relay Memory\n..."}
+    SS-->>CC: {additionalContext: "# Wyren Memory\n..."}
     Note over CC: Ingested as hidden system context.<br/>User never sees it.
     CC->>CC: first user prompt arrives warm
 ```
@@ -81,8 +81,8 @@ sequenceDiagram
     participant State as ups-state.json
 
     CC->>UPS: fires UserPromptSubmit (stdin JSON)
-    UPS->>Git: git fetch + checkout .relay/ (1.5 s cap)
-    Git-->>UPS: updated .relay/memory.md
+    UPS->>Git: git fetch + checkout .wyren/ (1.5 s cap)
+    Git-->>UPS: updated .wyren/memory.md
     UPS->>State: read last_injected_hash + last_injected_mtime
     alt mtime unchanged
         UPS-->>CC: exit 0 (no output)
@@ -117,8 +117,8 @@ sequenceDiagram
         alt score >= threshold
             Dist->>Claude: system prompt + memory + transcript slice
             Claude-->>Dist: updated memory.md content
-            Dist->>Dist: atomic write (.relay/memory.md.tmp → rename)
-            Dist->>Git: git add + commit + push .relay/
+            Dist->>Dist: atomic write (.wyren/memory.md.tmp → rename)
+            Dist->>Git: git add + commit + push .wyren/
             Dist->>State: clear distiller_running, set last_distilled_at
         else score below threshold
             Note over Dist: skip API call — update watermark only
@@ -130,7 +130,7 @@ sequenceDiagram
 
 ## State file ownership
 
-Three state files live in `.relay/state/`. They are deliberately separate to eliminate read-modify-write races between concurrent hooks.
+Three state files live in `.wyren/state/`. They are deliberately separate to eliminate read-modify-write races between concurrent hooks.
 
 | File | Owner | Fields |
 |---|---|---|
@@ -138,7 +138,7 @@ Three state files live in `.relay/state/`. They are deliberately separate to eli
 | `ups-state.json` | `user-prompt-submit.mjs` | `last_injected_mtime`, `last_injected_hash` |
 | `last-injected-memory.md` | `user-prompt-submit.mjs` | Full text of the last memory snapshot — used as the diff base each turn |
 
-Both files are in `.relay/state/` which is gitignored (per-machine state). Neither is ever written by the other hook.
+Both files are in `.wyren/state/` which is gitignored (per-machine state). Neither is ever written by the other hook.
 
 `stop.mjs` additionally maintains a PID liveness check: if `distiller_running` is set but `process.kill(pid, 0)` throws `ESRCH`, the flag is stale (process died) and is cleared automatically.
 
@@ -156,17 +156,17 @@ Both files are in `.relay/state/` which is gitignored (per-machine state). Neith
 | **Diff engine** | `lib/diff-memory.mjs` | `diffMemory`, `renderDelta`, `hashMemory` — pure functions, no I/O. |
 | **Transcript parser** | `lib/transcript.mjs` | JSONL streaming, since-watermark slicer, compact prose renderer. |
 | **Memory helper** | `lib/memory.mjs` | `memory.md` atomic read/write. |
-| **Sync layer** | `lib/sync.mjs` | `RelaySync` interface; `GitSync` default impl (pull/push/lock). Pluggable. |
-| **CLI** | `bin/relay.mjs` | `init`, `status`, `distill`, `broadcast-skill`, `install`, `update`, `uninstall`, `doctor`, `log`. |
+| **Sync layer** | `lib/sync.mjs` | `WyrenSync` interface; `GitSync` default impl (pull/push/lock). Pluggable. |
+| **CLI** | `bin/wyren.mjs` | `init`, `status`, `distill`, `broadcast-skill`, `install`, `update`, `uninstall`, `doctor`, `log`. |
 | **Installer** | `scripts/installer.mjs` | Cross-platform install/update/uninstall/doctor logic (zero deps). |
 | **Prompt** | `prompts/distill.md` | Distiller system prompt. |
 
 ## File layout (plugin)
 
-The installer clones Relay to `~/.claude/relay/` and creates a symlink/junction at `~/.claude/plugins/relay/` pointing to it. Files live in the clone; the junction is the plugin mount point.
+The installer clones Wyren to `~/.claude/wyren/` and creates a symlink/junction at `~/.claude/plugins/wyren/` pointing to it. Files live in the clone; the junction is the plugin mount point.
 
 ```
-~/.claude/relay/
+~/.claude/wyren/
 ├── hooks/
 │   ├── hooks.json                # plugin manifest: SessionStart + Stop + UserPromptSubmit
 │   ├── run-hook.cmd              # polyglot bash+cmd dispatcher (self-locates CLAUDE_PLUGIN_ROOT)
@@ -174,7 +174,7 @@ The installer clones Relay to `~/.claude/relay/` and creates a symlink/junction 
 │   ├── stop.mjs                  # Stop hook — watermark + detached distiller spawn
 │   └── user-prompt-submit.mjs    # UserPromptSubmit hook — live sync delta injection
 ├── lib/
-│   ├── sync.mjs                  # RelaySync interface + GitSync implementation
+│   ├── sync.mjs                  # WyrenSync interface + GitSync implementation
 │   ├── transcript.mjs            # JSONL parser, since-watermark slicer
 │   ├── memory.mjs                # memory.md read/write (atomic)
 │   ├── filter.mjs                # Tier 0 weighted scoring filter
@@ -182,12 +182,12 @@ The installer clones Relay to `~/.claude/relay/` and creates a symlink/junction 
 ├── prompts/
 │   └── distill.md                # distiller system prompt (core IP)
 ├── commands/
-│   └── relay-handoff.toml        # /relay-handoff slash command
+│   └── wyren-handoff.toml        # /wyren-handoff slash command
 ├── scripts/
 │   └── installer.mjs             # install/update/uninstall/doctor logic
 ├── distiller.mjs                 # background distillation process
 ├── bin/
-│   └── relay.mjs                 # CLI entrypoint
+│   └── wyren.mjs                 # CLI entrypoint
 ├── package.json                  # "type": "module", zero runtime deps
 └── README.md
 ```
@@ -196,7 +196,7 @@ The installer clones Relay to `~/.claude/relay/` and creates a symlink/junction 
 
 ```
 <repo>/
-├── .relay/
+├── .wyren/
 │   ├── memory.md                 # git-tracked, human-readable shared memory
 │   ├── broadcast/                # git-tracked — team skills + CLAUDE.md overrides
 │   │   ├── CLAUDE.md             # (optional) team-wide Claude Code context override
@@ -206,26 +206,26 @@ The installer clones Relay to `~/.claude/relay/` and creates a symlink/junction 
 │   │   ├── ups-state.json        # owned by user-prompt-submit.mjs
 │   │   └── last-injected-memory.md  # owned by user-prompt-submit.mjs (diff base)
 │   └── log                       # per-machine append log, NOT git-tracked
-└── .gitignore                    # .relay/state/ and .relay/log appended by relay init
+└── .gitignore                    # .wyren/state/ and .wyren/log appended by wyren init
 ```
 
 ## Injection point — why `SessionStart`
 
 Claude Code's `SessionStart` hook is the only surface that injects hidden system context at session initialization. The `additionalContext` field in the hook response is documented as injected system context — users never see it directly.
 
-MCP servers are tool-invocable only — they can't inject at init. Relay uses hooks, not MCP, for the core injection path. UserPromptSubmit extends this by re-injecting deltas as sessions evolve.
+MCP servers are tool-invocable only — they can't inject at init. Wyren uses hooks, not MCP, for the core injection path. UserPromptSubmit extends this by re-injecting deltas as sessions evolve.
 
 ## Sync layer — why git
 
 - **Zero infra.** Every team uses git already.
 - **Works LAN + WAN identically.** Same protocol, same credentials.
-- **Free version history.** `git log .relay/memory.md` shows how the team's shared context evolved.
-- **Pluggable.** `RelaySync` interface is abstract; `GitSync` is the default. An alternative backend swaps in without touching the hooks.
+- **Free version history.** `git log .wyren/memory.md` shows how the team's shared context evolved.
+- **Pluggable.** `WyrenSync` interface is abstract; `GitSync` is the default. An alternative backend swaps in without touching the hooks.
 
 ## Race handling
 
-Two distillers pushing concurrently is rare but real. Relay uses three layers of defense:
+Two distillers pushing concurrently is rare but real. Wyren uses three layers of defense:
 
-1. **Path-scoped push.** Only `.relay/memory.md` and `.relay/broadcast/` are ever staged. Main code is never touched.
+1. **Path-scoped push.** Only `.wyren/memory.md` and `.wyren/broadcast/` are ever staged. Main code is never touched.
 2. **Retry-on-conflict.** If `git push` fails (non-fast-forward), `GitSync.push()` pulls, re-distills against the merged base, retries. Bounded at 3 attempts.
-3. **Advisory lock.** `.relay/state/.lock` prevents concurrent distillers on the same machine. Stolen if held > 60 s (handles killed processes).
+3. **Advisory lock.** `.wyren/state/.lock` prevents concurrent distillers on the same machine. Stolen if held > 60 s (handles killed processes).

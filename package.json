@@ -1,5 +1,5 @@
 {
-  "name": "@ssm-08/relay",
+  "name": "@ssm-08/wyren",
   "version": "0.4.1",
   "type": "module",
   "description": "Shared team memory across Claude Code sessions",
@@ -7,9 +7,9 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ssm-08/relay.git"
+    "url": "git+https://github.com/ssm-08/wyren.git"
   },
-  "homepage": "https://ssm-08.github.io/relay/",
+  "homepage": "https://ssm-08.github.io/wyren/",
   "keywords": [
     "claude",
     "claude-code",
@@ -19,7 +19,7 @@
     "plugin"
   ],
   "bin": {
-    "relay": "bin/relay.mjs"
+    "wyren": "bin/wyren.mjs"
   },
   "files": [
     "bin/",

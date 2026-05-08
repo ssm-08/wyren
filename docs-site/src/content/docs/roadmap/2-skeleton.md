@@ -9,7 +9,7 @@ import { Badge } from '@astrojs/starlight/components';
 
 ## Goal
 
-Plugin hooks wired in `~/.claude/settings.json`. `SessionStart` hook reads `.relay/memory.md` and emits it as `additionalContext`. No distiller wired yet, no git sync yet — just the injection pipe.
+Plugin hooks wired in `~/.claude/settings.json`. `SessionStart` hook reads `.wyren/memory.md` and emits it as `additionalContext`. No distiller wired yet, no git sync yet — just the injection pipe.
 
 ## Files shipped
 
@@ -20,7 +20,7 @@ Plugin hooks wired in `~/.claude/settings.json`. `SessionStart` hook reads `.rel
 | `hooks/run-hook.cmd` | Windows/Unix polyglot: finds `node`, runs `.mjs` hook |
 | `hooks/session-start.mjs` | Reads memory.md + broadcast/, emits `additionalContext` |
 | `hooks/stop.mjs` | Stub — increments watermark turn counter only |
-| `bin/relay.mjs` | CLI: `relay init` creates `.relay/` structure |
+| `bin/wyren.mjs` | CLI: `wyren init` creates `.wyren/` structure |
 | `lib/util.mjs` | Shared `readStdin` + `isMain` helpers |
 
 ## How injection works
@@ -29,8 +29,8 @@ Plugin hooks wired in `~/.claude/settings.json`. `SessionStart` hook reads `.rel
 Claude Code fires SessionStart
   → run-hook.cmd session-start
     → node hooks/session-start.mjs
-      → reads .relay/memory.md
-      → reads .relay/broadcast/* (skips .gitkeep)
+      → reads .wyren/memory.md
+      → reads .wyren/broadcast/* (skips .gitkeep)
       → emits JSON to stdout:
         {"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"..."}}
   → Claude receives memory as hidden context before first message
@@ -42,27 +42,27 @@ Plugin hooks are wired via `install.sh` / `install.ps1` (see [Install guide](/re
 
 ```bash
 # macOS / Linux
-curl -fsSL https://raw.githubusercontent.com/ssm-08/relay/master/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/ssm-08/wyren/master/install.sh | sh
 
 # Windows
-iwr -useb https://raw.githubusercontent.com/ssm-08/relay/master/install.ps1 | iex
+iwr -useb https://raw.githubusercontent.com/ssm-08/wyren/master/install.ps1 | iex
 ```
 
 ## Init (per repo)
 
 ```bash
-relay init
-git add .relay/memory.md .gitignore
-git commit -m "chore: init relay"
+wyren init
+git add .wyren/memory.md .gitignore
+git commit -m "chore: init wyren"
 git push
 ```
 
 ## Manual memory seeding
 
-Until Chunk 3 wires the distiller, edit `.relay/memory.md` directly:
+Until Chunk 3 wires the distiller, edit `.wyren/memory.md` directly:
 
 ```markdown
-# Relay Memory
+# Wyren Memory
 
 ## Decisions
 - Use SQLite (rejected Postgres — too heavy)

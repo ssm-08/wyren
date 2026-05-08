@@ -31,9 +31,9 @@ Standalone CLI that reads a transcript + old memory, produces a new memory that 
 ```bash
 node distiller.mjs \
     --transcript ~/.claude/projects/<proj>/<session>.jsonl \
-    --memory .relay/memory.md \
+    --memory .wyren/memory.md \
     --since <uuid-or-empty> \
-    --out .relay/memory.new.md
+    --out .wyren/memory.new.md
 ```
 
 ## Distiller prompt (first draft)
@@ -90,7 +90,7 @@ Fallback: Anthropic SDK with `@anthropic-ai/sdk` (if `claude` CLI unavailable).
 
 ## Results on the gate run
 
-Test corpus: the 828-line planning session for Relay itself — real decisions, real rejected paths, real Windows-specific workaround discovered mid-session.
+Test corpus: the 828-line planning session for Wyren itself — real decisions, real rejected paths, real Windows-specific workaround discovered mid-session.
 
 | Pass | Input | Output | Time |
 |---|---|---|---|
@@ -99,9 +99,9 @@ Test corpus: the 828-line planning session for Relay itself — real decisions, 
 | 2b | Same as pass 2 (stability) | Same semantic content, phrasing varies | ~77s |
 
 Blind test (3 concrete facts a fresh teammate would need):
-- Docs site is deployed at `https://ssm-08.github.io/relay/` — ✅ captured.
+- Docs site is deployed at `https://ssm-08.github.io/wyren/` — ✅ captured.
 - Custom `rehype-mermaid-pre.mjs` replaces `rehype-mermaid` (the latter pulled playwright) — ✅ captured.
-- Windows Git Bash needs `MSYS_NO_PATHCONV=1` when setting `RELAY_BASE` locally — ✅ captured (non-obvious gotcha worth the whole feature).
+- Windows Git Bash needs `MSYS_NO_PATHCONV=1` when setting `WYREN_BASE` locally — ✅ captured (non-obvious gotcha worth the whole feature).
 
 Hygiene test: pass 1 recorded "open question: `.gitignore` content unconfirmed" at turn 265. The second half of the transcript resolved this. Pass 2 correctly **removed** the open question. Self-cleaning under load. ✅
 
@@ -113,6 +113,6 @@ Options in order of preference:
 
 1. **Iterate prompt.** Most likely fix. Add more explicit negative examples, tighten hygiene instructions.
 2. **Switch model.** Try Opus 4.7 if Sonnet is weak on hygiene.
-3. **Pivot to handoff-only.** Ship without auto-distiller: `/relay-handoff` becomes the only write path, humans author memory verbatim. Less magic, still useful, still demoable.
+3. **Pivot to handoff-only.** Ship without auto-distiller: `/wyren-handoff` becomes the only write path, humans author memory verbatim. Less magic, still useful, still demoable.
 
 Do NOT proceed to Chunk 2 until one of these passes.

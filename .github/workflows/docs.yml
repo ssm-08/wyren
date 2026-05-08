@@ -1,4 +1,4 @@
-name: Deploy Relay docs to GitHub Pages
+name: Deploy Wyren docs to GitHub Pages
 
 on:
   push:
@@ -35,8 +35,8 @@ jobs:
 
       - name: Build site
         env:
-          RELAY_SITE: https://${{ github.repository_owner }}.github.io
-          RELAY_BASE: /${{ github.event.repository.name }}
+          WYREN_SITE: https://${{ github.repository_owner }}.github.io
+          WYREN_BASE: /${{ github.event.repository.name }}
         run: npm run build
 
       - uses: actions/upload-pages-artifact@v3

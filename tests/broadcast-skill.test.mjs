@@ -4,54 +4,54 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
-import { relayBroadcastSkill } from '../bin/relay.mjs';
+import { wyrenBroadcastSkill } from '../bin/wyren.mjs';
 
 function makeTmpDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'relay-test-'));
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'wyren-test-'));
 }
 
-test('relayBroadcastSkill returns null when relay not initialized', () => {
+test('wyrenBroadcastSkill returns null when wyren not initialized', () => {
   const dir = makeTmpDir();
   try {
-    const result = relayBroadcastSkill(dir, '/some/skill.md');
+    const result = wyrenBroadcastSkill(dir, '/some/skill.md');
     assert.equal(result, null);
   } finally {
     fs.rmSync(dir, { recursive: true });
   }
 });
 
-test('relayBroadcastSkill returns null when source file not found', () => {
+test('wyrenBroadcastSkill returns null when source file not found', () => {
   const dir = makeTmpDir();
   try {
-    fs.mkdirSync(path.join(dir, '.relay'), { recursive: true });
-    const result = relayBroadcastSkill(dir, path.join(dir, 'nonexistent.md'));
+    fs.mkdirSync(path.join(dir, '.wyren'), { recursive: true });
+    const result = wyrenBroadcastSkill(dir, path.join(dir, 'nonexistent.md'));
     assert.equal(result, null);
   } finally {
     fs.rmSync(dir, { recursive: true });
   }
 });
 
-test('relayBroadcastSkill returns null when filePath missing', () => {
+test('wyrenBroadcastSkill returns null when filePath missing', () => {
   const dir = makeTmpDir();
   try {
-    fs.mkdirSync(path.join(dir, '.relay'), { recursive: true });
-    const result = relayBroadcastSkill(dir, undefined);
+    fs.mkdirSync(path.join(dir, '.wyren'), { recursive: true });
+    const result = wyrenBroadcastSkill(dir, undefined);
     assert.equal(result, null);
   } finally {
     fs.rmSync(dir, { recursive: true });
   }
 });
 
-test('relayBroadcastSkill copies file to .relay/broadcast/skills/<basename>', () => {
+test('wyrenBroadcastSkill copies file to .wyren/broadcast/skills/<basename>', () => {
   const dir = makeTmpDir();
   try {
-    fs.mkdirSync(path.join(dir, '.relay', 'broadcast'), { recursive: true });
+    fs.mkdirSync(path.join(dir, '.wyren', 'broadcast'), { recursive: true });
     const srcPath = path.join(dir, 'my-style.md');
     fs.writeFileSync(srcPath, '# Style\nUse 2-space indent.', 'utf8');
 
-    const result = relayBroadcastSkill(dir, srcPath);
+    const result = wyrenBroadcastSkill(dir, srcPath);
 
-    const expected = path.join(dir, '.relay', 'broadcast', 'skills', 'my-style.md');
+    const expected = path.join(dir, '.wyren', 'broadcast', 'skills', 'my-style.md');
     assert.equal(result, expected);
     assert.ok(fs.existsSync(expected), 'Skill file should exist at destination');
     const content = fs.readFileSync(expected, 'utf8');
@@ -62,17 +62,17 @@ test('relayBroadcastSkill copies file to .relay/broadcast/skills/<basename>', ()
   }
 });
 
-test('relayBroadcastSkill creates skills dir if it does not exist', () => {
+test('wyrenBroadcastSkill creates skills dir if it does not exist', () => {
   const dir = makeTmpDir();
   try {
-    fs.mkdirSync(path.join(dir, '.relay'), { recursive: true });
+    fs.mkdirSync(path.join(dir, '.wyren'), { recursive: true });
     const srcPath = path.join(dir, 'skill.md');
     fs.writeFileSync(srcPath, '# Skill', 'utf8');
 
-    relayBroadcastSkill(dir, srcPath);
+    wyrenBroadcastSkill(dir, srcPath);
 
     assert.ok(
-      fs.existsSync(path.join(dir, '.relay', 'broadcast', 'skills', 'skill.md')),
+      fs.existsSync(path.join(dir, '.wyren', 'broadcast', 'skills', 'skill.md')),
       'skills dir and file should be created'
     );
   } finally {
@@ -80,17 +80,17 @@ test('relayBroadcastSkill creates skills dir if it does not exist', () => {
   }
 });
 
-test('relayBroadcastSkill overwrites existing skill with same name', () => {
+test('wyrenBroadcastSkill overwrites existing skill with same name', () => {
   const dir = makeTmpDir();
   try {
-    fs.mkdirSync(path.join(dir, '.relay', 'broadcast', 'skills'), { recursive: true });
-    const destPath = path.join(dir, '.relay', 'broadcast', 'skills', 'style.md');
+    fs.mkdirSync(path.join(dir, '.wyren', 'broadcast', 'skills'), { recursive: true });
+    const destPath = path.join(dir, '.wyren', 'broadcast', 'skills', 'style.md');
     fs.writeFileSync(destPath, '# Old content', 'utf8');
 
     const srcPath = path.join(dir, 'style.md');
     fs.writeFileSync(srcPath, '# New content', 'utf8');
 
-    relayBroadcastSkill(dir, srcPath);
+    wyrenBroadcastSkill(dir, srcPath);
 
     const content = fs.readFileSync(destPath, 'utf8');
     assert.equal(content, '# New content', 'Should overwrite with exact new content');

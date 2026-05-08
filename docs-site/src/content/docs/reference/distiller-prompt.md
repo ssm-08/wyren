@@ -5,7 +5,7 @@ description: The full prompt, annotated. The core IP.
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="tip" title="This is the most important file in Relay.">
+<Aside type="tip" title="This is the most important file in Wyren.">
 Infrastructure is easy. Hygiene-respecting distillation is hard. This prompt is where the project succeeds or fails. Iterate aggressively during Chunk 1.
 </Aside>
 
@@ -179,4 +179,4 @@ Tool-use results are truncated at 500 chars. Pure file-read turns with no user t
 
 Full `memory.md` file content. No preamble, no markdown fences around the output, no commentary.
 
-Relay writes it atomically to `.relay/memory.md.tmp` then `rename()` to `.relay/memory.md`.
+Wyren writes it atomically to `.wyren/memory.md.tmp` then `rename()` to `.wyren/memory.md`.

@@ -8,10 +8,10 @@ import { Steps } from '@astrojs/starlight/components';
 ## Setup
 
 - Two laptops, screen-shared.
-- Both have Relay installed (see [Install guide](/reference/install/)).
-- Test repo on GitHub with Relay initialized (`relay init` done, committed, pushed).
+- Both have Wyren installed (see [Install guide](/reference/install/)).
+- Test repo on GitHub with Wyren initialized (`wyren init` done, committed, pushed).
 - Claude Code open on both laptops, pointed at the test repo.
-- Text editor side-by-side showing `.relay/memory.md` live on laptop A.
+- Text editor side-by-side showing `.wyren/memory.md` live on laptop A.
 
 ## The script
 
@@ -19,7 +19,7 @@ import { Steps } from '@astrojs/starlight/components';
 
 1. **Frame the problem (20s).**
 
-   > "When two people hack on the same repo with Claude Code, each session starts blank. All the reasoning behind decisions — what you tried, what you rejected, what's intentionally broken — disappears when you close the tab. Relay fixes that."
+   > "When two people hack on the same repo with Claude Code, each session starts blank. All the reasoning behind decisions — what you tried, what you rejected, what's intentionally broken — disappears when you close the tab. Wyren fixes that."
 
 2. **Laptop A: make meaningful decisions (90s).**
 
@@ -36,7 +36,7 @@ import { Steps } from '@astrojs/starlight/components';
 
 3. **Show the memory file live (30s).**
 
-   Close the session on laptop A. Switch to the text editor showing `.relay/memory.md`. It should now contain:
+   Close the session on laptop A. Switch to the text editor showing `.wyren/memory.md`. It should now contain:
 
    ```markdown
    ## Decisions
@@ -58,7 +58,7 @@ import { Steps } from '@astrojs/starlight/components';
 
    > "What's the state?"
 
-   Claude's first reply (target — this is what Relay delivers):
+   Claude's first reply (target — this is what Wyren delivers):
 
    > *"I see the team picked SQLite over Postgres and tried WebSocket unsuccessfully (switched to SSE because the browser proxy dropped the connection). There's a hardcoded `user_id=1` workaround in `/dashboard` that needs removing before demo. Where do you want to start?"*
 
@@ -69,7 +69,7 @@ import { Steps } from '@astrojs/starlight/components';
    Still on laptop B, run:
 
    ```bash
-   relay broadcast-skill ./team-skills/frontend-conventions.md
+   wyren broadcast-skill ./team-skills/frontend-conventions.md
    ```
 
    Narrate the output: *"Pushed a new skill to the team. Next time anyone opens a session, they'll have it."*
@@ -78,7 +78,7 @@ import { Steps } from '@astrojs/starlight/components';
 
    > *"Loaded 1 team skill(s): `frontend-conventions`."*
 
-   The exact phrasing comes from the acknowledgment instruction Relay injects alongside the broadcast content — Claude follows it but may paraphrase.
+   The exact phrasing comes from the acknowledgment instruction Wyren injects alongside the broadcast content — Claude follows it but may paraphrase.
 
    Narrate: *"One person writes a skill. Everyone inherits it. No chat messages, no 'hey did you see'."*
 
@@ -104,7 +104,7 @@ Target: **under 4 minutes**. If over, cut step 5 (broadcast) — the core story 
 |---|---|
 | "What if two people distill at once?" | Git rebase + retry + advisory lock. Seen zero merge conflicts in stress tests. |
 | "How much does this cost?" | $0 under the preferred path (rides Claude Code auth). See [Cost model](/cost-model/). |
-| "Doesn't this spam git history?" | Scoped to `.relay/` path. Main code history untouched. Optional daily squash. |
+| "Doesn't this spam git history?" | Scoped to `.wyren/` path. Main code history untouched. Optional daily squash. |
 | "What about privacy? My transcripts leak?" | Transcripts stay local. Only the *distilled* memory is pushed — no verbatim conversation. |
 | "Does this scale beyond short sprints?" | Yes — same plugin, same git sync, same distillation loop. Cloud sync and per-user permissions are the natural additions for larger teams. See [Future](/future/). |
 | "Why not an MCP server?" | MCPs are tool-invocable only — can't inject at SessionStart. Hook is the right surface. MCP for on-demand query is a great addition later. |

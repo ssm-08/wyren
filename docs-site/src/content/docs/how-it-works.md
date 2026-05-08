@@ -7,19 +7,19 @@ description: End-to-end walkthrough — Alice and Bob share one brain.
 
 Claude Code starts every session with no memory. For solo work, that's fine — you re-brief Claude at the start. For a team it breaks down: two people's Claudes give conflicting advice because neither knows what the other worked on.
 
-Relay's fix is a shared file in your git repo: `.relay/memory.md`. It holds what matters — decisions made, approaches that didn't work, temporary hacks still in the code. Claude reads it silently at every startup. No briefing needed, no special prompts, no change to how you work.
+Wyren's fix is a shared file in your git repo: `.wyren/memory.md`. It holds what matters — decisions made, approaches that didn't work, temporary hacks still in the code. Claude reads it silently at every startup. No briefing needed, no special prompts, no change to how you work.
 
 Here's the data flow:
 
 ```
 Your conversation
        ↓  (background, every ~5 turns)
- distiller.mjs  →  .relay/memory.md  →  git push
+ distiller.mjs  →  .wyren/memory.md  →  git push
                          ↓  (at every new session start)
                teammate's Claude Code
 ```
 
-The file is plain markdown — you can open it, read it, and edit it directly. Everything else in Relay is engineering to keep that file accurate and in sync.
+The file is plain markdown — you can open it, read it, and edit it directly. Everything else in Wyren is engineering to keep that file accurate and in sync.
 
 ---
 
@@ -29,20 +29,20 @@ The rest of this page walks through the full sequence step by step.
 
 ## T=0 — Install once
 
-Alice and Bob each run the one-liner on their machines (see [Install guide](/reference/install/)). The installer clones Relay to `~/.claude/relay/`, patches `~/.claude/settings.json` with the three hooks, and registers `relay` on PATH. No further setup per session.
+Alice and Bob each run the one-liner on their machines (see [Install guide](/reference/install/)). The installer clones Wyren to `~/.claude/wyren/`, patches `~/.claude/settings.json` with the three hooks, and registers `wyren` on PATH. No further setup per session.
 
 ## T=1 — Initialize the repo
 
-Alice runs `relay init` inside the repo:
+Alice runs `wyren init` inside the repo:
 
 ```bash
-$ relay init
-✔ Created .relay/memory.md (empty stub)
-✔ Created .relay/broadcast/
-✔ Appended .relay/state/ and .relay/log to .gitignore
+$ wyren init
+✔ Created .wyren/memory.md (empty stub)
+✔ Created .wyren/broadcast/
+✔ Appended .wyren/state/ and .wyren/log to .gitignore
 ✔ Verified git remote is configured (origin)
 
-Next: git add .relay/ && git commit -m "Add Relay" && git push
+Next: git add .wyren/ && git commit -m "Add Wyren" && git push
 ```
 
 She commits and pushes. Bob pulls. They're ready.
@@ -51,8 +51,8 @@ She commits and pushes. Bob pulls. They're ready.
 
 Claude Code fires the `SessionStart` hook. `session-start.mjs`:
 
-1. Calls `RelaySync.pull()` → `git fetch`, then `git checkout FETCH_HEAD -- .relay/` (path-scoped, 1.5s cap).
-2. Reads `.relay/memory.md` and any files under `.relay/broadcast/`.
+1. Calls `WyrenSync.pull()` → `git fetch`, then `git checkout FETCH_HEAD -- .wyren/` (path-scoped, 1.5s cap).
+2. Reads `.wyren/memory.md` and any files under `.wyren/broadcast/`.
 3. Prints a JSON envelope to stdout with `hookSpecificOutput.additionalContext` containing the merged memory + broadcast content.
 
 Claude Code ingests that text as **hidden system context**. Alice's Claude now knows the project state before she types a word.
@@ -67,14 +67,14 @@ Alice chats with Claude. Over 10 turns she:
 
 Every assistant turn fires the `Stop` hook. `stop.mjs`:
 
-- Appends the turn's UUID to `.relay/state/watermark.json` (per-machine, not git-tracked).
+- Appends the turn's UUID to `.wyren/state/watermark.json` (per-machine, not git-tracked).
 - After 5 new turns (or 2 min idle), spawns `distiller.mjs` **detached**. The turn itself is never blocked.
 
 ## T=3b — Live sync on every user prompt
 
 While Alice works, the `UserPromptSubmit` hook fires on each prompt she sends — before Claude sees it:
 
-1. `git fetch` then `git checkout FETCH_HEAD -- .relay/memory.md` (1.5s cap, 3s hook budget).
+1. `git fetch` then `git checkout FETCH_HEAD -- .wyren/memory.md` (1.5s cap, 3s hook budget).
 2. Computes a section-aware diff against the memory version injected at `SessionStart`.
 3. If there's new content (a teammate pushed a distilled update mid-session), injects only the **delta** as `additionalContext`.
 
@@ -90,13 +90,13 @@ If Bob is working concurrently and his distiller pushes an update, Alice's next 
 4. For slices with signal: shells out to `claude -p` (headless Claude Code) with the distiller prompt + current memory + transcript slice.
 5. Gets back a full new `memory.md` — hygiene-respecting (replaces superseded entries, removes resolved workarounds, never blindly appends).
 6. Atomic write (`.tmp` + rename).
-7. `RelaySync.push()` → `git add .relay/memory.md && git commit && git push`. Retries on rebase conflict.
+7. `WyrenSync.push()` → `git add .wyren/memory.md && git commit && git push`. Retries on rebase conflict.
 8. Updates watermark.
 
-Alice's `.relay/memory.md` now contains:
+Alice's `.wyren/memory.md` now contains:
 
 ```markdown
-# Relay Memory
+# Wyren Memory
 
 ## Decisions
 - SQLite over Postgres — lightweight, no external DB needed  [session 7a2e, turn 12]
@@ -115,7 +115,7 @@ Alice's `.relay/memory.md` now contains:
 
 Bob opens Claude Code in his clone. `SessionStart` fires:
 
-1. `git fetch`, then `git checkout FETCH_HEAD -- .relay/` — picks up Alice's `.relay/memory.md`.
+1. `git fetch`, then `git checkout FETCH_HEAD -- .wyren/` — picks up Alice's `.wyren/memory.md`.
 2. Reads the file, emits `additionalContext`.
 3. Claude Code injects it as hidden system context.
 

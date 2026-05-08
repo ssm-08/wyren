@@ -21,27 +21,27 @@ import { hashMemory } from '../lib/diff-memory.mjs';
 // Helpers
 // ---------------------------------------------------------------------------
 
-const RELAY_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const WYREN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 function makeTmpDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'relay-fault-'));
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'wyren-fault-'));
 }
 
 /** Initialise a bare git repo (no remote origin). */
 function initGit(dir) {
   spawnSync('git', ['init', '-q'], { cwd: dir, encoding: 'utf8' });
-  spawnSync('git', ['config', 'user.email', 'test@relay'], { cwd: dir, encoding: 'utf8' });
-  spawnSync('git', ['config', 'user.name', 'relay-test'], { cwd: dir, encoding: 'utf8' });
+  spawnSync('git', ['config', 'user.email', 'test@wyren'], { cwd: dir, encoding: 'utf8' });
+  spawnSync('git', ['config', 'user.name', 'wyren-test'], { cwd: dir, encoding: 'utf8' });
 }
 
-/** Create .relay dir with optional memory + state files. */
-function seedRelay(dir, { memory = null, upsState = null, snapshot = null } = {}) {
-  const relayDir = path.join(dir, '.relay');
-  const stateDir = path.join(relayDir, 'state');
+/** Create .wyren dir with optional memory + state files. */
+function seedWyren(dir, { memory = null, upsState = null, snapshot = null } = {}) {
+  const wyrenDir = path.join(dir, '.wyren');
+  const stateDir = path.join(wyrenDir, 'state');
   fs.mkdirSync(stateDir, { recursive: true });
 
   if (memory !== null) {
-    fs.writeFileSync(path.join(relayDir, 'memory.md'), memory, 'utf8');
+    fs.writeFileSync(path.join(wyrenDir, 'memory.md'), memory, 'utf8');
   }
   if (upsState !== null) {
     fs.writeFileSync(path.join(stateDir, 'ups-state.json'), JSON.stringify(upsState), 'utf8');
@@ -50,9 +50,9 @@ function seedRelay(dir, { memory = null, upsState = null, snapshot = null } = {}
     fs.writeFileSync(path.join(stateDir, 'last-injected-memory.md'), snapshot, 'utf8');
   }
   return {
-    relayDir,
+    wyrenDir,
     stateDir,
-    memoryPath: path.join(relayDir, 'memory.md'),
+    memoryPath: path.join(wyrenDir, 'memory.md'),
     upsStatePath: path.join(stateDir, 'ups-state.json'),
     snapshotPath: path.join(stateDir, 'last-injected-memory.md'),
   };
@@ -61,7 +61,7 @@ function seedRelay(dir, { memory = null, upsState = null, snapshot = null } = {}
 /**
  * Run the user-prompt-submit hook as a subprocess.
  * opts.env overrides (merged on top of process.env).
- * opts.skipPull sets RELAY_SKIP_PULL=1.
+ * opts.skipPull sets WYREN_SKIP_PULL=1.
  * opts.path overrides PATH (node is always invoked via process.execPath so PATH only affects git).
  */
 function runHook(cwd, opts = {}) {
@@ -72,12 +72,12 @@ function runHook(cwd, opts = {}) {
     hook_event_name: 'UserPromptSubmit',
   });
 
-  // Build env — omit RELAY_SKIP_PULL if not requested (delete any inherited value)
+  // Build env — omit WYREN_SKIP_PULL if not requested (delete any inherited value)
   const env = { ...process.env };
   if (opts.skipPull) {
-    env.RELAY_SKIP_PULL = '1';
+    env.WYREN_SKIP_PULL = '1';
   } else {
-    delete env.RELAY_SKIP_PULL;
+    delete env.WYREN_SKIP_PULL;
   }
   if (opts.path !== undefined) {
     env.PATH = opts.path;
@@ -89,7 +89,7 @@ function runHook(cwd, opts = {}) {
   // Use process.execPath (absolute path to node binary) so that overriding PATH
   // does not prevent node itself from being found — PATH restriction only affects git.
   return spawnSync(process.execPath, ['hooks/user-prompt-submit.mjs'], {
-    cwd: RELAY_ROOT,
+    cwd: WYREN_ROOT,
     input: stdin,
     encoding: 'utf8',
     env,
@@ -106,7 +106,7 @@ test('no remote configured — hook exits 0 without crashing', () => {
   try {
     initGit(dir);  // bare git init, no remote
     const memory = '## Decisions\n- Use SQLite [session a, turn 1]\n';
-    seedRelay(dir, { memory });
+    seedWyren(dir, { memory });
 
     const result = runHook(dir);
 
@@ -124,25 +124,25 @@ test('no remote configured — hook exits 0 without crashing', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 2: RELAY_SKIP_PULL=1 + disk content changed → diff still injected
+// Test 2: WYREN_SKIP_PULL=1 + disk content changed → diff still injected
 // ---------------------------------------------------------------------------
 
-test('RELAY_SKIP_PULL=1 + content changed on disk — delta injected without network', () => {
+test('WYREN_SKIP_PULL=1 + content changed on disk — delta injected without network', () => {
   const dir = makeTmpDir();
   try {
     initGit(dir);
     const oldMem = '## Decisions\n- Use SQLite [session a, turn 1]\n';
     const newMem = '## Decisions\n- Use SQLite [session a, turn 1]\n- Add rate limiting [session b, turn 2]\n';
 
-    // Seed .relay with NEW memory.md (simulating a change from another machine already landed)
-    const { upsStatePath } = seedRelay(dir, {
+    // Seed .wyren with NEW memory.md (simulating a change from another machine already landed)
+    const { upsStatePath } = seedWyren(dir, {
       memory: newMem,
       snapshot: oldMem,
       // UPS state references the OLD hash so the hook sees a change
       upsState: { last_injected_mtime: 1, last_injected_hash: hashMemory(oldMem) },
     });
 
-    // Run with RELAY_SKIP_PULL — skips network fetch but disk is already updated
+    // Run with WYREN_SKIP_PULL — skips network fetch but disk is already updated
     const result = runHook(dir, { skipPull: true });
 
     assert.equal(result.status, 0, `hook exited ${result.status}: stderr=${result.stderr}`);
@@ -175,14 +175,14 @@ test('pull timeout — buildInjection proceeds with disk state, exits 0', () => 
     const oldMem = '## Decisions\n- Use SQLite [session a, turn 1]\n';
     const newMem = '## Decisions\n- Use SQLite [session a, turn 1]\n- New item [session c, turn 3]\n';
 
-    const { relayDir, upsStatePath, snapshotPath, memoryPath } = seedRelay(dir, {
+    const { wyrenDir, upsStatePath, snapshotPath, memoryPath } = seedWyren(dir, {
       memory: newMem,
       snapshot: oldMem,
       upsState: { last_injected_mtime: 1, last_injected_hash: hashMemory(oldMem) },
     });
 
     // Directly call buildInjection (simulates the hook after a timed-out pull)
-    const result = buildInjection({ cwd: dir, relayDir, upsStatePath, snapshotPath, memoryPath });
+    const result = buildInjection({ cwd: dir, wyrenDir, upsStatePath, snapshotPath, memoryPath });
 
     assert.ok(result !== null, 'buildInjection must return a result after timeout');
     assert.ok(result.delta, 'delta should be non-null when content changed');
@@ -192,16 +192,16 @@ test('pull timeout — buildInjection proceeds with disk state, exits 0', () => 
   }
 });
 
-// Also verify via full subprocess with an env that would make fetch hang (RELAY_SKIP_PULL=0
+// Also verify via full subprocess with an env that would make fetch hang (WYREN_SKIP_PULL=0
 // but no remote → git config check short-circuits safely). The hook itself must exit 0.
 test('pull timeout subprocess — hook exits 0 (no remote = instant short-circuit)', () => {
   const dir = makeTmpDir();
   try {
     initGit(dir);  // no origin → pull() returns early before any fetch
     const memory = '## Decisions\n- Use SQLite [session a, turn 1]\n';
-    seedRelay(dir, { memory });
+    seedWyren(dir, { memory });
 
-    const result = runHook(dir);  // RELAY_SKIP_PULL NOT set — exercises short-circuit path
+    const result = runHook(dir);  // WYREN_SKIP_PULL NOT set — exercises short-circuit path
 
     assert.equal(result.status, 0, `hook crashed: ${result.stderr}`);
   } finally {
@@ -217,10 +217,10 @@ test('git not on PATH — hook exits 0 (ENOENT handled gracefully)', () => {
   const dir = makeTmpDir();
   try {
     const memory = '## Decisions\n- Use SQLite [session a, turn 1]\n';
-    seedRelay(dir, { memory });
+    seedWyren(dir, { memory });
 
     // Override PATH to a non-existent directory so git spawn throws ENOENT
-    const result = runHook(dir, { path: path.join(os.tmpdir(), 'nonexistent-path-relay-test') });
+    const result = runHook(dir, { path: path.join(os.tmpdir(), 'nonexistent-path-wyren-test') });
 
     // The hook must exit 0 even when git is not found
     assert.equal(result.status, 0, `hook exited ${result.status} when git not on PATH: stderr=${result.stderr}`);
@@ -237,13 +237,13 @@ test('git not on PATH — buildInjection has no git dependency, works fine', () 
     const oldMem = '## Decisions\n- Use SQLite [session a, turn 1]\n';
     const newMem = '## Decisions\n- Use SQLite [session a, turn 1]\n- No git needed [session d, turn 4]\n';
 
-    const { relayDir, upsStatePath, snapshotPath, memoryPath } = seedRelay(dir, {
+    const { wyrenDir, upsStatePath, snapshotPath, memoryPath } = seedWyren(dir, {
       memory: newMem,
       snapshot: oldMem,
       upsState: { last_injected_mtime: 1, last_injected_hash: hashMemory(oldMem) },
     });
 
-    const result = buildInjection({ cwd: dir, relayDir, upsStatePath, snapshotPath, memoryPath });
+    const result = buildInjection({ cwd: dir, wyrenDir, upsStatePath, snapshotPath, memoryPath });
 
     assert.ok(result !== null, 'buildInjection must succeed without git');
     assert.ok(result.delta && result.delta.includes('No git needed'), 'delta must reflect change');
@@ -253,37 +253,37 @@ test('git not on PATH — buildInjection has no git dependency, works fine', () 
 });
 
 // ---------------------------------------------------------------------------
-// Test 5: No .relay dir at all — hook exits 0 immediately
+// Test 5: No .wyren dir at all — hook exits 0 immediately
 // ---------------------------------------------------------------------------
 
-test('no .relay dir — hook exits 0 immediately', () => {
+test('no .wyren dir — hook exits 0 immediately', () => {
   const dir = makeTmpDir();
   try {
-    // Plain empty directory — no git, no .relay
+    // Plain empty directory — no git, no .wyren
     const result = runHook(dir);
 
     assert.equal(result.status, 0, `hook exited ${result.status}: stderr=${result.stderr}`);
     assert.equal(result.error, undefined);
     // Hook should produce no stdout (early exit)
     const stdout = (result.stdout || '').trim();
-    assert.equal(stdout, '', 'no output expected when .relay dir is absent');
+    assert.equal(stdout, '', 'no output expected when .wyren dir is absent');
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
 
 // Also test via buildInjection — memory.md doesn't exist (hook exits 0, buildInjection returns null)
-test('no .relay dir — buildInjection returns null for missing memoryPath', () => {
+test('no .wyren dir — buildInjection returns null for missing memoryPath', () => {
   const dir = makeTmpDir();
   try {
-    const relayDir = path.join(dir, '.relay');
-    const stateDir = path.join(relayDir, 'state');
+    const wyrenDir = path.join(dir, '.wyren');
+    const stateDir = path.join(wyrenDir, 'state');
     const result = buildInjection({
       cwd: dir,
-      relayDir,
+      wyrenDir,
       upsStatePath: path.join(stateDir, 'ups-state.json'),
       snapshotPath: path.join(stateDir, 'last-injected-memory.md'),
-      memoryPath: path.join(relayDir, 'memory.md'),  // does not exist
+      memoryPath: path.join(wyrenDir, 'memory.md'),  // does not exist
     });
 
     assert.equal(result, null, 'buildInjection must return null when memory.md missing');
@@ -301,16 +301,16 @@ test('empty git repo (no commits) — hook exits 0, pull failure handled gracefu
   try {
     // git init but no commits → no HEAD, `git config --get remote.origin.url` fails → short-circuits
     spawnSync('git', ['init', '-q'], { cwd: dir, encoding: 'utf8' });
-    spawnSync('git', ['config', 'user.email', 'test@relay'], { cwd: dir, encoding: 'utf8' });
-    spawnSync('git', ['config', 'user.name', 'relay-test'], { cwd: dir, encoding: 'utf8' });
+    spawnSync('git', ['config', 'user.email', 'test@wyren'], { cwd: dir, encoding: 'utf8' });
+    spawnSync('git', ['config', 'user.name', 'wyren-test'], { cwd: dir, encoding: 'utf8' });
     // Use file:// URL to force fetch path — fails immediately without spawning network helpers.
     // git:// URLs on Windows spawn helper processes that may hold handles and cause EBUSY on cleanup.
-    spawnSync('git', ['remote', 'add', 'origin', 'file:///nonexistent-relay-test-remote'], { cwd: dir, encoding: 'utf8' });
+    spawnSync('git', ['remote', 'add', 'origin', 'file:///nonexistent-wyren-test-remote'], { cwd: dir, encoding: 'utf8' });
 
     const memory = '## Decisions\n- Use SQLite [session a, turn 1]\n';
-    seedRelay(dir, { memory });
+    seedWyren(dir, { memory });
 
-    // RELAY_SKIP_PULL not set — hook will attempt pull, fetch will fail → fail-open
+    // WYREN_SKIP_PULL not set — hook will attempt pull, fetch will fail → fail-open
     const result = runHook(dir);
 
     assert.equal(result.status, 0, `hook exited ${result.status}: stderr=${result.stderr}`);
@@ -326,7 +326,7 @@ test('empty git repo, no remote — hook exits 0 without touching network', () =
   try {
     initGit(dir);  // no remote, no commits
     const memory = '## Status\n- No commits yet [session e, turn 1]\n';
-    seedRelay(dir, { memory });
+    seedWyren(dir, { memory });
 
     const result = runHook(dir);
 

@@ -7,8 +7,8 @@ import { readStdin, isMain } from '../lib/util.mjs';
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 
-const TURNS_THRESHOLD = process.env.RELAY_TURNS_THRESHOLD ? parseInt(process.env.RELAY_TURNS_THRESHOLD, 10) : 5;
-const IDLE_MS = process.env.RELAY_IDLE_MS ? parseInt(process.env.RELAY_IDLE_MS, 10) : 2 * 60 * 1000;
+const TURNS_THRESHOLD = process.env.WYREN_TURNS_THRESHOLD ? parseInt(process.env.WYREN_TURNS_THRESHOLD, 10) : 5;
+const IDLE_MS = process.env.WYREN_IDLE_MS ? parseInt(process.env.WYREN_IDLE_MS, 10) : 2 * 60 * 1000;
 
 export function writeWatermarkAtomic(watermarkPath, state) {
   const tmp = `${watermarkPath}.${process.pid}.${Date.now()}.tmp`;
@@ -27,8 +27,8 @@ export function writeWatermarkAtomic(watermarkPath, state) {
   throw lastErr;
 }
 
-export function updateWatermark(relayDir) {
-  const stateDir = path.join(relayDir, 'state');
+export function updateWatermark(wyrenDir) {
+  const stateDir = path.join(wyrenDir, 'state');
   fs.mkdirSync(stateDir, { recursive: true });
 
   const watermarkPath = path.join(stateDir, 'watermark.json');
@@ -71,14 +71,14 @@ export function shouldDistill(state) {
   return false;
 }
 
-export function spawnDistiller({ relayDir, transcriptPath, since, cwd }) {
+export function spawnDistiller({ wyrenDir, transcriptPath, since, cwd }) {
   const distillerPath =
     process.env.CLAUDE_PLUGIN_ROOT
       ? path.join(process.env.CLAUDE_PLUGIN_ROOT, 'distiller.mjs')
       : path.join(__dirname, '..', 'distiller.mjs');
 
-  const memoryPath = path.join(relayDir, 'memory.md');
-  const logPath = path.join(relayDir, 'log');
+  const memoryPath = path.join(wyrenDir, 'memory.md');
+  const logPath = path.join(wyrenDir, 'log');
 
   const args = [
     distillerPath,
@@ -102,7 +102,7 @@ export function spawnDistiller({ relayDir, transcriptPath, since, cwd }) {
     stdio: ['ignore', logFd, logFd],
   });
   proc.on('error', (e) => {
-    process.stderr.write(`[relay] distiller spawn failed: ${e.message}\n`);
+    process.stderr.write(`[wyren] distiller spawn failed: ${e.message}\n`);
   });
   proc.unref();
   // close parent's copy — child already inherited its own fd
@@ -115,24 +115,24 @@ async function main() {
     const raw = await readStdin();
     const input = JSON.parse(raw);
     const { cwd, transcript_path } = input;
-    const relayDir = path.join(cwd, '.relay');
-    if (!fs.existsSync(relayDir)) process.exit(0);
+    const wyrenDir = path.join(cwd, '.wyren');
+    if (!fs.existsSync(wyrenDir)) process.exit(0);
 
-    const state = updateWatermark(relayDir);
+    const state = updateWatermark(wyrenDir);
 
     if (shouldDistill(state) && transcript_path) {
       // openSync('wx') is atomic — EEXIST if another Stop hook beat us here
-      const triggerLock = path.join(relayDir, 'state', 'distill-trigger.lock');
+      const triggerLock = path.join(wyrenDir, 'state', 'distill-trigger.lock');
       try {
         fs.closeSync(fs.openSync(triggerLock, 'wx'));
       } catch {
         process.exit(0); // another process won the race
       }
 
-      const watermarkPath = path.join(relayDir, 'state', 'watermark.json');
+      const watermarkPath = path.join(wyrenDir, 'state', 'watermark.json');
 
       const distProc = spawnDistiller({
-        relayDir,
+        wyrenDir,
         transcriptPath: transcript_path,
         since: state.last_uuid || '',
         cwd,
@@ -152,7 +152,7 @@ async function main() {
       try { fs.unlinkSync(triggerLock); } catch {}
     }
   } catch (e) {
-    process.stderr.write(`[relay] stop error: ${e.message}\n`);
+    process.stderr.write(`[wyren] stop error: ${e.message}\n`);
   }
   process.exit(0);
 }

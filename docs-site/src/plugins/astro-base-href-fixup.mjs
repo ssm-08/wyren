@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 export function baseHrefFixup({ base }) {
 	const prefix = base.endsWith('/') ? base.slice(0, -1) : base;
 	return {
-		name: 'relay:base-href-fixup',
+		name: 'wyren:base-href-fixup',
 		hooks: {
 			'astro:build:done': async ({ dir }) => {
 				if (!prefix) return;

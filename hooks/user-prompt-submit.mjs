@@ -19,7 +19,7 @@ const UPS_STATE_FILE = 'ups-state.json';
 
 function appendLog(cwd, msg) {
   try {
-    const logPath = path.join(cwd, '.relay', 'log');
+    const logPath = path.join(cwd, '.wyren', 'log');
     fs.appendFileSync(logPath, `[${new Date().toISOString()}] [ups] ${msg}\n`);
   } catch {}
 }
@@ -55,12 +55,12 @@ function markInjection(cwd, event) {
  *
  * @param {object} opts
  * @param {string} opts.cwd
- * @param {string} opts.relayDir
+ * @param {string} opts.wyrenDir
  * @param {string} opts.upsStatePath  - path to ups-state.json (UPS-owned, never written by stop.mjs)
  * @param {string} opts.snapshotPath
  * @param {string} opts.memoryPath
  */
-export function buildInjection({ cwd, relayDir, upsStatePath, snapshotPath, memoryPath }) {
+export function buildInjection({ cwd, wyrenDir, upsStatePath, snapshotPath, memoryPath }) {
   // 1. Check memory.md exists
   if (!fs.existsSync(memoryPath)) return null;
 
@@ -126,8 +126,8 @@ async function main() {
     const input = JSON.parse(raw);
     cwd = input.cwd;
 
-    const relayDir = path.join(cwd, '.relay');
-    if (!fs.existsSync(relayDir)) { process.exit(0); }
+    const wyrenDir = path.join(cwd, '.wyren');
+    if (!fs.existsSync(wyrenDir)) { process.exit(0); }
 
     // Pull latest memory from remote with tight timeout (stay within 2s hook budget)
     try {
@@ -137,12 +137,12 @@ async function main() {
       // Fail-open: proceed with whatever is on disk
     }
 
-    const stateDir = path.join(relayDir, 'state');
+    const stateDir = path.join(wyrenDir, 'state');
     const upsStatePath = path.join(stateDir, UPS_STATE_FILE);
     const snapshotPath = path.join(stateDir, SNAPSHOT_FILE);
-    const memoryPath = path.join(relayDir, 'memory.md');
+    const memoryPath = path.join(wyrenDir, 'memory.md');
 
-    const result = buildInjection({ cwd, relayDir, upsStatePath, snapshotPath, memoryPath });
+    const result = buildInjection({ cwd, wyrenDir, upsStatePath, snapshotPath, memoryPath });
 
     if (!result) { process.exit(0); }
 

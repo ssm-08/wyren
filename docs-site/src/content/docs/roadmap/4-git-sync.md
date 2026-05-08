@@ -9,66 +9,66 @@ description: Hours 22-32. Cross-machine sync. Alice's decisions reach Bob's lapt
 
 ## Goal
 
-Make the single-machine loop from Chunk 3 work across teammates. Git becomes the sync medium. `RelaySync` interface lets a future cloud backend slot in without touching hooks.
+Make the single-machine loop from Chunk 3 work across teammates. Git becomes the sync medium. `WyrenSync` interface lets a future cloud backend slot in without touching hooks.
 
 ## Files
 
 | File | Purpose |
 |---|---|
-| `lib/sync.mjs` | `RelaySync` interface + `GitSync` implementation |
+| `lib/sync.mjs` | `WyrenSync` interface + `GitSync` implementation |
 | `hooks/session-start.mjs` | Add `sync.pull()` before reading memory |
 | `distiller.mjs` | Add `sync.push()` after writing memory |
-| `bin/relay` | Add `relay status`, `relay distill` commands |
+| `bin/wyren` | Add `wyren status`, `wyren distill` commands |
 
-## RelaySync interface
+## WyrenSync interface
 
 ```js
-export class RelaySync {
-  async pull() {}            // bring .relay/ up-to-date; idempotent
-  async push() {}            // commit+push .relay/ changes only
+export class WyrenSync {
+  async pull() {}            // bring .wyren/ up-to-date; idempotent
+  async push() {}            // commit+push .wyren/ changes only
   async lock() {}            // advisory lock; returns release fn
 }
 
-export class GitSync extends RelaySync {
+export class GitSync extends WyrenSync {
   constructor(cwd) { super(); this.cwd = cwd; }
   // real impl
 }
 ```
 
-Later a `CloudSync extends RelaySync` slots in — zero hook changes.
+Later a `CloudSync extends WyrenSync` slots in — zero hook changes.
 
 ## GitSync.pull()
 
 ```js
 pull(cwd) {
-  if (process.env.RELAY_SKIP_PULL) return;   // escape hatch for local/demo
+  if (process.env.WYREN_SKIP_PULL) return;   // escape hatch for local/demo
   // short-circuit if no remote configured
   // git fetch --quiet  (3s timeout, fail-open)
-  // git checkout origin/<branch> -- .relay/memory.md
-  // git checkout origin/<branch> -- .relay/broadcast
+  // git checkout origin/<branch> -- .wyren/memory.md
+  // git checkout origin/<branch> -- .wyren/broadcast
 }
 ```
 
-Scoped checkout — never rebases or touches the user's working code. `.relay/state/` is gitignored and machine-local; never pulled.
+Scoped checkout — never rebases or touches the user's working code. `.wyren/state/` is gitignored and machine-local; never pulled.
 
 ## GitSync.push()
 
 ```js
 push(cwd, sessionId) {
-  // git add .relay/memory.md .relay/broadcast
+  // git add .wyren/memory.md .wyren/broadcast
   // if nothing staged → return
-  // git commit -m "[relay] memory update (session <short-id>)"
+  // git commit -m "[wyren] memory update (session <short-id>)"
   // for attempt in 0..2:
   //   git push origin HEAD → success: return
   //   on fail: git fetch + git rebase FETCH_HEAD
   //     on conflict: rebase --abort + reset --mixed FETCH_HEAD
-  //                  git checkout FETCH_HEAD -- .relay/memory.md
+  //                  git checkout FETCH_HEAD -- .wyren/memory.md
   //                  reset turns → re-distill next cycle; return
   // on 3 failures: log + leave commit local
 }
 ```
 
-Conflict strategy: `reset --mixed FETCH_HEAD` advances local HEAD to remote tip without touching the working tree outside `.relay/`. Safer than `--theirs + rebase --continue` on Windows (no GIT_EDITOR needed). Local session changes re-distill on next trigger.
+Conflict strategy: `reset --mixed FETCH_HEAD` advances local HEAD to remote tip without touching the working tree outside `.wyren/`. Safer than `--theirs + rebase --continue` on Windows (no GIT_EDITOR needed). Local session changes re-distill on next trigger.
 
 ## GitSync.lock()
 
@@ -87,7 +87,7 @@ session-start.mjs:
 
 ```js
 import { GitSync } from '../lib/sync.mjs';
-if (fs.existsSync(relayDir)) {
+if (fs.existsSync(wyrenDir)) {
   try { new GitSync().pull(cwd); } catch {}
 }
 // ... buildContext, emit additionalContext
@@ -104,17 +104,17 @@ try { sync.push(cwd, sessionId); } finally { release(); }
 
 ## Race handling
 
-1. **Path-scoped push** — only `.relay/*` staged/committed. Main code untouched.
+1. **Path-scoped push** — only `.wyren/*` staged/committed. Main code untouched.
 2. **Retry-on-conflict** — fetch + rebase FETCH_HEAD; on conflict abort + reset --mixed.
 3. **Advisory lock** — `openSync('wx')` atomic; 60s stale-steal. Cross-machine via git.
 
-For 2-10 person teams: sufficient. Beyond that → `CloudSync extends RelaySync`.
+For 2-10 person teams: sufficient. Beyond that → `CloudSync extends WyrenSync`.
 
 ## CLI additions
 
 ```bash
-relay status          # memory size, last distill time, watermark age, git sync state
-relay distill --force # manual distill trigger for debugging
+wyren status          # memory size, last distill time, watermark age, git sync state
+wyren distill --force # manual distill trigger for debugging
 ```
 
 ## Verification
@@ -129,6 +129,6 @@ relay distill --force # manual distill trigger for debugging
 ## Exit criteria
 
 - Two-machine warm-start demo works reliably over **5 consecutive trials**.
-- Git log of `.relay/memory.md` is clean-linear in default workflow.
+- Git log of `.wyren/memory.md` is clean-linear in default workflow.
 - Memory doesn't grow unbounded under multi-machine merges (hygiene survives).
-- `relay status` command provides clear debug info.
+- `wyren status` command provides clear debug info.

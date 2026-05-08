@@ -7,16 +7,16 @@ import os from 'node:os';
 import { updateWatermark, shouldDistill } from '../hooks/stop.mjs';
 
 function makeTmpDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'relay-test-'));
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'wyren-test-'));
 }
 
 test('updateWatermark creates state dir and watermark.json on first call', () => {
   const dir = makeTmpDir();
-  const relayDir = path.join(dir, '.relay');
-  fs.mkdirSync(relayDir);
+  const wyrenDir = path.join(dir, '.wyren');
+  fs.mkdirSync(wyrenDir);
   try {
-    updateWatermark(relayDir);
-    const watermarkPath = path.join(relayDir, 'state', 'watermark.json');
+    updateWatermark(wyrenDir);
+    const watermarkPath = path.join(wyrenDir, 'state', 'watermark.json');
     assert.ok(fs.existsSync(watermarkPath), 'watermark.json should exist');
     const state = JSON.parse(fs.readFileSync(watermarkPath, 'utf8'));
     assert.equal(state.turns_since_distill, 1, 'First call should set turns=1');
@@ -28,12 +28,12 @@ test('updateWatermark creates state dir and watermark.json on first call', () =>
 
 test('updateWatermark increments turns_since_distill on each call', () => {
   const dir = makeTmpDir();
-  const relayDir = path.join(dir, '.relay');
-  fs.mkdirSync(relayDir);
+  const wyrenDir = path.join(dir, '.wyren');
+  fs.mkdirSync(wyrenDir);
   try {
-    updateWatermark(relayDir);
-    updateWatermark(relayDir);
-    const state = updateWatermark(relayDir);
+    updateWatermark(wyrenDir);
+    updateWatermark(wyrenDir);
+    const state = updateWatermark(wyrenDir);
     assert.equal(state.turns_since_distill, 3, 'After 3 calls turns should be 3');
   } finally {
     fs.rmSync(dir, { recursive: true });
@@ -42,10 +42,10 @@ test('updateWatermark increments turns_since_distill on each call', () => {
 
 test('updateWatermark returns the updated state object', () => {
   const dir = makeTmpDir();
-  const relayDir = path.join(dir, '.relay');
-  fs.mkdirSync(relayDir);
+  const wyrenDir = path.join(dir, '.wyren');
+  fs.mkdirSync(wyrenDir);
   try {
-    const state = updateWatermark(relayDir);
+    const state = updateWatermark(wyrenDir);
     assert.ok(state && typeof state === 'object', 'Should return state object');
     assert.equal(state.turns_since_distill, 1);
   } finally {
@@ -55,13 +55,13 @@ test('updateWatermark returns the updated state object', () => {
 
 test('updateWatermark persists last_uuid from previous state', () => {
   const dir = makeTmpDir();
-  const relayDir = path.join(dir, '.relay');
-  const stateDir = path.join(relayDir, 'state');
+  const wyrenDir = path.join(dir, '.wyren');
+  const stateDir = path.join(wyrenDir, 'state');
   fs.mkdirSync(stateDir, { recursive: true });
   const existingState = { turns_since_distill: 2, last_uuid: 'abc-123', last_turn_at: 1000 };
   fs.writeFileSync(path.join(stateDir, 'watermark.json'), JSON.stringify(existingState), 'utf8');
   try {
-    const state = updateWatermark(relayDir);
+    const state = updateWatermark(wyrenDir);
     assert.equal(state.last_uuid, 'abc-123', 'Should preserve existing last_uuid');
     assert.equal(state.turns_since_distill, 3, 'Should increment from 2 to 3');
   } finally {
@@ -117,11 +117,11 @@ test('updateWatermark writes atomically (no partial read during write)', () => {
   // Verifies tmp+rename pattern: watermark.json is never in a partial-write state.
   // We can't simulate a mid-write crash, but we can verify no .tmp file lingers.
   const dir = makeTmpDir();
-  const relayDir = path.join(dir, '.relay');
-  fs.mkdirSync(relayDir);
+  const wyrenDir = path.join(dir, '.wyren');
+  fs.mkdirSync(wyrenDir);
   try {
-    updateWatermark(relayDir);
-    const stateDir = path.join(relayDir, 'state');
+    updateWatermark(wyrenDir);
+    const stateDir = path.join(wyrenDir, 'state');
     const files = fs.readdirSync(stateDir);
     const tmpFiles = files.filter((f) => f.includes('.tmp'));
     assert.equal(tmpFiles.length, 0, 'No .tmp files should linger after atomic write');
@@ -162,9 +162,9 @@ test('trigger lock prevents double-spawn: second openSync(wx) throws EEXIST', ()
   // Simulates C2 fix: two concurrent Stop hooks race on distill-trigger.lock.
   // First wins; second sees EEXIST and skips spawn.
   const dir = makeTmpDir();
-  const relayDir = path.join(dir, '.relay');
-  fs.mkdirSync(path.join(relayDir, 'state'), { recursive: true });
-  const triggerLock = path.join(relayDir, 'state', 'distill-trigger.lock');
+  const wyrenDir = path.join(dir, '.wyren');
+  fs.mkdirSync(path.join(wyrenDir, 'state'), { recursive: true });
+  const triggerLock = path.join(wyrenDir, 'state', 'distill-trigger.lock');
   try {
     // First hook claims the lock
     fs.closeSync(fs.openSync(triggerLock, 'wx'));

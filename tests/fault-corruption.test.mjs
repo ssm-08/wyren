@@ -14,24 +14,24 @@ import { buildInjection } from '../hooks/user-prompt-submit.mjs';
 import { hashMemory } from '../lib/diff-memory.mjs';
 
 function makeTmpDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'relay-fault-'));
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'wyren-fault-'));
 }
 
 /**
- * Sets up .relay dir. upsState → ups-state.json (UPS-owned, NOT watermark.json).
+ * Sets up .wyren dir. upsState → ups-state.json (UPS-owned, NOT watermark.json).
  */
-function makeRelayDir(base, { memory = null, snapshot = null, upsState = null } = {}) {
-  const relayDir = path.join(base, '.relay');
-  const stateDir = path.join(relayDir, 'state');
+function makeWyrenDir(base, { memory = null, snapshot = null, upsState = null } = {}) {
+  const wyrenDir = path.join(base, '.wyren');
+  const stateDir = path.join(wyrenDir, 'state');
   fs.mkdirSync(stateDir, { recursive: true });
-  if (memory !== null) fs.writeFileSync(path.join(relayDir, 'memory.md'), memory, 'utf8');
+  if (memory !== null) fs.writeFileSync(path.join(wyrenDir, 'memory.md'), memory, 'utf8');
   if (snapshot !== null) fs.writeFileSync(path.join(stateDir, 'last-injected-memory.md'), snapshot, 'utf8');
   if (upsState !== null) fs.writeFileSync(path.join(stateDir, 'ups-state.json'), JSON.stringify(upsState), 'utf8');
   return {
-    relayDir,
+    wyrenDir,
     upsStatePath: path.join(stateDir, 'ups-state.json'),
     snapshotPath: path.join(stateDir, 'last-injected-memory.md'),
-    memoryPath: path.join(relayDir, 'memory.md'),
+    memoryPath: path.join(wyrenDir, 'memory.md'),
   };
 }
 
@@ -42,13 +42,13 @@ test('corrupt ups-state.json (invalid JSON) → treated as empty {}, seeds on fi
   const dir = makeTmpDir();
   try {
     const memory = '## Decisions\n- Use SQLite [session a, turn 1]\n';
-    const { relayDir, upsStatePath, snapshotPath, memoryPath } = makeRelayDir(dir, { memory });
+    const { wyrenDir, upsStatePath, snapshotPath, memoryPath } = makeWyrenDir(dir, { memory });
     // Write invalid JSON to ups-state.json
     fs.writeFileSync(upsStatePath, '{not valid json!!!', 'utf8');
 
     let result;
     assert.doesNotThrow(() => {
-      result = buildInjection({ cwd: dir, relayDir, upsStatePath, snapshotPath, memoryPath });
+      result = buildInjection({ cwd: dir, wyrenDir, upsStatePath, snapshotPath, memoryPath });
     }, 'must not throw on corrupt ups-state.json');
 
     assert.ok(result !== null, 'result should not be null');
@@ -67,7 +67,7 @@ test('ups-state.json null last_injected_mtime → no fast-path skip, falls throu
   const dir = makeTmpDir();
   try {
     const memory = '## Decisions\n- Use SQLite [session a, turn 1]\n';
-    const { relayDir, upsStatePath, snapshotPath, memoryPath } = makeRelayDir(dir, { memory });
+    const { wyrenDir, upsStatePath, snapshotPath, memoryPath } = makeWyrenDir(dir, { memory });
     // Write ups-state with null mtime but a hash (simulates partial corruption)
     fs.writeFileSync(
       upsStatePath,
@@ -77,7 +77,7 @@ test('ups-state.json null last_injected_mtime → no fast-path skip, falls throu
 
     let result;
     assert.doesNotThrow(() => {
-      result = buildInjection({ cwd: dir, relayDir, upsStatePath, snapshotPath, memoryPath });
+      result = buildInjection({ cwd: dir, wyrenDir, upsStatePath, snapshotPath, memoryPath });
     }, 'must not throw with null mtime');
 
     // null !== currentMtime (a number), so fast-path is bypassed.
@@ -99,7 +99,7 @@ test('snapshot path is a directory → EISDIR caught, treated as empty snapshot'
   const dir = makeTmpDir();
   try {
     const memory = '## Decisions\n- Use SQLite [session a, turn 1]\n';
-    const { relayDir, upsStatePath, snapshotPath, memoryPath } = makeRelayDir(dir, {
+    const { wyrenDir, upsStatePath, snapshotPath, memoryPath } = makeWyrenDir(dir, {
       memory,
       upsState: { last_injected_mtime: 1, last_injected_hash: 'stale000aaaa' },
     });
@@ -108,7 +108,7 @@ test('snapshot path is a directory → EISDIR caught, treated as empty snapshot'
 
     let result;
     assert.doesNotThrow(() => {
-      result = buildInjection({ cwd: dir, relayDir, upsStatePath, snapshotPath, memoryPath });
+      result = buildInjection({ cwd: dir, wyrenDir, upsStatePath, snapshotPath, memoryPath });
     }, 'must not throw when snapshot is a directory');
 
     assert.ok(result !== null, 'should proceed, not crash');
@@ -125,13 +125,13 @@ test('snapshot path is a directory → EISDIR caught, treated as empty snapshot'
 test('memory.md is a directory → hook returns null without crashing', () => {
   const dir = makeTmpDir();
   try {
-    const { relayDir, upsStatePath, snapshotPath, memoryPath } = makeRelayDir(dir);
+    const { wyrenDir, upsStatePath, snapshotPath, memoryPath } = makeWyrenDir(dir);
     // Create memory.md as a directory
     fs.mkdirSync(memoryPath, { recursive: true });
 
     let result;
     assert.doesNotThrow(() => {
-      result = buildInjection({ cwd: dir, relayDir, upsStatePath, snapshotPath, memoryPath });
+      result = buildInjection({ cwd: dir, wyrenDir, upsStatePath, snapshotPath, memoryPath });
     }, 'must not throw when memory.md is a directory');
 
     // isFile() check in buildInjection returns null for directories
@@ -147,7 +147,7 @@ test('memory.md is a directory → hook returns null without crashing', () => {
 test('empty memory.md → no delta (empty vs empty snapshot), ups-state seeded', () => {
   const dir = makeTmpDir();
   try {
-    const { relayDir, upsStatePath, snapshotPath, memoryPath } = makeRelayDir(dir, {
+    const { wyrenDir, upsStatePath, snapshotPath, memoryPath } = makeWyrenDir(dir, {
       memory: '',       // 0-byte file
       snapshot: '',     // empty snapshot too
     });
@@ -155,7 +155,7 @@ test('empty memory.md → no delta (empty vs empty snapshot), ups-state seeded',
 
     let result;
     assert.doesNotThrow(() => {
-      result = buildInjection({ cwd: dir, relayDir, upsStatePath, snapshotPath, memoryPath });
+      result = buildInjection({ cwd: dir, wyrenDir, upsStatePath, snapshotPath, memoryPath });
     });
 
     // First-run seed: no prior hash
@@ -175,7 +175,7 @@ test('ups-state.json hash matches empty content → no delta returned', () => {
   const dir = makeTmpDir();
   try {
     const emptyHash = hashMemory('');
-    const { relayDir, upsStatePath, snapshotPath, memoryPath } = makeRelayDir(dir, {
+    const { wyrenDir, upsStatePath, snapshotPath, memoryPath } = makeWyrenDir(dir, {
       memory: '',
       snapshot: '',
       upsState: { last_injected_mtime: 1, last_injected_hash: emptyHash },
@@ -183,7 +183,7 @@ test('ups-state.json hash matches empty content → no delta returned', () => {
 
     let result;
     assert.doesNotThrow(() => {
-      result = buildInjection({ cwd: dir, relayDir, upsStatePath, snapshotPath, memoryPath });
+      result = buildInjection({ cwd: dir, wyrenDir, upsStatePath, snapshotPath, memoryPath });
     });
 
     // currentHash === stored hash → "hash unchanged" path → delta: null
@@ -211,7 +211,7 @@ test('100KB snapshot + small memory.md → diff works, delta is additions only',
     const newMemory = '## Decisions\n- Use SQLite [session a, turn 1]\n';
     const oldHash = hashMemory(hugSnapshot);
 
-    const { relayDir, upsStatePath, snapshotPath, memoryPath } = makeRelayDir(dir, {
+    const { wyrenDir, upsStatePath, snapshotPath, memoryPath } = makeWyrenDir(dir, {
       memory: newMemory,
       snapshot: hugSnapshot,
       upsState: { last_injected_mtime: 1, last_injected_hash: oldHash },
@@ -224,7 +224,7 @@ test('100KB snapshot + small memory.md → diff works, delta is additions only',
 
     let result;
     assert.doesNotThrow(() => {
-      result = buildInjection({ cwd: dir, relayDir, upsStatePath, snapshotPath, memoryPath });
+      result = buildInjection({ cwd: dir, wyrenDir, upsStatePath, snapshotPath, memoryPath });
     }, 'must not throw or OOM on 100KB snapshot');
 
     assert.ok(result !== null);
@@ -237,7 +237,7 @@ test('100KB snapshot + small memory.md → diff works, delta is additions only',
 });
 
 // ---------------------------------------------------------------------------
-// 8. All .relay/state/ files read-only (POSIX only)
+// 8. All .wyren/state/ files read-only (POSIX only)
 // ---------------------------------------------------------------------------
 test('read-only ups-state.json → buildInjection fails gracefully on write (POSIX only)', {
   skip: process.platform === 'win32' ? 'Windows permission model differs' : false,
@@ -245,13 +245,13 @@ test('read-only ups-state.json → buildInjection fails gracefully on write (POS
   const dir = makeTmpDir();
   try {
     const memory = '## Decisions\n- Use SQLite [session a, turn 1]\n';
-    const { relayDir, upsStatePath, snapshotPath, memoryPath } = makeRelayDir(dir, {
+    const { wyrenDir, upsStatePath, snapshotPath, memoryPath } = makeWyrenDir(dir, {
       memory,
       upsState: { last_injected_mtime: 1, last_injected_hash: 'stale000aaaa' },
     });
     // Make the state directory and its files read-only
     fs.chmodSync(upsStatePath, 0o444);
-    fs.chmodSync(path.join(relayDir, 'state'), 0o555);
+    fs.chmodSync(path.join(wyrenDir, 'state'), 0o555);
 
     // buildInjection() itself only reads; it's the caller (main()) that writes.
     // So buildInjection should return a valid result (content changed path).
@@ -259,14 +259,14 @@ test('read-only ups-state.json → buildInjection fails gracefully on write (POS
     // This test verifies buildInjection doesn't itself crash on read-only state.
     let result;
     assert.doesNotThrow(() => {
-      result = buildInjection({ cwd: dir, relayDir, upsStatePath, snapshotPath, memoryPath });
+      result = buildInjection({ cwd: dir, wyrenDir, upsStatePath, snapshotPath, memoryPath });
     }, 'buildInjection must not throw even when state dir is read-only');
 
     assert.ok(result !== null, 'should return a result for changed content');
   } finally {
     // Restore permissions before cleanup
-    try { fs.chmodSync(path.join(dir, '.relay', 'state'), 0o755); } catch {}
-    try { fs.chmodSync(path.join(dir, '.relay', 'state', 'ups-state.json'), 0o644); } catch {}
+    try { fs.chmodSync(path.join(dir, '.wyren', 'state'), 0o755); } catch {}
+    try { fs.chmodSync(path.join(dir, '.wyren', 'state', 'ups-state.json'), 0o644); } catch {}
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
@@ -278,14 +278,14 @@ test('TOCTOU: memory.md rewritten after seed → second call detects change, ret
   const dir = makeTmpDir();
   try {
     const v1 = '## Decisions\n- Use SQLite [session a, turn 1]\n';
-    const { relayDir, upsStatePath, snapshotPath, memoryPath } = makeRelayDir(dir, {
+    const { wyrenDir, upsStatePath, snapshotPath, memoryPath } = makeWyrenDir(dir, {
       memory: v1,
     });
 
     // First call → seed (no hash yet)
     let seed;
     assert.doesNotThrow(() => {
-      seed = buildInjection({ cwd: dir, relayDir, upsStatePath, snapshotPath, memoryPath });
+      seed = buildInjection({ cwd: dir, wyrenDir, upsStatePath, snapshotPath, memoryPath });
     });
     assert.ok(seed !== null);
     assert.equal(seed.delta, null, 'first run: seed, no delta');
@@ -304,7 +304,7 @@ test('TOCTOU: memory.md rewritten after seed → second call detects change, ret
     // Second call → should detect the change and return a delta
     let result;
     assert.doesNotThrow(() => {
-      result = buildInjection({ cwd: dir, relayDir, upsStatePath, snapshotPath, memoryPath });
+      result = buildInjection({ cwd: dir, wyrenDir, upsStatePath, snapshotPath, memoryPath });
     });
     assert.ok(result !== null, 'second call must not return null');
     assert.ok(result.delta, 'delta must be non-empty after content change');
@@ -321,7 +321,7 @@ test('1MB garbage ups-state.json → parse fails, falls back to empty {}, seeds 
   const dir = makeTmpDir();
   try {
     const memory = '## Decisions\n- Use SQLite [session a, turn 1]\n';
-    const { relayDir, upsStatePath, snapshotPath, memoryPath } = makeRelayDir(dir, { memory });
+    const { wyrenDir, upsStatePath, snapshotPath, memoryPath } = makeWyrenDir(dir, { memory });
 
     // Write 1MB of garbage that is not valid JSON
     const garbage = 'x'.repeat(1024 * 1024);
@@ -329,7 +329,7 @@ test('1MB garbage ups-state.json → parse fails, falls back to empty {}, seeds 
 
     let result;
     assert.doesNotThrow(() => {
-      result = buildInjection({ cwd: dir, relayDir, upsStatePath, snapshotPath, memoryPath });
+      result = buildInjection({ cwd: dir, wyrenDir, upsStatePath, snapshotPath, memoryPath });
     }, 'must not throw or OOM on 1MB garbage ups-state.json');
 
     assert.ok(result !== null, 'should return seed result');

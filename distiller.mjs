@@ -110,7 +110,7 @@ function runClaude(prompt, model) {
 // Intentionally not imported from stop.mjs — distiller runs detached and must be self-contained.
 function writeWatermark(cwd, uuid, { clearRunning = false, transcript = '' } = {}) {
   if (!cwd) return;
-  const statePath = path.join(cwd, '.relay', 'state', 'watermark.json');
+  const statePath = path.join(cwd, '.wyren', 'state', 'watermark.json');
   fs.mkdirSync(path.dirname(statePath), { recursive: true });
   let state = {};
   try { state = JSON.parse(fs.readFileSync(statePath, 'utf8')); } catch {}

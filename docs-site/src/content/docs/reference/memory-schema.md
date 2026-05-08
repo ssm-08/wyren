@@ -14,7 +14,7 @@ description: Sections, hygiene rules, and a worked example.
 | `## Live workarounds` | Known hacks, stubs, hardcodes — with what "done" looks like. |
 | `## Scope changes` | Added / dropped / deferred items. |
 | `## Open questions` | Unresolved decisions the team is carrying. |
-| `## Handoff notes` | (optional) Human-authored via `/relay-handoff`. Bypasses distiller. |
+| `## Handoff notes` | (optional) Human-authored via `/wyren-handoff`. Bypasses distiller. |
 
 Empty sections are omitted by the distiller.
 
@@ -30,7 +30,7 @@ Empty sections are omitted by the distiller.
 ## Example (live snapshot)
 
 ```markdown
-# Relay Memory
+# Wyren Memory
 _Last distilled: 2026-04-21T14:32Z by session 7a2e-… (Tier 1 Haiku)_
 
 ## Decisions
@@ -68,9 +68,9 @@ JSON would require: (a) a schema, (b) a renderer for humans, (c) a validator for
 
 ## Editing memory.md by hand
 
-Safe. Relay distiller treats existing content as "the trusted starting state" and merges new signal into it — it won't nuke human edits unless they contradict transcript evidence.
+Safe. Wyren distiller treats existing content as "the trusted starting state" and merges new signal into it — it won't nuke human edits unless they contradict transcript evidence.
 
-If you want something preserved permanently (e.g. a hand-crafted team charter), put it in `.relay/broadcast/` instead. Files under `broadcast/` are injected as context at every SessionStart but are never read or rewritten by the distiller — they stay exactly as you wrote them. Skills specifically live in `.relay/broadcast/skills/` and trigger an acknowledgment instruction; regular files anywhere else under `broadcast/` inject without the acknowledgment.
+If you want something preserved permanently (e.g. a hand-crafted team charter), put it in `.wyren/broadcast/` instead. Files under `broadcast/` are injected as context at every SessionStart but are never read or rewritten by the distiller — they stay exactly as you wrote them. Skills specifically live in `.wyren/broadcast/skills/` and trigger an acknowledgment instruction; regular files anywhere else under `broadcast/` inject without the acknowledgment.
 
 ## Size budget
 

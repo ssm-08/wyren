@@ -7,16 +7,16 @@ import { isMain } from '../lib/util.mjs';
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 
-export function relayInit(targetDir) {
-  const relayDir = path.join(targetDir, '.relay');
+export function wyrenInit(targetDir) {
+  const wyrenDir = path.join(targetDir, '.wyren');
 
-  if (fs.existsSync(relayDir)) {
-    console.log('Relay already initialized.');
+  if (fs.existsSync(wyrenDir)) {
+    console.log('Wyren already initialized.');
     return false;
   }
 
-  // Create .relay/memory.md — optionally seeded from existing CLAUDE.md
-  fs.mkdirSync(relayDir, { recursive: true });
+  // Create .wyren/memory.md — optionally seeded from existing CLAUDE.md
+  fs.mkdirSync(wyrenDir, { recursive: true });
 
   let seedSection = '';
   const claudeMdPath = path.join(targetDir, 'CLAUDE.md');
@@ -28,24 +28,24 @@ export function relayInit(targetDir) {
     const body = raw.length > MAX ? raw.slice(0, MAX) + '\n<!-- truncated -->' : raw;
     const trimmed = body.trim();
     if (trimmed) {
-      seedSection = `\n\n## Seeded from CLAUDE.md\n\n<!-- One-time import on relay init. Not kept in sync. -->\n\n${trimmed}`;
+      seedSection = `\n\n## Seeded from CLAUDE.md\n\n<!-- One-time import on wyren init. Not kept in sync. -->\n\n${trimmed}`;
       console.log('  → Seeded memory.md from existing CLAUDE.md');
     }
   }
 
   fs.writeFileSync(
-    path.join(relayDir, 'memory.md'),
-    `# Relay Memory\n<!-- Populated by distiller. Edit manually to seed context. -->${seedSection}\n`,
+    path.join(wyrenDir, 'memory.md'),
+    `# Wyren Memory\n<!-- Populated by distiller. Edit manually to seed context. -->${seedSection}\n`,
     'utf8'
   );
 
-  // Create .relay/broadcast/ with .gitkeep so git tracks the empty dir
-  fs.mkdirSync(path.join(relayDir, 'broadcast'), { recursive: true });
-  fs.writeFileSync(path.join(relayDir, 'broadcast', '.gitkeep'), '', 'utf8');
+  // Create .wyren/broadcast/ with .gitkeep so git tracks the empty dir
+  fs.mkdirSync(path.join(wyrenDir, 'broadcast'), { recursive: true });
+  fs.writeFileSync(path.join(wyrenDir, 'broadcast', '.gitkeep'), '', 'utf8');
 
-  // Create .relay/broadcast/skills/ with .gitkeep so git tracks it before any skill is broadcast
-  fs.mkdirSync(path.join(relayDir, 'broadcast', 'skills'), { recursive: true });
-  fs.writeFileSync(path.join(relayDir, 'broadcast', 'skills', '.gitkeep'), '', 'utf8');
+  // Create .wyren/broadcast/skills/ with .gitkeep so git tracks it before any skill is broadcast
+  fs.mkdirSync(path.join(wyrenDir, 'broadcast', 'skills'), { recursive: true });
+  fs.writeFileSync(path.join(wyrenDir, 'broadcast', 'skills', '.gitkeep'), '', 'utf8');
 
   // Update .gitignore — idempotent
   const gitignorePath = path.join(targetDir, '.gitignore');
@@ -53,28 +53,28 @@ export function relayInit(targetDir) {
   try { existing = fs.readFileSync(gitignorePath, 'utf8'); } catch {}
 
   const toAdd = [];
-  if (!existing.includes('.relay/state/')) toAdd.push('.relay/state/');
-  if (!existing.includes('.relay/log')) toAdd.push('.relay/log');
+  if (!existing.includes('.wyren/state/')) toAdd.push('.wyren/state/');
+  if (!existing.includes('.wyren/log')) toAdd.push('.wyren/log');
 
   if (toAdd.length > 0) {
     const prefix = existing.length > 0 && !existing.endsWith('\n') ? '\n' : '';
     fs.appendFileSync(gitignorePath, prefix + toAdd.join('\n') + '\n', 'utf8');
   }
 
-  console.log('Relay initialized.\n');
-  console.log('  git add .relay/ .gitignore');
-  console.log('  git commit -m "chore: add relay shared memory"');
+  console.log('Wyren initialized.\n');
+  console.log('  git add .wyren/ .gitignore');
+  console.log('  git commit -m "chore: add wyren shared memory"');
   console.log('  git push\n');
   console.log('Teammates install once per machine:');
-  console.log('  npm install -g @ssm-08/relay && relay install');
+  console.log('  npm install -g @ssm-08/wyren && wyren install');
   return true;
 }
 
-export function relayStatus(targetDir) {
-  const relayDir = path.join(targetDir, '.relay');
+export function wyrenStatus(targetDir) {
+  const wyrenDir = path.join(targetDir, '.wyren');
 
-  if (!fs.existsSync(relayDir)) {
-    console.log('Relay not initialized in this repo. Run: relay init');
+  if (!fs.existsSync(wyrenDir)) {
+    console.log('Wyren not initialized in this repo. Run: wyren init');
     return;
   }
 
@@ -82,19 +82,19 @@ export function relayStatus(targetDir) {
   const label = (s) => s.padEnd(11);
 
   // Memory stats
-  const memPath = path.join(relayDir, 'memory.md');
+  const memPath = path.join(wyrenDir, 'memory.md');
   if (fs.existsSync(memPath)) {
     const content = fs.readFileSync(memPath, 'utf8');
     const lines = content.split(/\r?\n/).length;
     const bytes = fs.statSync(memPath).size;
-    console.log(`${label('Memory:')} .relay/memory.md  (${(bytes / 1024).toFixed(1)} KB, ${lines} lines)`);
+    console.log(`${label('Memory:')} .wyren/memory.md  (${(bytes / 1024).toFixed(1)} KB, ${lines} lines)`);
   } else {
-    console.log(`${label('Memory:')} .relay/memory.md  (not found)`);
+    console.log(`${label('Memory:')} .wyren/memory.md  (not found)`);
   }
 
   // Watermark / distiller state
-  const watermarkPath = path.join(relayDir, 'state', 'watermark.json');
-  const logPath = path.join(relayDir, 'log');
+  const watermarkPath = path.join(wyrenDir, 'state', 'watermark.json');
+  const logPath = path.join(wyrenDir, 'log');
   if (fs.existsSync(watermarkPath)) {
     let state = {};
     try { state = JSON.parse(fs.readFileSync(watermarkPath, 'utf8')); } catch {}
@@ -111,7 +111,7 @@ export function relayStatus(targetDir) {
     }
 
     const turns = state.turns_since_distill ?? 0;
-    const threshold = parseInt(process.env.RELAY_TURNS_THRESHOLD ?? '5', 10);
+    const threshold = parseInt(process.env.WYREN_TURNS_THRESHOLD ?? '5', 10);
     const progressLine = state.distiller_running
       ? `${turns} turns (distilling now...)`
       : `${turns} / ${threshold} turns until next distill`;
@@ -149,7 +149,7 @@ export function relayStatus(targetDir) {
   }
 
   // Only show lock when held — not held is the normal state, not worth showing
-  const lockPath = path.join(relayDir, 'state', '.lock');
+  const lockPath = path.join(wyrenDir, 'state', '.lock');
   if (fs.existsSync(lockPath)) {
     try {
       const age = Math.round((Date.now() - fs.statSync(lockPath).mtimeMs) / 1000);
@@ -160,11 +160,11 @@ export function relayStatus(targetDir) {
   }
 }
 
-export async function relayDistill(targetDir, argv) {
-  const relayDir = path.join(targetDir, '.relay');
+export async function wyrenDistill(targetDir, argv) {
+  const wyrenDir = path.join(targetDir, '.wyren');
 
-  if (!fs.existsSync(relayDir)) {
-    console.error('Relay not initialized. Run: relay init');
+  if (!fs.existsSync(wyrenDir)) {
+    console.error('Wyren not initialized. Run: wyren init');
     process.exit(1);
   }
 
@@ -181,7 +181,7 @@ export async function relayDistill(targetDir, argv) {
   // Resolve transcript path
   let transcriptPath = flags.transcript;
   if (!transcriptPath) {
-    const watermarkPath = path.join(relayDir, 'state', 'watermark.json');
+    const watermarkPath = path.join(wyrenDir, 'state', 'watermark.json');
     try {
       const state = JSON.parse(fs.readFileSync(watermarkPath, 'utf8'));
       transcriptPath = state.last_transcript;
@@ -193,7 +193,7 @@ export async function relayDistill(targetDir, argv) {
     process.exit(1);
   }
 
-  const memoryPath = path.join(relayDir, 'memory.md');
+  const memoryPath = path.join(wyrenDir, 'memory.md');
   const distillerPath = path.join(__dirname, '..', 'distiller.mjs');
 
   const args = [
@@ -213,15 +213,15 @@ export async function relayDistill(targetDir, argv) {
     const sync = new GitSync();
     let release = () => {};
     try { release = sync.lock(targetDir); } catch (e) {
-      if (e.message !== 'LOCKED') console.error(`relay distill: lock error: ${e.message}`);
-      else console.error('relay distill: sync locked by another process — retry in a moment');
+      if (e.message !== 'LOCKED') console.error(`wyren distill: lock error: ${e.message}`);
+      else console.error('wyren distill: sync locked by another process — retry in a moment');
       // M1: exit 2 so callers can detect that push was skipped (not conflated with success)
       process.exit(2);
     }
     try {
       sync.push(targetDir, 'manual');
     } catch (e) {
-      console.error(`relay distill: push failed: ${e.message}`);
+      console.error(`wyren distill: push failed: ${e.message}`);
     } finally {
       release();
     }
@@ -230,16 +230,16 @@ export async function relayDistill(targetDir, argv) {
   process.exit(result.status ?? 0);
 }
 
-export function relayBroadcastSkill(targetDir, filePath) {
-  const relayDir = path.join(targetDir, '.relay');
+export function wyrenBroadcastSkill(targetDir, filePath) {
+  const wyrenDir = path.join(targetDir, '.wyren');
 
-  if (!fs.existsSync(relayDir)) {
-    console.error('Relay not initialized. Run: relay init');
+  if (!fs.existsSync(wyrenDir)) {
+    console.error('Wyren not initialized. Run: wyren init');
     return null;
   }
 
   if (!filePath) {
-    console.error('Usage: relay broadcast-skill <file>');
+    console.error('Usage: wyren broadcast-skill <file>');
     return null;
   }
 
@@ -255,49 +255,49 @@ export function relayBroadcastSkill(targetDir, filePath) {
     console.warn(`Warning: "${skillName}" has extension "${ext}" — expected a text skill file (.md, .toml). Proceeding anyway.`);
   }
 
-  const destDir = path.join(relayDir, 'broadcast', 'skills');
+  const destDir = path.join(wyrenDir, 'broadcast', 'skills');
   fs.mkdirSync(destDir, { recursive: true });
 
   const destPath = path.join(destDir, skillName);
   fs.copyFileSync(filePath, destPath);
-  console.log(`Broadcast: .relay/broadcast/skills/${skillName}`);
+  console.log(`Broadcast: .wyren/broadcast/skills/${skillName}`);
   return destPath;
 }
 
 const HELP_TEXT =
-  `Usage: relay <command>\n\nCommands:\n` +
-  `  init              Initialize relay in current repository\n` +
+  `Usage: wyren <command>\n\nCommands:\n` +
+  `  init              Initialize wyren in current repository\n` +
   `  status            Show memory, watermark, and sync state\n` +
   `  log               Show distiller log [--lines <n>] (default 50)\n` +
   `  distill           Run distiller manually [--transcript <path>] [--force] [--dry-run] [--push]\n` +
   `  broadcast-skill   Broadcast a skill file to all teammates [<file>]\n` +
-  `  install           Install relay hooks on this machine [--from-local <path>] [--home <path>]\n` +
-  `  update            Update relay to latest version\n` +
-  `  uninstall         Remove relay hooks from this machine [--yes]\n` +
-  `  doctor            Verify relay install is working correctly\n\n` +
+  `  install           Install wyren hooks on this machine [--from-local <path>] [--home <path>]\n` +
+  `  update            Update wyren to latest version\n` +
+  `  uninstall         Remove wyren hooks from this machine [--yes]\n` +
+  `  doctor            Verify wyren install is working correctly\n\n` +
   `Options:\n` +
-  `  --version         Print relay version\n` +
+  `  --version         Print wyren version\n` +
   `  --help            Show this help`;
 
-export function relayVersion() {
+export function wyrenVersion() {
   const pkgPath = path.join(__dirname, '..', 'package.json');
   try {
     const { version } = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-    console.log(`relay ${version}`);
+    console.log(`wyren ${version}`);
   } catch {
-    console.log('relay (unknown version)');
+    console.log('wyren (unknown version)');
   }
 }
 
-export function relayLog(targetDir, argv) {
-  const logPath = path.join(targetDir, '.relay', 'log');
+export function wyrenLog(targetDir, argv) {
+  const logPath = path.join(targetDir, '.wyren', 'log');
 
   let lines = 50;
   for (let i = 0; i < argv.length; i++) {
     if ((argv[i] === '--lines' || argv[i] === '-n') && argv[i + 1]) {
       const n = parseInt(argv[++i], 10);
       if (!isNaN(n) && n > 0) lines = n;
-      else if (!isNaN(n)) console.error(`relay log: --lines must be a positive integer (got ${n}), using default ${lines}`);
+      else if (!isNaN(n)) console.error(`wyren log: --lines must be a positive integer (got ${n}), using default ${lines}`);
     }
   }
 
@@ -346,20 +346,20 @@ if (isMain(import.meta.url)) {
   const [, , command, ...rest] = process.argv;
 
   if (command === '--version' || command === '-v') {
-    relayVersion();
+    wyrenVersion();
   } else if (command === '--help' || command === '-h') {
     console.log(HELP_TEXT);
   } else if (command === 'init') {
-    relayInit(process.cwd());
+    wyrenInit(process.cwd());
   } else if (command === 'status') {
-    relayStatus(process.cwd());
+    wyrenStatus(process.cwd());
   } else if (command === 'log') {
-    relayLog(process.cwd(), rest);
+    wyrenLog(process.cwd(), rest);
   } else if (command === 'distill') {
-    await relayDistill(process.cwd(), rest);
+    await wyrenDistill(process.cwd(), rest);
   } else if (command === 'broadcast-skill') {
     const filePath = rest[0];
-    const dest = relayBroadcastSkill(process.cwd(), filePath);
+    const dest = wyrenBroadcastSkill(process.cwd(), filePath);
     if (!dest) process.exit(1);
     const { GitSync } = await import('../lib/sync.mjs');
     const sync = new GitSync();
@@ -368,7 +368,7 @@ if (isMain(import.meta.url)) {
       release = sync.lock(process.cwd());
     } catch (e) {
       if (e.message === 'LOCKED') {
-        console.error('relay: sync locked by another process');
+        console.error('wyren: sync locked by another process');
         process.exit(2);
       }
       throw e;
@@ -377,7 +377,7 @@ if (isMain(import.meta.url)) {
       sync.push(process.cwd(), 'broadcast');
       console.log('Pushed to remote.');
     } catch (e) {
-      console.error(`relay: push failed: ${e.message}`);
+      console.error(`wyren: push failed: ${e.message}`);
       process.exit(1);
     } finally {
       release();
@@ -388,7 +388,7 @@ if (isMain(import.meta.url)) {
   } else if (command === undefined) {
     console.log(HELP_TEXT);
   } else {
-    console.error(`relay: unknown command '${command}'\n\n${HELP_TEXT}`);
+    console.error(`wyren: unknown command '${command}'\n\n${HELP_TEXT}`);
     process.exit(1);
   }
 }

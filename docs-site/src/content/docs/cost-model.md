@@ -3,7 +3,7 @@ title: Cost model
 description: Tiered extraction keeps background distillation cheap — or free.
 ---
 
-Relay's distiller runs continuously in the background. Naively, that's wasteful. Relay uses a **three-tier pipeline** to keep cost minimal — or zero under the preferred execution path.
+Wyren's distiller runs continuously in the background. Naively, that's wasteful. Wyren uses a **three-tier pipeline** to keep cost minimal — or zero under the preferred execution path.
 
 ## Naive baseline (what we DON'T do)
 
@@ -38,7 +38,7 @@ Edit tool calls (`Edit` / `Write` / `MultiEdit`) are scored separately at weight
 - Average user message length > 200 chars: +2 (explains context or decisions)
 - File edits ≥ 3: +2; ≥ 8: +4 total
 
-**Rule:** total score must reach the threshold (default **3**, overridable via `RELAY_TIER0_THRESHOLD`) to proceed. A single high-value signal word is enough; weak words alone need reinforcement. **~60–70% of triggers die here for free.**
+**Rule:** total score must reach the threshold (default **3**, overridable via `WYREN_TIER0_THRESHOLD`) to proceed. A single high-value signal word is enough; weak words alone need reinforcement. **~60–70% of triggers die here for free.**
 
 ## Tier 1 — Claude Haiku 4.5 (routine distillation)
 
@@ -56,9 +56,9 @@ Sonnet is designed for a slower cadence to correct Haiku drift over long session
 
 - Once per hour after any Tier 1 runs
 - When `memory.md` exceeds 60 lines → forced re-compression
-- On explicit `/relay-handoff`
+- On explicit `/wyren-handoff`
 
-**Not yet automated.** The standalone `distiller.mjs` accepts `--model <id>`, so you can invoke Sonnet manually with `relay distill --model claude-sonnet-4-6 --push` — but the Stop hook always uses Haiku. No timer or line-count trigger exists yet. `/relay-handoff` runs the normal distiller (Haiku) with `--push`.
+**Not yet automated.** The standalone `distiller.mjs` accepts `--model <id>`, so you can invoke Sonnet manually with `wyren distill --model claude-sonnet-4-6 --push` — but the Stop hook always uses Haiku. No timer or line-count trigger exists yet. `/wyren-handoff` runs the normal distiller (Haiku) with `--push`.
 
 Haiku drift on long sessions is a real concern — Tier 2 automation is planned follow-up work, not a current capability. See [Future](/future/).
 

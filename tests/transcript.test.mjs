@@ -12,7 +12,7 @@ import {
 } from '../lib/transcript.mjs';
 
 function makeTmp() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'relay-transcript-'));
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'wyren-transcript-'));
 }
 
 function writeJSONL(dir, lines) {

@@ -7,7 +7,7 @@ Everything below is designed for but not yet built. The architecture is already 
 
 ## Cloud sync backend
 
-The `RelaySync` interface has two methods: `pull()` and `push()`. `GitSync` is the default. A `CloudSync` implementation would slot in with zero changes to hooks.
+The `WyrenSync` interface has two methods: `pull()` and `push()`. `GitSync` is the default. A `CloudSync` implementation would slot in with zero changes to hooks.
 
 **Candidate backends:**
 
@@ -23,7 +23,7 @@ The `RelaySync` interface has two methods: `pull()` and `push()`. `GitSync` is t
 **Interface:**
 
 ```js
-class CloudSync extends RelaySync {
+class CloudSync extends WyrenSync {
   constructor({ endpoint, teamId, secret }) { super(); /* ... */ }
   async pull() { /* GET /memory/<teamId> */ }
   async push(memory) { /* PUT /memory/<teamId> with If-Match ETag */ }
@@ -34,12 +34,12 @@ ETag conditional writes give optimistic concurrency control without app-level lo
 
 ## MCP server for on-demand transcript RAG
 
-Current Relay injects distilled memory. A separate MCP server could expose tools for *on-demand* retrieval:
+Current Wyren injects distilled memory. A separate MCP server could expose tools for *on-demand* retrieval:
 
 ```
-relay_search(query: string) -> top-K transcript chunks from teammates
-relay_history(topic: string) -> timeline of decisions on a topic
-relay_who_decided(question: string) -> session/turn citation
+wyren_search(query: string) -> top-K transcript chunks from teammates
+wyren_history(topic: string) -> timeline of decisions on a topic
+wyren_who_decided(question: string) -> session/turn citation
 ```
 
 Implementation: index teammate transcripts into a local embedding store (SQLite + sqlite-vec), expose via MCP. Claude calls the tool when it needs deep context — on-demand, not always-on.
@@ -48,7 +48,7 @@ Complements (doesn't replace) the SessionStart injection path.
 
 ## Permissions & multi-team
 
-Current Relay assumes trust model = same team. A real product needs:
+Current Wyren assumes trust model = same team. A real product needs:
 
 - **Per-user memory visibility.** "Alice can see what Bob decided on `/auth/*` but not on private sessions."
 - **Team boundaries.** Memory is scoped to a team, not a repo.
@@ -68,11 +68,11 @@ A browser view of:
 
 Not a core value driver — memory.md in a text editor is already fine — but great for stakeholder pitches and async teams.
 
-Most hackable version: a tiny Astro site that reads `.relay/*` and renders. GitHub Pages is enough.
+Most hackable version: a tiny Astro site that reads `.wyren/*` and renders. GitHub Pages is enough.
 
 ## Cursor / Windsurf / other editors
 
-Relay is Claude Code-specific today (uses Claude Code hooks). Generalizing requires:
+Wyren is Claude Code-specific today (uses Claude Code hooks). Generalizing requires:
 
 1. A "transcript watcher" daemon that understands each editor's log format.
 2. A unified memory format (already markdown — done).
@@ -111,7 +111,7 @@ Useful for retrospectives, post-mortems, demo narratives. Implementation: append
 For larger codebases, split memory by directory:
 
 ```
-.relay/
+.wyren/
 ├── memory.md                    # cross-cutting
 ├── memory/
 │   ├── auth.md                  # scoped to /src/auth
@@ -135,8 +135,8 @@ Prevents prompt regressions when iterating.
 
 ## Integration with existing tools
 
-- **Linear / Jira:** `relay_sync_to_linear` tool — push open questions into tickets.
+- **Linear / Jira:** `wyren_sync_to_linear` tool — push open questions into tickets.
 - **Slack:** bot posts memory diffs to a team channel.
-- **GitHub Actions:** `.relay/memory.md` gets rendered into PR descriptions automatically.
+- **GitHub Actions:** `.wyren/memory.md` gets rendered into PR descriptions automatically.
 
 All low-hanging once the core memory loop works.

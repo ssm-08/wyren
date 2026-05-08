@@ -6,28 +6,28 @@ import os from 'node:os';
 
 import {
   resolveHome,
-  relayPaths,
+  wyrenPaths,
   patchSettingsInMemory,
   readSettings,
   createLink,
   inspectLink,
   removeLink,
-  validateRelayCheckout,
+  validateWyrenCheckout,
 } from '../scripts/installer.mjs';
 
 function makeTmpDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'relay-installer-test-'));
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'wyren-installer-test-'));
 }
 
 // ---------------------------------------------------------------------------
 // resolveHome
 // ---------------------------------------------------------------------------
 
-test('resolveHome uses RELAY_HOME when set', () => {
-  assert.equal(resolveHome({ RELAY_HOME: '/test/relay' }), '/test/relay');
+test('resolveHome uses WYREN_HOME when set', () => {
+  assert.equal(resolveHome({ WYREN_HOME: '/test/wyren' }), '/test/wyren');
 });
 
-test('resolveHome uses CLAUDE_HOME when RELAY_HOME absent', () => {
+test('resolveHome uses CLAUDE_HOME when WYREN_HOME absent', () => {
   assert.equal(resolveHome({ CLAUDE_HOME: '/test/claude' }), '/test/claude');
 });
 
@@ -38,12 +38,12 @@ test('resolveHome falls back to os.homedir()/.claude', () => {
 });
 
 // ---------------------------------------------------------------------------
-// relayPaths
+// wyrenPaths
 // ---------------------------------------------------------------------------
 
-test('relayPaths returns expected sub-paths', () => {
-  const p = relayPaths('/home/test/.claude');
-  assert.equal(p.plugin, path.join('/home/test/.claude', 'plugins', 'relay'));
+test('wyrenPaths returns expected sub-paths', () => {
+  const p = wyrenPaths('/home/test/.claude');
+  assert.equal(p.plugin, path.join('/home/test/.claude', 'plugins', 'wyren'));
   assert.equal(p.settings, path.join('/home/test/.claude', 'settings.json'));
 });
 
@@ -131,7 +131,7 @@ test('readSettings throws on unparseable content', () => {
 // patchSettingsInMemory — install mode
 // ---------------------------------------------------------------------------
 
-const FAKE_REPO = path.join('/fake', 'relay');
+const FAKE_REPO = path.join('/fake', 'wyren');
 
 test('patchSettingsInMemory install: creates hooks when absent', () => {
   const result = patchSettingsInMemory({}, { mode: 'install', repoDir: FAKE_REPO });
@@ -158,15 +158,15 @@ test('patchSettingsInMemory install: preserves foreign SessionStart entries', ()
   assert.equal(entries[0].hooks[0].command, 'echo hi');
 });
 
-test('patchSettingsInMemory install: replaces stale relay entry, no duplicate', () => {
+test('patchSettingsInMemory install: replaces stale wyren entry, no duplicate', () => {
   const stale = { matcher: '', hooks: [{ type: 'command', command: '"C:\\old\\path\\run-hook.cmd" session-start' }] };
   const settings = { hooks: { SessionStart: [stale] } };
   const result = patchSettingsInMemory(settings, { mode: 'install', repoDir: FAKE_REPO });
-  const relayEntries = result.hooks.SessionStart.filter((e) =>
+  const wyrenEntries = result.hooks.SessionStart.filter((e) =>
     e.hooks && e.hooks[0] && e.hooks[0].command.includes('run-hook.cmd')
   );
-  assert.equal(relayEntries.length, 1, 'Exactly one relay entry after replace');
-  assert.ok(relayEntries[0].hooks[0].command.includes(FAKE_REPO), 'Uses new repoDir path');
+  assert.equal(wyrenEntries.length, 1, 'Exactly one wyren entry after replace');
+  assert.ok(wyrenEntries[0].hooks[0].command.includes(FAKE_REPO), 'Uses new repoDir path');
 });
 
 test('patchSettingsInMemory install: handles Stop as single object (not array)', () => {
@@ -174,7 +174,7 @@ test('patchSettingsInMemory install: handles Stop as single object (not array)',
   const settings = { hooks: { Stop: stopEntry } };
   const result = patchSettingsInMemory(settings, { mode: 'install', repoDir: FAKE_REPO });
   assert.ok(Array.isArray(result.hooks.Stop));
-  // should have the foreign entry + new relay entry
+  // should have the foreign entry + new wyren entry
   assert.equal(result.hooks.Stop.length, 2);
 });
 
@@ -188,17 +188,17 @@ test('patchSettingsInMemory install: preserves _comment key', () => {
 // patchSettingsInMemory — uninstall mode
 // ---------------------------------------------------------------------------
 
-test('patchSettingsInMemory uninstall: removes relay entries', () => {
-  const relayEntry = { matcher: '', hooks: [{ type: 'command', command: '"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd" session-start' }] };
-  const settings = { hooks: { SessionStart: [relayEntry] } };
+test('patchSettingsInMemory uninstall: removes wyren entries', () => {
+  const wyrenEntry = { matcher: '', hooks: [{ type: 'command', command: '"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd" session-start' }] };
+  const settings = { hooks: { SessionStart: [wyrenEntry] } };
   const result = patchSettingsInMemory(settings, { mode: 'uninstall' });
   assert.equal(result.hooks, undefined, 'hooks should be removed when empty');
 });
 
 test('patchSettingsInMemory uninstall: preserves foreign entries', () => {
   const foreign = { matcher: 'src/**', hooks: [{ type: 'command', command: 'echo hi' }] };
-  const relayEntry = { matcher: '', hooks: [{ type: 'command', command: '"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd" session-start' }] };
-  const settings = { hooks: { SessionStart: [foreign, relayEntry] } };
+  const wyrenEntry = { matcher: '', hooks: [{ type: 'command', command: '"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd" session-start' }] };
+  const settings = { hooks: { SessionStart: [foreign, wyrenEntry] } };
   const result = patchSettingsInMemory(settings, { mode: 'uninstall' });
   assert.ok(Array.isArray(result.hooks.SessionStart));
   assert.equal(result.hooks.SessionStart.length, 1);
@@ -206,9 +206,9 @@ test('patchSettingsInMemory uninstall: preserves foreign entries', () => {
 });
 
 test('patchSettingsInMemory uninstall: removes hooks key when fully empty', () => {
-  const relaySession = { matcher: '', hooks: [{ type: 'command', command: 'plugins/relay/hooks/run-hook.cmd session-start' }] };
-  const relayStop = { matcher: '', hooks: [{ type: 'command', command: 'plugins/relay/hooks/run-hook.cmd stop' }] };
-  const settings = { hooks: { SessionStart: [relaySession], Stop: [relayStop] } };
+  const wyrenSession = { matcher: '', hooks: [{ type: 'command', command: 'plugins/wyren/hooks/run-hook.cmd session-start' }] };
+  const wyrenStop = { matcher: '', hooks: [{ type: 'command', command: 'plugins/wyren/hooks/run-hook.cmd stop' }] };
+  const settings = { hooks: { SessionStart: [wyrenSession], Stop: [wyrenStop] } };
   const result = patchSettingsInMemory(settings, { mode: 'uninstall' });
   assert.equal(result.hooks, undefined, 'hooks key should be removed');
 });
@@ -227,7 +227,7 @@ test('createLink creates a symlink on POSIX and inspectLink detects it', () => {
   const dir = makeTmpDir();
   try {
     const src = path.join(dir, 'source');
-    const dst = path.join(dir, 'links', 'relay');
+    const dst = path.join(dir, 'links', 'wyren');
     fs.mkdirSync(src);
 
     createLink(src, dst);
@@ -247,7 +247,7 @@ test('createLink is idempotent — no-op when target matches', () => {
   const dir = makeTmpDir();
   try {
     const src = path.join(dir, 'source');
-    const dst = path.join(dir, 'relay');
+    const dst = path.join(dir, 'wyren');
     fs.mkdirSync(src);
 
     createLink(src, dst);
@@ -263,7 +263,7 @@ test('createLink throws when dst exists and points elsewhere', () => {
   try {
     const src1 = path.join(dir, 'source1');
     const src2 = path.join(dir, 'source2');
-    const dst = path.join(dir, 'relay');
+    const dst = path.join(dir, 'wyren');
     fs.mkdirSync(src1);
     fs.mkdirSync(src2);
 
@@ -279,7 +279,7 @@ test('removeLink removes an existing symlink', () => {
   const dir = makeTmpDir();
   try {
     const src = path.join(dir, 'source');
-    const dst = path.join(dir, 'relay');
+    const dst = path.join(dir, 'wyren');
     fs.mkdirSync(src);
 
     createLink(src, dst);
@@ -305,7 +305,7 @@ test('createLink creates a junction on Windows and inspectLink detects it', () =
   const dir = makeTmpDir();
   try {
     const src = path.join(dir, 'source');
-    const dst = path.join(dir, 'links', 'relay');
+    const dst = path.join(dir, 'links', 'wyren');
     fs.mkdirSync(src);
 
     createLink(src, dst);
@@ -316,7 +316,7 @@ test('createLink creates a junction on Windows and inspectLink detects it', () =
     const normalTarget = (info.target || '').replace(/\\/g, '/').replace(/^\\\\\?\\/, '').toLowerCase();
     assert.ok(normalTarget.includes(normalSrc.split('/').pop()), `Target ${normalTarget} should include ${normalSrc}`);
   } finally {
-    try { fs.rmdirSync(path.join(dir, 'links', 'relay')); } catch {}
+    try { fs.rmdirSync(path.join(dir, 'links', 'wyren')); } catch {}
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
@@ -326,13 +326,13 @@ test('createLink is idempotent on Windows (junction)', () => {
   const dir = makeTmpDir();
   try {
     const src = path.join(dir, 'source');
-    const dst = path.join(dir, 'relay');
+    const dst = path.join(dir, 'wyren');
     fs.mkdirSync(src);
 
     createLink(src, dst);
     assert.doesNotThrow(() => createLink(src, dst), 'Second createLink should not throw');
   } finally {
-    try { fs.rmdirSync(path.join(dir, 'relay')); } catch {}
+    try { fs.rmdirSync(path.join(dir, 'wyren')); } catch {}
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
@@ -342,7 +342,7 @@ test('removeLink removes a Windows junction', () => {
   const dir = makeTmpDir();
   try {
     const src = path.join(dir, 'source');
-    const dst = path.join(dir, 'relay');
+    const dst = path.join(dir, 'wyren');
     fs.mkdirSync(src);
 
     createLink(src, dst);
@@ -351,34 +351,34 @@ test('removeLink removes a Windows junction', () => {
     removeLink(dst);
     assert.equal(inspectLink(dst).kind, 'missing');
   } finally {
-    try { fs.rmdirSync(path.join(dir, 'relay')); } catch {}
+    try { fs.rmdirSync(path.join(dir, 'wyren')); } catch {}
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
 
 // ---------------------------------------------------------------------------
-// validateRelayCheckout
+// validateWyrenCheckout
 // ---------------------------------------------------------------------------
 
-test('validateRelayCheckout throws when markers missing', () => {
+test('validateWyrenCheckout throws when markers missing', () => {
   const dir = makeTmpDir();
   try {
-    assert.throws(() => validateRelayCheckout(dir), /Not a valid Relay checkout/);
+    assert.throws(() => validateWyrenCheckout(dir), /Not a valid Wyren checkout/);
   } finally {
     fs.rmSync(dir, { recursive: true });
   }
 });
 
-test('validateRelayCheckout passes when all markers present', () => {
+test('validateWyrenCheckout passes when all markers present', () => {
   const dir = makeTmpDir();
   try {
     // Create marker files
-    for (const m of ['bin/relay.mjs', 'hooks/run-hook.cmd', '.claude-plugin/plugin.json']) {
+    for (const m of ['bin/wyren.mjs', 'hooks/run-hook.cmd', '.claude-plugin/plugin.json']) {
       const full = path.join(dir, m);
       fs.mkdirSync(path.dirname(full), { recursive: true });
       fs.writeFileSync(full, '', 'utf8');
     }
-    assert.doesNotThrow(() => validateRelayCheckout(dir));
+    assert.doesNotThrow(() => validateWyrenCheckout(dir));
   } finally {
     fs.rmSync(dir, { recursive: true });
   }

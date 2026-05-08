@@ -1,9 +1,9 @@
 ---
 title: Two-system test walkthrough
-description: End-to-end guide for verifying Relay works across two machines — System A distills and pushes, System B receives memory at SessionStart.
+description: End-to-end guide for verifying Wyren works across two machines — System A distills and pushes, System B receives memory at SessionStart.
 ---
 
-This guide walks through a full end-to-end test of Relay across two machines. By the end, a session on **System A** will have its decisions distilled into `.relay/memory.md`, pushed to a shared git remote, and automatically injected into **System B**'s next session.
+This guide walks through a full end-to-end test of Wyren across two machines. By the end, a session on **System A** will have its decisions distilled into `.wyren/memory.md`, pushed to a shared git remote, and automatically injected into **System B**'s next session.
 
 **Prerequisites on both systems:**
 - Node.js 20+
@@ -17,9 +17,9 @@ This guide walks through a full end-to-end test of Relay across two machines. By
 Do this once on either machine.
 
 ```bash
-mkdir relay-test-repo && cd relay-test-repo
+mkdir wyren-test-repo && cd wyren-test-repo
 git init
-git remote add origin git@github.com:YOUR_USERNAME/relay-test-repo.git
+git remote add origin git@github.com:YOUR_USERNAME/wyren-test-repo.git
 
 echo "# Test" > README.md
 git add README.md && git commit -m "init"
@@ -33,26 +33,26 @@ git push -u origin master
 **macOS / Linux:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ssm-08/relay/master/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/ssm-08/wyren/master/install.sh | sh
 ```
 
 **Windows (PowerShell):**
 
 ```powershell
-iwr -useb https://raw.githubusercontent.com/ssm-08/relay/master/install.ps1 | iex
+iwr -useb https://raw.githubusercontent.com/ssm-08/wyren/master/install.ps1 | iex
 ```
 
 **Dev / local clone (any OS):**
 
 ```bash
-# From inside your relay checkout
+# From inside your wyren checkout
 node scripts/installer.mjs install --from-local .
 ```
 
 Verify install is healthy:
 ```bash
-relay doctor
-# [relay] doctor: all checks passed
+wyren doctor
+# [wyren] doctor: all checks passed
 
 node scripts/test-e2e.mjs   # 32 tests, ~25s, no Claude session needed
 ```
@@ -66,33 +66,33 @@ Same one-liner as Phase 2 — run it on the second machine:
 **macOS / Linux:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ssm-08/relay/master/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/ssm-08/wyren/master/install.sh | sh
 ```
 
 **Windows:**
 
 ```powershell
-iwr -useb https://raw.githubusercontent.com/ssm-08/relay/master/install.ps1 | iex
+iwr -useb https://raw.githubusercontent.com/ssm-08/wyren/master/install.ps1 | iex
 ```
 
 Verify:
 
 ```bash
-relay doctor
+wyren doctor
 ```
 
 ---
 
-## Phase 4 — Initialize relay in the shared repo (System A)
+## Phase 4 — Initialize wyren in the shared repo (System A)
 
 ```bash
-cd relay-test-repo
+cd wyren-test-repo
 
-relay init
-# Output: "Relay initialized. Run: git add .relay/memory.md && git commit"
+wyren init
+# Output: "Wyren initialized. Run: git add .wyren/memory.md && git commit"
 
-git add .relay/ .gitignore
-git commit -m "chore: init relay"
+git add .wyren/ .gitignore
+git commit -m "chore: init wyren"
 git push
 ```
 
@@ -100,10 +100,10 @@ git push
 
 ## Phase 5 — Generate a session on System A
 
-Open Claude Code in `relay-test-repo`:
+Open Claude Code in `wyren-test-repo`:
 
 ```bash
-cd relay-test-repo
+cd wyren-test-repo
 claude
 ```
 
@@ -119,23 +119,23 @@ After the fifth turn, end the session (`/exit` or Ctrl+C). The Stop hook spawns 
 
 ```bash
 # Wait ~30s, then:
-cat .relay/log               # shows "wrote memory.md (N chars)" on success
-cat .relay/memory.md         # bullet-point memory entries
-relay status
+cat .wyren/log               # shows "wrote memory.md (N chars)" on success
+cat .wyren/memory.md         # bullet-point memory entries
+wyren status
 ```
 
-Expected `relay status` output:
+Expected `wyren status` output:
 
 ```
-Memory:     .relay/memory.md  (1.2 KB, 34 lines)
+Memory:     .wyren/memory.md  (1.2 KB, 34 lines)
 Distilled:  2026-04-22T10:30:00.000Z (2 min ago)
 Last UUID:  abc12345
 Progress:   0 / 5 turns until next distill
 Transcript: /Users/alice/.claude/projects/.../abc12345.jsonl
-Remote:     origin → git@github.com:YOUR_USERNAME/relay-test-repo.git
+Remote:     origin → git@github.com:YOUR_USERNAME/wyren-test-repo.git
 ```
 
-The `Lock:` line only appears when a distiller process is actively running. If distillation appears stuck, run `relay distill --force` to reset — check `.relay/log` for the crash reason.
+The `Lock:` line only appears when a distiller process is actively running. If distillation appears stuck, run `wyren distill --force` to reset — check `.wyren/log` for the crash reason.
 
 ---
 
@@ -145,20 +145,20 @@ The distiller auto-pushes after writing memory. Confirm:
 
 ```bash
 git log --oneline -3
-# Should show a "[relay] distill ..." commit
+# Should show a "[wyren] distill ..." commit
 ```
 
 If the auto-push didn't fire (no remote configured at distill time):
 
 ```bash
-relay distill --push --force
+wyren distill --push --force
 ```
 
 ---
 
 ## Phase 5b — Live sync: A's updates reach B without restart
 
-Once both systems have active Claude Code sessions open in the shared repo, live sync kicks in automatically. After System A finishes a turn and the distiller pushes updated memory to git, System B's **next user prompt** triggers the `UserPromptSubmit` hook: it pulls the latest `.relay/memory.md` (1.5s cap), diffs it against the last-seen snapshot, and injects only the new sections as hidden `additionalContext`. System B should see a `Relay live update` block in its session context containing just the delta — no restart needed. To disable the pull while keeping the diff-based injection, set `RELAY_SKIP_PULL=1` in System B's environment.
+Once both systems have active Claude Code sessions open in the shared repo, live sync kicks in automatically. After System A finishes a turn and the distiller pushes updated memory to git, System B's **next user prompt** triggers the `UserPromptSubmit` hook: it pulls the latest `.wyren/memory.md` (1.5s cap), diffs it against the last-seen snapshot, and injects only the new sections as hidden `additionalContext`. System B should see a `Wyren live update` block in its session context containing just the delta — no restart needed. To disable the pull while keeping the diff-based injection, set `WYREN_SKIP_PULL=1` in System B's environment.
 
 ---
 
@@ -167,9 +167,9 @@ Once both systems have active Claude Code sessions open in the shared repo, live
 Pull the shared repo:
 
 ```bash
-cd relay-test-repo
+cd wyren-test-repo
 git pull
-cat .relay/memory.md   # confirm memory arrived
+cat .wyren/memory.md   # confirm memory arrived
 ```
 
 Open Claude Code in the same repo:
@@ -178,7 +178,7 @@ Open Claude Code in the same repo:
 claude
 ```
 
-The `Loading relay memory…` status message appears at startup — the SessionStart hook injected memory as hidden `additionalContext`. Verify by asking Claude:
+The `Loading wyren memory…` status message appears at startup — the SessionStart hook injected memory as hidden `additionalContext`. Verify by asking Claude:
 
 > "What do you know about this project from previous sessions?"
 
@@ -194,9 +194,9 @@ Pipe a real transcript directly into the Stop hook to trigger distillation immed
 TRANSCRIPT=$(ls ~/.claude/projects/*/transcripts/*.jsonl 2>/dev/null | tail -1)
 
 echo "{\"cwd\": \"$(pwd)\", \"transcript_path\": \"$TRANSCRIPT\"}" \
-  | node ~/.claude/relay/hooks/stop.mjs
+  | node ~/.claude/wyren/hooks/stop.mjs
 
-sleep 30 && cat .relay/memory.md
+sleep 30 && cat .wyren/memory.md
 ```
 
 ---
@@ -205,11 +205,11 @@ sleep 30 && cat .relay/memory.md
 
 | Symptom | What to check |
 |---|---|
-| Memory not injected on System B | `cat .relay/log` for session-start errors |
-| Distiller never ran | `relay status` — `turns_since_distill` stuck at 5+? Stop hook not firing |
-| `distiller_running` stuck | Distiller crashed. Check `.relay/log`, then run `relay distill --force` to reset |
+| Memory not injected on System B | `cat .wyren/log` for session-start errors |
+| Distiller never ran | `wyren status` — `turns_since_distill` stuck at 5+? Stop hook not firing |
+| `distiller_running` stuck | Distiller crashed. Check `.wyren/log`, then run `wyren distill --force` to reset |
 | Push rejected | `git remote -v` — is remote configured? Does auth work? |
-| Plugin hooks not firing | `relay doctor` — check if plugin link exists and settings.json is wired |
+| Plugin hooks not firing | `wyren doctor` — check if plugin link exists and settings.json is wired |
 | `claude -p` fails | Run `claude -p --bare "hello"` manually to check auth |
 | Memory not on System B after distill | Distiller's auto-push may have been interrupted — run `git push` manually on System A, then `git pull` on System B |
-| Random cmd window flashing during distillation | Pull latest relay source — fixed in `distiller.mjs` with `windowsHide: true` |
+| Random cmd window flashing during distillation | Pull latest wyren source — fixed in `distiller.mjs` with `windowsHide: true` |

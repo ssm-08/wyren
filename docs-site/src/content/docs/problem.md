@@ -31,11 +31,11 @@ Teams already use `CLAUDE.md`, `README.md`, architecture docs. Those files captu
 
 That reasoning is what a new Claude needs to be useful from message one. It's also the thing nobody has time to write down at the moment they have least time.
 
-## What Relay does that existing tools don't
+## What Wyren does that existing tools don't
 
 Several tools solve parts of this problem. None address the core gap.
 
-| Capability | Git | `CLAUDE.md` | Claude Projects | Agent Teams | **Relay** |
+| Capability | Git | `CLAUDE.md` | Claude Projects | Agent Teams | **Wyren** |
 |---|---|---|---|---|---|
 | Syncs code | ✅ | — | — | — | — |
 | Persistent shared memory | — | ✅ (static) | ✅ (static) | ❌ | **✅ (live)** |
@@ -54,16 +54,16 @@ Several tools solve parts of this problem. None address the core gap.
 - **Claude Projects** offer shared docs, but context is static and manually uploaded — not continuously distilled from live sessions.
 - **Agent Teams** coordinates AI-to-AI task distribution under one human. It doesn't solve N humans each with their own Claude.
 
-Relay's differentiator is **human-to-human coordination *through* AI** — not one human orchestrating many AIs, but many humans each with their own Claude, sharing one brain.
+Wyren's differentiator is **human-to-human coordination *through* AI** — not one human orchestrating many AIs, but many humans each with their own Claude, sharing one brain.
 
 ## What "useful from message one" means
 
-The success bar for Relay is a blind A/B test:
+The success bar for Wyren is a blind A/B test:
 
 > Open Claude Code on a 4-hour-old project you haven't seen.
 >
-> - **Without Relay:** "What would you like to work on?"
-> - **With Relay:** "I see the team picked SQLite and rejected Postgres. There's a hardcoded `user_id=1` workaround in `/dashboard` that needs removing before demo. Where do you want to start?"
+> - **Without Wyren:** "What would you like to work on?"
+> - **With Wyren:** "I see the team picked SQLite and rejected Postgres. There's a hardcoded `user_id=1` workaround in `/dashboard` that needs removing before demo. Where do you want to start?"
 
 The difference isn't technical — it's conversational warmth. Claude treating you like a teammate who just stepped out, not a stranger.
 

@@ -17,7 +17,7 @@ function isMain(metaUrl) {
   }
 }
 
-const NPM_PACKAGE = '@ssm-08/relay';
+const NPM_PACKAGE = '@ssm-08/wyren';
 
 // --------------------------------------------------------------------------
 // Logging
@@ -25,7 +25,7 @@ const NPM_PACKAGE = '@ssm-08/relay';
 
 function log(level, phase, msg) {
   const tag = level === 'err' ? ' ERR' : level === 'warn' ? '  !!' : '  OK';
-  process.stderr.write(`[relay] [${phase}]${tag}  ${msg}\n`);
+  process.stderr.write(`[wyren] [${phase}]${tag}  ${msg}\n`);
 }
 
 function reporter(phase) {
@@ -41,13 +41,13 @@ function reporter(phase) {
 // --------------------------------------------------------------------------
 
 export function resolveHome(env = process.env) {
-  return env.RELAY_HOME ?? env.CLAUDE_HOME ?? path.join(os.homedir(), '.claude');
+  return env.WYREN_HOME ?? env.CLAUDE_HOME ?? path.join(os.homedir(), '.claude');
 }
 
-export function relayPaths(home) {
+export function wyrenPaths(home) {
   return {
     home,
-    plugin: path.join(home, 'plugins', 'relay'),
+    plugin: path.join(home, 'plugins', 'wyren'),
     settings: path.join(home, 'settings.json'),
   };
 }
@@ -70,7 +70,7 @@ export function preflight() {
   }
   r.ok(`Node v${process.versions.node}`);
 
-  // git is required by relay's sync mechanism at runtime
+  // git is required by wyren's sync mechanism at runtime
   const gitResult = spawnSync('git', ['--version'], { encoding: 'utf8', windowsHide: true });
   if (gitResult.error || gitResult.status !== 0) {
     throw new PreflightError(
@@ -93,25 +93,25 @@ export function preflight() {
 // Repo resolution
 // --------------------------------------------------------------------------
 
-export function validateRelayCheckout(dir) {
-  const markers = ['bin/relay.mjs', 'hooks/run-hook.cmd', '.claude-plugin/plugin.json'];
+export function validateWyrenCheckout(dir) {
+  const markers = ['bin/wyren.mjs', 'hooks/run-hook.cmd', '.claude-plugin/plugin.json'];
   for (const m of markers) {
     if (!fs.existsSync(path.join(dir, m))) {
       throw new Error(
-        `Not a valid Relay checkout (missing ${m}): ${dir}\n` +
-        'Pass --from-local to the Relay repo root.'
+        `Not a valid Wyren checkout (missing ${m}): ${dir}\n` +
+        'Pass --from-local to the Wyren repo root.'
       );
     }
   }
 }
 
-// Resolve the directory where relay source files live.
+// Resolve the directory where wyren source files live.
 // - --from-local: user-provided path (dev/local checkout)
 // - default: package root derived from __dirname (works for npm global install)
 export function resolvePackageDir(fromLocal) {
   if (fromLocal) {
     const abs = path.resolve(fromLocal);
-    validateRelayCheckout(abs);
+    validateWyrenCheckout(abs);
     return abs;
   }
   return path.resolve(path.join(__dirname, '..'));
@@ -169,7 +169,7 @@ export function createLink(src, dst) {
     throw new Error(
       `${dst} exists and points to: ${existing.target}\n` +
       `Expected: ${src}\n` +
-      'Run "relay uninstall" first, or delete the link manually.'
+      'Run "wyren uninstall" first, or delete the link manually.'
     );
   }
 
@@ -196,9 +196,9 @@ export function removeLink(p) {
 // settings.json patching
 // --------------------------------------------------------------------------
 
-const HOOK_DETECTION_PATTERNS = ['run-hook.cmd', 'run-hook.sh', 'plugins/relay/hooks/'];
+const HOOK_DETECTION_PATTERNS = ['run-hook.cmd', 'run-hook.sh', 'plugins/wyren/hooks/'];
 
-function isRelayHookEntry(entry) {
+function isWyrenHookEntry(entry) {
   const hooks = Array.isArray(entry.hooks) ? entry.hooks : [entry.hooks].filter(Boolean);
   return hooks.some((h) =>
     h && h.command && HOOK_DETECTION_PATTERNS.some((p) => h.command.includes(p))
@@ -211,7 +211,7 @@ function buildHookEntries(repoDir) {
   return {
     SessionStart: {
       matcher: '',
-      hooks: [{ type: 'command', command: `${q} session-start`, timeout: 2, statusMessage: 'Loading relay memory...' }],
+      hooks: [{ type: 'command', command: `${q} session-start`, timeout: 2, statusMessage: 'Loading wyren memory...' }],
     },
     Stop: {
       matcher: '',
@@ -271,7 +271,7 @@ export function patchSettingsInMemory(settings, { mode, repoDir = '' }) {
     if (!current) current = [];
     else if (!Array.isArray(current)) current = [current];
 
-    const filtered = current.filter((entry) => !isRelayHookEntry(entry));
+    const filtered = current.filter((entry) => !isWyrenHookEntry(entry));
 
     if (mode === 'install') {
       const fresh = buildHookEntries(repoDir);
@@ -296,11 +296,11 @@ export function writeSettingsAtomic(p, obj, { backup = true } = {}) {
   if (backup && fs.existsSync(p)) {
     const base = path.basename(p);
     const old = fs.readdirSync(dir)
-      .filter((f) => f.startsWith(`${base}.relay-backup-`))
+      .filter((f) => f.startsWith(`${base}.wyren-backup-`))
       .map((f) => path.join(dir, f));
     for (const f of old) { try { fs.unlinkSync(f); } catch {} }
     const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    fs.copyFileSync(p, `${p}.relay-backup-${ts}`);
+    fs.copyFileSync(p, `${p}.wyren-backup-${ts}`);
   }
 
   const tmp = `${p}.tmp`;
@@ -335,19 +335,19 @@ export function verifyInstall(paths) {
 
   const linkedDir = (info.target && info.kind !== 'missing') ? info.target : null;
   if (linkedDir) {
-    const relayBin = path.join(linkedDir, 'bin', 'relay.mjs');
-    if (fs.existsSync(relayBin)) {
-      const r = spawnSync('node', [relayBin, 'status'], {
+    const wyrenBin = path.join(linkedDir, 'bin', 'wyren.mjs');
+    if (fs.existsSync(wyrenBin)) {
+      const r = spawnSync('node', [wyrenBin, 'status'], {
         encoding: 'utf8',
         timeout: 5_000,
         windowsHide: true,
         stdio: ['pipe', 'pipe', 'pipe'],
       });
       if (r.status !== 0) {
-        issues.push(`relay CLI failed: ${(r.stderr || '').trim()}`);
+        issues.push(`wyren CLI failed: ${(r.stderr || '').trim()}`);
       }
     } else {
-      issues.push(`relay CLI not found at: ${relayBin}`);
+      issues.push(`wyren CLI not found at: ${wyrenBin}`);
     }
   }
 
@@ -356,11 +356,11 @@ export function verifyInstall(paths) {
     const hooksObj = settings.hooks || {};
     for (const event of ['SessionStart', 'Stop', 'UserPromptSubmit']) {
       const entries = Array.isArray(hooksObj[event]) ? hooksObj[event] : [];
-      const relayEntries = entries.filter(isRelayHookEntry);
-      if (relayEntries.length === 0) {
-        issues.push(`settings.json missing Relay ${event} hook`);
-      } else if (relayEntries.length > 1) {
-        issues.push(`settings.json has ${relayEntries.length} Relay ${event} hooks (expected 1)`);
+      const wyrenEntries = entries.filter(isWyrenHookEntry);
+      if (wyrenEntries.length === 0) {
+        issues.push(`settings.json missing Wyren ${event} hook`);
+      } else if (wyrenEntries.length > 1) {
+        issues.push(`settings.json has ${wyrenEntries.length} Wyren ${event} hooks (expected 1)`);
       }
     }
   } catch (e) {
@@ -398,13 +398,13 @@ export function registerCli(repoDir, r) {
   if (result.error || result.status !== 0) {
     const npmErr = (result.stderr || result.stdout || '').trim().slice(0, 500);
     r.warn(
-      `Could not register relay CLI globally (npm link failed).\n` +
+      `Could not register wyren CLI globally (npm link failed).\n` +
       (npmErr ? `  npm: ${npmErr}\n` : '') +
       `  Run manually: cd "${repoDir}" && npm link\n` +
-      `  Or invoke directly: node "${path.join(repoDir, 'bin', 'relay.mjs')}" <command>`
+      `  Or invoke directly: node "${path.join(repoDir, 'bin', 'wyren.mjs')}" <command>`
     );
   } else {
-    r.ok('relay CLI registered globally via npm link (relay <command> now works)');
+    r.ok('wyren CLI registered globally via npm link (wyren <command> now works)');
   }
 }
 
@@ -415,7 +415,7 @@ export function registerCli(repoDir, r) {
 export function install(opts) {
   const { home, fromLocal, dryRun } = opts;
   const r = reporter('install');
-  const paths = relayPaths(home);
+  const paths = wyrenPaths(home);
 
   r.ok(`Home: ${home}`);
   preflight();
@@ -444,7 +444,7 @@ export function install(opts) {
   }
 
   // For --from-local dev installs, wire the CLI via npm link.
-  // npm global installs already have relay on PATH — skip.
+  // npm global installs already have wyren on PATH — skip.
   if (!dryRun && fromLocal) {
     registerCli(repoDir, reporter('cli'));
   }
@@ -461,18 +461,18 @@ export function install(opts) {
       }
     } catch {}
 
-    process.stderr.write('\n[relay] Install complete.\n\n');
+    process.stderr.write('\n[wyren] Install complete.\n\n');
     if (repoHint) {
       process.stderr.write(`  Detected repo: ${repoHint}\n`);
       process.stderr.write(`  Run from that directory:\n\n`);
     } else {
       process.stderr.write('  Next — cd into your project repo, then:\n\n');
     }
-    process.stderr.write('    relay init\n');
-    process.stderr.write('    git add .relay/ .gitignore\n');
-    process.stderr.write('    git commit -m "chore: add relay shared memory"\n');
+    process.stderr.write('    wyren init\n');
+    process.stderr.write('    git add .wyren/ .gitignore\n');
+    process.stderr.write('    git commit -m "chore: add wyren shared memory"\n');
     process.stderr.write('    git push\n\n');
-    process.stderr.write('  Verify: relay doctor\n');
+    process.stderr.write('  Verify: wyren doctor\n');
   }
   return result;
 }
@@ -480,7 +480,7 @@ export function install(opts) {
 export function uninstall(opts) {
   const { home, dryRun } = opts;
   const r = reporter('uninstall');
-  const paths = relayPaths(home);
+  const paths = wyrenPaths(home);
 
   if (!dryRun) {
     removeLink(paths.plugin);
@@ -490,7 +490,7 @@ export function uninstall(opts) {
       const settings = readSettings(paths.settings);
       const patched = patchSettingsInMemory(settings, { mode: 'uninstall' });
       writeSettingsAtomic(paths.settings, patched, { backup: false });
-      r.ok(`Removed relay entries from settings.json`);
+      r.ok(`Removed wyren entries from settings.json`);
     }
 
     // Deregister global CLI — fail-open
@@ -499,9 +499,9 @@ export function uninstall(opts) {
       : ['npm', ['uninstall', '-g', NPM_PACKAGE]];
     const npmResult = spawnSync(npmExe, npmArgs, { encoding: 'utf8', windowsHide: true, timeout: 15_000 });
     if (!npmResult.error && npmResult.status === 0) {
-      r.ok('relay CLI deregistered from global PATH');
+      r.ok('wyren CLI deregistered from global PATH');
     } else {
-      r.warn(`Could not deregister relay CLI — remove manually: npm uninstall -g ${NPM_PACKAGE}`);
+      r.warn(`Could not deregister wyren CLI — remove manually: npm uninstall -g ${NPM_PACKAGE}`);
     }
 
     // Clean up settings backup files
@@ -509,7 +509,7 @@ export function uninstall(opts) {
     const settingsBase = path.basename(paths.settings);
     try {
       const backups = fs.readdirSync(settingsDir)
-        .filter((f) => f.startsWith(`${settingsBase}.relay-backup-`));
+        .filter((f) => f.startsWith(`${settingsBase}.wyren-backup-`));
       for (const f of backups) {
         try { fs.unlinkSync(path.join(settingsDir, f)); } catch {}
       }
@@ -523,11 +523,11 @@ export function uninstall(opts) {
 export function update(opts) {
   const { home } = opts;
   const r = reporter('update');
-  const paths = relayPaths(home);
+  const paths = wyrenPaths(home);
 
   const linkInfo = inspectLink(paths.plugin);
   if (linkInfo.kind === 'missing') {
-    throw new Error('Relay not installed. Run: relay install');
+    throw new Error('Wyren not installed. Run: wyren install');
   }
 
   // Detect --from-local install: link target does not pass through node_modules
@@ -535,9 +535,9 @@ export function update(opts) {
   if (!isNpmInstall) {
     throw new Error(
       `Local install detected — plugin points to: ${linkInfo.target}\n` +
-      `  relay update only works for npm installs.\n` +
+      `  wyren update only works for npm installs.\n` +
       `  Pull your local checkout manually, then re-run:\n` +
-      `    relay install --from-local "${linkInfo.target}"`
+      `    wyren install --from-local "${linkInfo.target}"`
     );
   }
 
@@ -574,21 +574,21 @@ export function update(opts) {
 }
 
 function issueHint(issue) {
-  if (issue.includes('Plugin link missing')) return 'relay install';
-  if (issue.includes('relay CLI')) return 'relay install';
-  if (issue.includes('settings.json missing Relay')) return 'relay install';
-  if (issue.includes('settings.json has') && issue.includes('hooks')) return 'relay uninstall && relay install';
+  if (issue.includes('Plugin link missing')) return 'wyren install';
+  if (issue.includes('wyren CLI')) return 'wyren install';
+  if (issue.includes('settings.json missing Wyren')) return 'wyren install';
+  if (issue.includes('settings.json has') && issue.includes('hooks')) return 'wyren uninstall && wyren install';
   if (issue.includes('not executable')) {
     const m = issue.match(/: (.+?) —/);
-    return m ? `chmod +x "${m[1]}"` : 'relay install';
+    return m ? `chmod +x "${m[1]}"` : 'wyren install';
   }
-  if (issue.includes('settings.json unreadable')) return 'Check settings.json is valid JSON, then: relay install';
-  return 'relay install';
+  if (issue.includes('settings.json unreadable')) return 'Check settings.json is valid JSON, then: wyren install';
+  return 'wyren install';
 }
 
 export function doctor(opts) {
   const { home } = opts;
-  const paths = relayPaths(home);
+  const paths = wyrenPaths(home);
   const result = verifyInstall(paths);
 
   const claudeCheck = process.platform === 'win32'
@@ -597,10 +597,10 @@ export function doctor(opts) {
   const claudeOk = !claudeCheck.error && claudeCheck.status === 0;
 
   if (result.ok && claudeOk) {
-    process.stdout.write('[relay] doctor: all checks passed\n');
+    process.stdout.write('[wyren] doctor: all checks passed\n');
   } else {
     if (!result.ok) {
-      process.stdout.write(`[relay] doctor: ${result.issues.length} issue(s) found:\n`);
+      process.stdout.write(`[wyren] doctor: ${result.issues.length} issue(s) found:\n`);
       for (const issue of result.issues) {
         process.stdout.write(`  - ${issue}\n`);
         process.stdout.write(`    Fix: ${issueHint(issue)}\n`);
@@ -611,7 +611,7 @@ export function doctor(opts) {
       process.stdout.write('    Fix: Install Claude Code from https://claude.ai/download\n');
     }
     if (!result.ok) {
-      process.stdout.write('\n  Run: relay install to repair most issues.\n');
+      process.stdout.write('\n  Run: wyren install to repair most issues.\n');
     }
   }
   return result;
@@ -643,7 +643,7 @@ export async function main(argv) {
   const [command] = args._;
   const home = resolveHome(
     args.home
-      ? { ...process.env, RELAY_HOME: args.home }
+      ? { ...process.env, WYREN_HOME: args.home }
       : process.env
   );
 
@@ -679,7 +679,7 @@ export async function main(argv) {
       default:
         process.stderr.write(
           'Usage: node scripts/installer.mjs <install|uninstall|update|doctor>\n' +
-          '  --from-local <path>  Use local relay checkout (dev only)\n' +
+          '  --from-local <path>  Use local wyren checkout (dev only)\n' +
           '  --home <path>        Override ~/.claude/ location (for testing)\n' +
           '  --dry-run            Preview actions without making changes\n'
         );
@@ -687,9 +687,9 @@ export async function main(argv) {
     }
   } catch (e) {
     if (e instanceof Error && e.constructor.name === 'PreflightError') {
-      process.stderr.write(`[relay] preflight failed: ${e.message}\n`);
+      process.stderr.write(`[wyren] preflight failed: ${e.message}\n`);
     } else {
-      process.stderr.write(`[relay] error: ${e && e.message ? e.message : e}\n`);
+      process.stderr.write(`[wyren] error: ${e && e.message ? e.message : e}\n`);
     }
     process.exit(1);
   }

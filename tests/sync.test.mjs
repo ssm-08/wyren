@@ -6,9 +6,9 @@ import os from 'node:os';
 import { execSync } from 'node:child_process';
 import { GitSync } from '../lib/sync.mjs';
 
-// Create a local bare repo (remote) + a local repo with .relay/ initialized
+// Create a local bare repo (remote) + a local repo with .wyren/ initialized
 function makeGitFixture() {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'relay-sync-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wyren-sync-'));
   const bare = path.join(tmp, 'remote.git');
   const local = path.join(tmp, 'repo');
 
@@ -21,18 +21,18 @@ function makeGitFixture() {
   // Local repo
   fs.mkdirSync(local, { recursive: true });
   g(`init ${local}`);
-  g('config user.email test@relay', local);
-  g('config user.name "Relay Test"', local);
+  g('config user.email test@wyren', local);
+  g('config user.name "Wyren Test"', local);
   g(`remote add origin ${bare}`, local);
 
-  // Seed .relay/
-  const relayDir = path.join(local, '.relay');
-  fs.mkdirSync(path.join(relayDir, 'broadcast'), { recursive: true });
-  fs.mkdirSync(path.join(relayDir, 'state'), { recursive: true });
-  fs.writeFileSync(path.join(relayDir, 'memory.md'), '# Relay Memory\n');
-  fs.writeFileSync(path.join(relayDir, 'broadcast', '.gitkeep'), '');
+  // Seed .wyren/
+  const wyrenDir = path.join(local, '.wyren');
+  fs.mkdirSync(path.join(wyrenDir, 'broadcast'), { recursive: true });
+  fs.mkdirSync(path.join(wyrenDir, 'state'), { recursive: true });
+  fs.writeFileSync(path.join(wyrenDir, 'memory.md'), '# Wyren Memory\n');
+  fs.writeFileSync(path.join(wyrenDir, 'broadcast', '.gitkeep'), '');
 
-  g('add .relay/', local);
+  g('add .wyren/', local);
   g('commit -m "init"', local);
   g('push origin HEAD', local);
 
@@ -49,18 +49,18 @@ function cloneFixture(bare, tmp) {
   const g = (args, cwd) =>
     execSync(`git ${args}`, { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
   g(`clone ${bare} ${clone}`);
-  g('config user.email clone@relay', clone);
-  g('config user.name "Relay Clone"', clone);
+  g('config user.email clone@wyren', clone);
+  g('config user.name "Wyren Clone"', clone);
   return clone;
 }
 
 test('pull() does not throw when no remote is configured', (t) => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'relay-norepo-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wyren-norepo-'));
   t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
-  const relayDir = path.join(tmp, '.relay');
-  fs.mkdirSync(path.join(relayDir, 'state'), { recursive: true });
-  fs.writeFileSync(path.join(relayDir, 'memory.md'), '# old\n');
+  const wyrenDir = path.join(tmp, '.wyren');
+  fs.mkdirSync(path.join(wyrenDir, 'state'), { recursive: true });
+  fs.writeFileSync(path.join(wyrenDir, 'memory.md'), '# old\n');
 
   // Init git but no remote
   execSync(`git init ${tmp}`, { stdio: 'ignore' });
@@ -69,7 +69,7 @@ test('pull() does not throw when no remote is configured', (t) => {
   assert.doesNotThrow(() => sync.pull(tmp));
 
   // Memory unchanged (fetch failed, fail-open)
-  assert.equal(fs.readFileSync(path.join(relayDir, 'memory.md'), 'utf8'), '# old\n');
+  assert.equal(fs.readFileSync(path.join(wyrenDir, 'memory.md'), 'utf8'), '# old\n');
 });
 
 test('pull() updates memory.md from remote', (t) => {
@@ -80,8 +80,8 @@ test('pull() updates memory.md from remote', (t) => {
   const clone = cloneFixture(path.join(tmp, 'remote.git'), tmp);
   const g = (args, cwd) =>
     execSync(`git ${args}`, { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
-  fs.writeFileSync(path.join(clone, '.relay', 'memory.md'), '# Updated Remote Memory\n');
-  g('add .relay/memory.md', clone);
+  fs.writeFileSync(path.join(clone, '.wyren', 'memory.md'), '# Updated Remote Memory\n');
+  g('add .wyren/memory.md', clone);
   g('commit -m "remote update"', clone);
   g('push origin HEAD', clone);
 
@@ -89,7 +89,7 @@ test('pull() updates memory.md from remote', (t) => {
   const sync = new GitSync();
   sync.pull(local);
 
-  const content = fs.readFileSync(path.join(local, '.relay', 'memory.md'), 'utf8');
+  const content = fs.readFileSync(path.join(local, '.wyren', 'memory.md'), 'utf8');
   assert.ok(content.includes('Updated Remote Memory'), 'memory.md should reflect remote update');
 });
 
@@ -115,18 +115,18 @@ test('push() commits and pushes new memory.md to remote', (t) => {
   const g = (args, cwd) =>
     execSync(`git ${args}`, { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
 
-  fs.writeFileSync(path.join(local, '.relay', 'memory.md'), '# New Memory\nDecision: use SQLite\n');
+  fs.writeFileSync(path.join(local, '.wyren', 'memory.md'), '# New Memory\nDecision: use SQLite\n');
 
   const sync = new GitSync();
   sync.push(local, 'session1');
 
   // Verify commit exists and was pushed to bare
   const log = g('log --oneline -1', local).trim();
-  assert.ok(log.includes('[relay] memory update'), `commit message not found: ${log}`);
+  assert.ok(log.includes('[wyren] memory update'), `commit message not found: ${log}`);
 
   // Check remote has the commit
   const remoteLog = g('log --oneline -1', bare).trim();
-  assert.ok(remoteLog.includes('[relay] memory update'), `remote not updated: ${remoteLog}`);
+  assert.ok(remoteLog.includes('[wyren] memory update'), `remote not updated: ${remoteLog}`);
 });
 
 test('push() handles non-fast-forward conflict: remote wins, HEAD advances, second push succeeds', (t) => {
@@ -139,16 +139,16 @@ test('push() handles non-fast-forward conflict: remote wins, HEAD advances, seco
   // Second machine: push a commit that local doesn't have
   const clone = cloneFixture(path.join(tmp, 'remote.git'), tmp);
   fs.writeFileSync(
-    path.join(clone, '.relay', 'memory.md'),
+    path.join(clone, '.wyren', 'memory.md'),
     '# Remote Memory\nFrom second machine\n'
   );
-  g('add .relay/memory.md', clone);
+  g('add .wyren/memory.md', clone);
   g('commit -m "second machine"', clone);
   g('push origin HEAD', clone);
 
   // Local: modify memory.md with conflicting content
   fs.writeFileSync(
-    path.join(local, '.relay', 'memory.md'),
+    path.join(local, '.wyren', 'memory.md'),
     '# Local Memory\nFrom first machine\n'
   );
 
@@ -164,7 +164,7 @@ test('push() handles non-fast-forward conflict: remote wins, HEAD advances, seco
   );
 
   // C2: remote (FETCH_HEAD) wins — local memory.md must have remote content
-  const content = fs.readFileSync(path.join(local, '.relay', 'memory.md'), 'utf8');
+  const content = fs.readFileSync(path.join(local, '.wyren', 'memory.md'), 'utf8');
   assert.ok(content.includes('Remote Memory'), 'remote memory should win on conflict');
 
   // C2: local HEAD must match FETCH_HEAD — no longer stuck behind remote
@@ -173,45 +173,45 @@ test('push() handles non-fast-forward conflict: remote wins, HEAD advances, seco
   assert.equal(headSHA, fetchSHA, 'local HEAD must equal FETCH_HEAD after conflict resolution');
 
   // C2: a subsequent push from local must succeed (no infinite re-conflict loop)
-  fs.writeFileSync(path.join(local, '.relay', 'memory.md'), '# re-distilled after conflict\n');
+  fs.writeFileSync(path.join(local, '.wyren', 'memory.md'), '# re-distilled after conflict\n');
   const sync2 = new GitSync();
   assert.doesNotThrow(() => sync2.push(local, 'nextcycle'));
   const bareLog = g('log --oneline -1', path.join(tmp, 'remote.git'));
-  assert.ok(bareLog.includes('[relay] memory update'), `second push must reach remote, got: ${bareLog}`);
+  assert.ok(bareLog.includes('[wyren] memory update'), `second push must reach remote, got: ${bareLog}`);
 });
 
 test('push() does not throw when remote is not configured', (t) => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'relay-nopush-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wyren-nopush-'));
   t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
-  const relayDir = path.join(tmp, '.relay');
-  fs.mkdirSync(path.join(relayDir, 'broadcast'), { recursive: true });
-  fs.mkdirSync(path.join(relayDir, 'state'), { recursive: true });
-  fs.writeFileSync(path.join(relayDir, 'memory.md'), '# Memory\n');
-  fs.writeFileSync(path.join(relayDir, 'broadcast', '.gitkeep'), '');
+  const wyrenDir = path.join(tmp, '.wyren');
+  fs.mkdirSync(path.join(wyrenDir, 'broadcast'), { recursive: true });
+  fs.mkdirSync(path.join(wyrenDir, 'state'), { recursive: true });
+  fs.writeFileSync(path.join(wyrenDir, 'memory.md'), '# Memory\n');
+  fs.writeFileSync(path.join(wyrenDir, 'broadcast', '.gitkeep'), '');
 
   execSync(`git init ${tmp}`, { stdio: 'ignore' });
-  execSync('git config user.email test@relay', { cwd: tmp });
+  execSync('git config user.email test@wyren', { cwd: tmp });
   execSync('git config user.name "Test"', { cwd: tmp });
-  execSync('git add .relay/', { cwd: tmp });
+  execSync('git add .wyren/', { cwd: tmp });
   execSync('git commit -m "init"', { cwd: tmp });
 
   // Modify memory.md — should commit fine but push will fail (no remote)
-  fs.writeFileSync(path.join(relayDir, 'memory.md'), '# Updated\n');
+  fs.writeFileSync(path.join(wyrenDir, 'memory.md'), '# Updated\n');
 
   const sync = new GitSync();
   assert.doesNotThrow(() => sync.push(tmp, 'nosession'));
 });
 
 test('lock() creates lock file and returns a release function', (t) => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'relay-lock-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wyren-lock-'));
   t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
-  const relayDir = path.join(tmp, '.relay');
-  fs.mkdirSync(relayDir, { recursive: true });
+  const wyrenDir = path.join(tmp, '.wyren');
+  fs.mkdirSync(wyrenDir, { recursive: true });
 
   const sync = new GitSync();
-  const lockPath = path.join(relayDir, 'state', '.lock');
+  const lockPath = path.join(wyrenDir, 'state', '.lock');
 
   const release = sync.lock(tmp);
   assert.ok(fs.existsSync(lockPath), 'lock file should exist after lock()');
@@ -221,11 +221,11 @@ test('lock() creates lock file and returns a release function', (t) => {
 });
 
 test('lock() throws LOCKED when a fresh lock exists', (t) => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'relay-lock2-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wyren-lock2-'));
   t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
-  const relayDir = path.join(tmp, '.relay');
-  fs.mkdirSync(path.join(relayDir, 'state'), { recursive: true });
+  const wyrenDir = path.join(tmp, '.wyren');
+  fs.mkdirSync(path.join(wyrenDir, 'state'), { recursive: true });
 
   const sync = new GitSync();
   const release = sync.lock(tmp);
@@ -240,11 +240,11 @@ test('lock() throws LOCKED when a fresh lock exists', (t) => {
 });
 
 test('lock() steals a stale lock (older than 60s)', (t) => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'relay-lock3-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wyren-lock3-'));
   t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
 
-  const relayDir = path.join(tmp, '.relay');
-  const stateDir = path.join(relayDir, 'state');
+  const wyrenDir = path.join(tmp, '.wyren');
+  const stateDir = path.join(wyrenDir, 'state');
   fs.mkdirSync(stateDir, { recursive: true });
 
   // Write a "stale" lock by backdating its mtime

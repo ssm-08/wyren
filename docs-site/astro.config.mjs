@@ -7,11 +7,11 @@ import { baseHrefFixup } from './src/plugins/astro-base-href-fixup.mjs';
 
 // https://astro.build/config
 // site/base can be overridden via env for GitHub Pages deployment:
-//   RELAY_SITE=https://<user>.github.io  RELAY_BASE=/<repo-name>  npm run build
-const BASE = process.env.RELAY_BASE || '/relay';
+//   WYREN_SITE=https://<user>.github.io  WYREN_BASE=/<repo-name>  npm run build
+const BASE = process.env.WYREN_BASE || '/wyren';
 
 export default defineConfig({
-	site: process.env.RELAY_SITE || 'https://ssm-08.github.io',
+	site: process.env.WYREN_SITE || 'https://ssm-08.github.io',
 	base: BASE,
 	markdown: {
 		syntaxHighlight: {
@@ -26,10 +26,10 @@ export default defineConfig({
 	integrations: [
 		baseHrefFixup({ base: BASE }),
 		starlight({
-			title: 'Relay',
+			title: 'Wyren',
 			description: 'Shared brain for teams using Claude Code. One memory, every session warm.',
 			social: [
-				{ icon: 'github', label: 'GitHub', href: 'https://github.com/ssm-08/relay' },
+				{ icon: 'github', label: 'GitHub', href: 'https://github.com/ssm-08/wyren' },
 			],
 			head: [
 				{
@@ -53,7 +53,7 @@ export default defineConfig({
 				{
 					label: 'Start here',
 					items: [
-						{ label: 'What is Relay?', slug: 'index' },
+						{ label: 'What is Wyren?', slug: 'index' },
 						{ label: 'The problem', slug: 'problem' },
 						{ label: 'How it works', slug: 'how-it-works' },
 					],

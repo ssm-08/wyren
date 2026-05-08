@@ -25,7 +25,7 @@ Hook up the Chunk 1 distiller to the Chunk 2 plugin skeleton. The `Stop` hook de
 
 Three exported functions:
 
-**`updateWatermark(relayDir)`** — increments `turns_since_distill`, records `last_turn_at`. Called every turn regardless of whether distillation fires.
+**`updateWatermark(wyrenDir)`** — increments `turns_since_distill`, records `last_turn_at`. Called every turn regardless of whether distillation fires.
 
 **`shouldDistill(state)`** — returns true if:
 - `turns_since_distill >= 5` (main trigger), OR
@@ -33,13 +33,13 @@ Three exported functions:
 
 Returns false if `distiller_running` is true (lock guard).
 
-**`spawnDistiller({ relayDir, transcriptPath, since, cwd })`** — spawns `distiller.mjs` detached with `--transcript`, `--memory`, `--out`, `--cwd`, `--since`. Resolves distiller path via `CLAUDE_PLUGIN_ROOT` env (set by Claude Code) or relative fallback. Logs stdout+stderr to `.relay/log`. Never uses `shell:true` — avoids argument splitting on paths with spaces.
+**`spawnDistiller({ wyrenDir, transcriptPath, since, cwd })`** — spawns `distiller.mjs` detached with `--transcript`, `--memory`, `--out`, `--cwd`, `--since`. Resolves distiller path via `CLAUDE_PLUGIN_ROOT` env (set by Claude Code) or relative fallback. Logs stdout+stderr to `.wyren/log`. Never uses `shell:true` — avoids argument splitting on paths with spaces.
 
 In `main()`:
 
 1. Read stdin → extract `{ cwd, transcript_path }`.
-2. Bail if no `.relay/` directory (not a relay repo).
-3. `updateWatermark(relayDir)`.
+2. Bail if no `.wyren/` directory (not a wyren repo).
+3. `updateWatermark(wyrenDir)`.
 4. If `shouldDistill(state) && transcript_path`:
    - Set `distiller_running = true`, reset `turns_since_distill = 0` — **before** spawn to prevent race.
    - Call `spawnDistiller(...)`.
@@ -91,7 +91,7 @@ export function hasTier0Signal(transcriptText, lines = []) { ... }  // backwards
 export function scoreTier0(transcriptText, lines = []) { ... }       // returns { score, passes, breakdown }
 ```
 
-`RELAY_TIER0_THRESHOLD` env var (default `3`) controls the minimum score to pass.
+`WYREN_TIER0_THRESHOLD` env var (default `3`) controls the minimum score to pass.
 
 **Why a separate file?** Importing `distiller.mjs` in tests would trigger `main()`. Extracting the filter keeps it purely testable.
 
@@ -105,7 +105,7 @@ See [Cost model](/cost-model/) for the full tiering strategy. Tier 0 is free —
 
 1. Open Claude Code in test repo (initialized from Chunk 2).
 2. Have a 10-turn conversation: pick X, reject Y, install workaround Z.
-3. Watch `.relay/memory.md` update after turn 5 (`tail -f .relay/log`).
+3. Watch `.wyren/memory.md` update after turn 5 (`tail -f .wyren/log`).
 4. Exit session, open new one. First assistant reply names X, Y, Z correctly.
 
 ## Exit criteria (all met)
@@ -113,4 +113,4 @@ See [Cost model](/cost-model/) for the full tiering strategy. Tier 0 is free —
 - Distiller triggers automatically, **never blocks a turn** — spawned detached, hook exits 0 immediately.
 - Memory updates visibly during a live session.
 - Single-machine warm-start test passes.
-- Tier 0 filter demonstrably skips no-signal slices (visible in `.relay/log`).
+- Tier 0 filter demonstrably skips no-signal slices (visible in `.wyren/log`).

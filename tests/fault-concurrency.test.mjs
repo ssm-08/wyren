@@ -7,7 +7,7 @@
  * After the split-file fix (ups-state.json owned by UPS, watermark.json owned by Stop),
  * the two hooks never share a writable file — eliminating the read-modify-write race.
  *
- * All subprocess spawns use RELAY_SKIP_PULL=1 to avoid network calls.
+ * All subprocess spawns use WYREN_SKIP_PULL=1 to avoid network calls.
  */
 
 import { test, describe } from 'node:test';
@@ -22,30 +22,30 @@ import { fileURLToPath } from 'node:url';
 // Helpers
 // ---------------------------------------------------------------------------
 
-const RELAY_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const WYREN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 function makeTmpDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'relay-conc-'));
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'wyren-conc-'));
 }
 
 function initGit(dir) {
   spawnSync('git', ['init', '-q'], { cwd: dir, encoding: 'utf8', windowsHide: true });
-  spawnSync('git', ['config', 'user.email', 'test@relay.local'], { cwd: dir, encoding: 'utf8', windowsHide: true });
-  spawnSync('git', ['config', 'user.name', 'Relay Test'], { cwd: dir, encoding: 'utf8', windowsHide: true });
+  spawnSync('git', ['config', 'user.email', 'test@wyren.local'], { cwd: dir, encoding: 'utf8', windowsHide: true });
+  spawnSync('git', ['config', 'user.name', 'Wyren Test'], { cwd: dir, encoding: 'utf8', windowsHide: true });
 }
 
 /**
- * Create .relay structure.
- *   upsState   → .relay/state/ups-state.json   (UPS-owned: last_injected_mtime, last_injected_hash)
- *   stopState  → .relay/state/watermark.json   (Stop-owned: turns_since_distill, etc.)
+ * Create .wyren structure.
+ *   upsState   → .wyren/state/ups-state.json   (UPS-owned: last_injected_mtime, last_injected_hash)
+ *   stopState  → .wyren/state/watermark.json   (Stop-owned: turns_since_distill, etc.)
  */
-function seedRelay(dir, { memory = null, upsState = null, stopState = null } = {}) {
-  const relayDir = path.join(dir, '.relay');
-  const stateDir = path.join(relayDir, 'state');
+function seedWyren(dir, { memory = null, upsState = null, stopState = null } = {}) {
+  const wyrenDir = path.join(dir, '.wyren');
+  const stateDir = path.join(wyrenDir, 'state');
   fs.mkdirSync(stateDir, { recursive: true });
 
   if (memory !== null) {
-    fs.writeFileSync(path.join(relayDir, 'memory.md'), memory, 'utf8');
+    fs.writeFileSync(path.join(wyrenDir, 'memory.md'), memory, 'utf8');
   }
   if (upsState !== null) {
     fs.writeFileSync(path.join(stateDir, 'ups-state.json'), JSON.stringify(upsState, null, 2), 'utf8');
@@ -54,16 +54,16 @@ function seedRelay(dir, { memory = null, upsState = null, stopState = null } = {
     fs.writeFileSync(path.join(stateDir, 'watermark.json'), JSON.stringify(stopState, null, 2), 'utf8');
   }
   // Create empty log file
-  fs.writeFileSync(path.join(relayDir, 'log'), '', 'utf8');
+  fs.writeFileSync(path.join(wyrenDir, 'log'), '', 'utf8');
 }
 
 function readUpsState(dir) {
-  const p = path.join(dir, '.relay', 'state', 'ups-state.json');
+  const p = path.join(dir, '.wyren', 'state', 'ups-state.json');
   return JSON.parse(fs.readFileSync(p, 'utf8'));
 }
 
 function readStopState(dir) {
-  const p = path.join(dir, '.relay', 'state', 'watermark.json');
+  const p = path.join(dir, '.wyren', 'state', 'watermark.json');
   return JSON.parse(fs.readFileSync(p, 'utf8'));
 }
 
@@ -81,10 +81,10 @@ function spawnUPS(targetCwd) {
     });
 
     const proc = spawn('node', ['hooks/user-prompt-submit.mjs'], {
-      cwd: RELAY_ROOT,
+      cwd: WYREN_ROOT,
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
-      env: { ...process.env, RELAY_SKIP_PULL: '1' },
+      env: { ...process.env, WYREN_SKIP_PULL: '1' },
     });
 
     let stdout = '';
@@ -110,10 +110,10 @@ function spawnStop(targetCwd, { extraEnv = {} } = {}) {
     });
 
     const proc = spawn('node', ['hooks/stop.mjs'], {
-      cwd: RELAY_ROOT,
+      cwd: WYREN_ROOT,
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
-      env: { ...process.env, RELAY_SKIP_PULL: '1', ...extraEnv },
+      env: { ...process.env, WYREN_SKIP_PULL: '1', ...extraEnv },
     });
 
     let stdout = '';
@@ -131,7 +131,7 @@ function spawnStop(targetCwd, { extraEnv = {} } = {}) {
 describe('fault-concurrency (sequential)', { concurrency: false }, () => {
 
 // ---------------------------------------------------------------------------
-// Test 1: 10 concurrent UPS fires on same .relay/ dir
+// Test 1: 10 concurrent UPS fires on same .wyren/ dir
 // ---------------------------------------------------------------------------
 
 test('Test 1: 10 concurrent UPS on same dir → all exit 0, ups-state consistent JSON', async () => {
@@ -139,7 +139,7 @@ test('Test 1: 10 concurrent UPS on same dir → all exit 0, ups-state consistent
   initGit(dir);
 
   const memory = '## Decisions\n- Use SQLite [session a, turn 1]\n- Add caching [session b, turn 2]\n';
-  seedRelay(dir, {
+  seedWyren(dir, {
     memory,
     // No ups-state seeded → first-run race: all 10 see no last_injected_hash
   });
@@ -156,7 +156,7 @@ test('Test 1: 10 concurrent UPS on same dir → all exit 0, ups-state consistent
   );
 
   // ups-state.json must be readable valid JSON
-  const upsStatePath = path.join(dir, '.relay', 'state', 'ups-state.json');
+  const upsStatePath = path.join(dir, '.wyren', 'state', 'ups-state.json');
   assert.ok(fs.existsSync(upsStatePath), 'ups-state.json must exist after 10 concurrent UPS');
 
   let st;
@@ -169,7 +169,7 @@ test('Test 1: 10 concurrent UPS on same dir → all exit 0, ups-state consistent
   assert.ok(st.last_injected_mtime, 'last_injected_mtime must be set');
 
   // No .tmp files should linger (atomic write guarantee)
-  const stateDir = path.join(dir, '.relay', 'state');
+  const stateDir = path.join(dir, '.wyren', 'state');
   const tmpFiles = fs.readdirSync(stateDir).filter((f) => f.includes('.tmp'));
   assert.equal(tmpFiles.length, 0, `Stale .tmp files found: ${tmpFiles.join(', ')}`);
 
@@ -186,7 +186,7 @@ test('Test 2: UPS + Stop concurrent → each owns separate file, both keys survi
 
   const memory = '## Decisions\n- Use Postgres [session a, turn 1]\n';
   // Seed both files independently
-  seedRelay(dir, {
+  seedWyren(dir, {
     memory,
     upsState: {
       last_injected_mtime: 1, // stale → UPS will process
@@ -232,7 +232,7 @@ test('Test 2: UPS + Stop concurrent → each owns separate file, both keys survi
     'watermark.json must not contain UPS-owned last_injected_hash (split is clean)');
 
   // No .tmp files
-  const stateDir = path.join(dir, '.relay', 'state');
+  const stateDir = path.join(dir, '.wyren', 'state');
   const tmpFiles = fs.readdirSync(stateDir).filter((f) => f.includes('.tmp'));
   assert.equal(tmpFiles.length, 0, `Stale .tmp files: ${tmpFiles.join(', ')}`);
 
@@ -249,7 +249,7 @@ test('Test 3: 5 concurrent UPS on empty ups-state → no corruption, hash seeded
 
   const memory = '## Architecture\n- Microservices pattern [session a, turn 1]\n';
   // No ups-state at all — pure first-run race
-  seedRelay(dir, { memory });
+  seedWyren(dir, { memory });
 
   const results = await Promise.all(
     Array.from({ length: 5 }, () => spawnUPS(dir))
@@ -288,12 +288,12 @@ test('Test 4: 20 rapid sequential UPS with unchanged memory → fast-path, state
   const { hashMemory } = await import('../lib/diff-memory.mjs');
   const memory = '## Decisions\n- Use Redis for caching [session a, turn 1]\n';
 
-  seedRelay(dir, { memory });
+  seedWyren(dir, { memory });
   // Get actual mtime after writing
-  const actualMtime = fs.statSync(path.join(dir, '.relay', 'memory.md')).mtimeMs;
+  const actualMtime = fs.statSync(path.join(dir, '.wyren', 'memory.md')).mtimeMs;
 
   // Seed ups-state with current mtime → UPS fast-path (mtime unchanged → return null)
-  const stateDir = path.join(dir, '.relay', 'state');
+  const stateDir = path.join(dir, '.wyren', 'state');
   fs.writeFileSync(
     path.join(stateDir, 'ups-state.json'),
     JSON.stringify({
@@ -348,7 +348,7 @@ test('Test 5: Sequential Stop then UPS → Stop watermark keys preserved (no clo
   initGit(dir);
 
   const memory = '## Decisions\n- Use Kafka [session a, turn 1]\n';
-  seedRelay(dir, {
+  seedWyren(dir, {
     memory,
     upsState: {
       last_injected_mtime: 1, // stale → UPS will write
@@ -402,7 +402,7 @@ test('Test 6: Atomic write — no torn JSON from 15 concurrent ups-state renames
 
   // Seed with stale hash so all 15 processes attempt a write
   const memory = '## Stress\n- Bullet one [session x, turn 1]\n- Bullet two [session x, turn 2]\n';
-  seedRelay(dir, {
+  seedWyren(dir, {
     memory,
     upsState: {
       last_injected_mtime: 1,
@@ -450,7 +450,7 @@ test('Test 7: 8 concurrent UPS with real content change → at most all emit del
   const newMem = '## Decisions\n- Use SQLite [session a, turn 1]\n- Add indexes [session b, turn 3]\n';
 
   const { hashMemory } = await import('../lib/diff-memory.mjs');
-  seedRelay(dir, {
+  seedWyren(dir, {
     memory: newMem,
     upsState: {
       last_injected_mtime: 1,  // stale → all 8 will read memory
@@ -458,7 +458,7 @@ test('Test 7: 8 concurrent UPS with real content change → at most all emit del
     },
   });
 
-  const stateDir = path.join(dir, '.relay', 'state');
+  const stateDir = path.join(dir, '.wyren', 'state');
   // Write a snapshot of the old content for diffing
   fs.writeFileSync(path.join(stateDir, 'last-injected-memory.md'), oldMem, 'utf8');
 
@@ -480,8 +480,8 @@ test('Test 7: 8 concurrent UPS with real content change → at most all emit del
     }, `Delta output must be valid JSON: ${emitter.stdout.slice(0, 200)}`);
     assert.ok(parsed.hookSpecificOutput?.additionalContext,
       'additionalContext must be non-empty string');
-    assert.ok(parsed.hookSpecificOutput.additionalContext.includes('Relay live update'),
-      'additionalContext must include the relay header');
+    assert.ok(parsed.hookSpecificOutput.additionalContext.includes('Wyren live update'),
+      'additionalContext must include the wyren header');
   }
 
   // ups-state.json must be clean JSON with updated hash
@@ -521,17 +521,17 @@ test('Test 8 (race eliminated): UPS writes ups-state.json, Stop writes watermark
   initGit(dir);
 
   const memory = '## Decisions\n- Use Redis [session a, turn 1]\n';
-  seedRelay(dir, {
+  seedWyren(dir, {
     memory,
     upsState: { last_injected_mtime: 1, last_injected_hash: 'stale0000000' },
     stopState: { turns_since_distill: 0, last_turn_at: Date.now() },
   });
 
   // Hammer both hooks concurrently: 10 UPS + 10 Stop
-  // RELAY_TURNS_THRESHOLD=100: prevents distillation from firing (which would reset
+  // WYREN_TURNS_THRESHOLD=100: prevents distillation from firing (which would reset
   // turns_since_distill to 0) even if processes run sequentially on a slow CI runner.
   const upsPromises = Array.from({ length: 10 }, () => spawnUPS(dir));
-  const stopPromises = Array.from({ length: 10 }, () => spawnStop(dir, { extraEnv: { RELAY_TURNS_THRESHOLD: '100' } }));
+  const stopPromises = Array.from({ length: 10 }, () => spawnStop(dir, { extraEnv: { WYREN_TURNS_THRESHOLD: '100' } }));
   const results = await Promise.all([...upsPromises, ...stopPromises]);
 
   const nonZero = results.filter((r) => r.code !== 0);
