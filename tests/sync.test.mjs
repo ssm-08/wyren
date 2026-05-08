@@ -260,3 +260,94 @@ test('lock() steals a stale lock (older than 60s)', (t) => {
 
   if (release) release();
 });
+
+test('push() preserves partially staged user files', (t) => {
+  const { tmp, local } = makeGitFixture();
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+
+  const g = (args, cwd = local) =>
+    execSync(`git ${args}`, { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+
+  fs.writeFileSync(path.join(local, 'app.txt'), 'one\n', 'utf8');
+  g('add app.txt');
+  g('commit -m "add app"');
+  g('push origin HEAD');
+
+  fs.writeFileSync(path.join(local, 'app.txt'), 'one\nstaged\n', 'utf8');
+  g('add app.txt');
+  fs.writeFileSync(path.join(local, 'app.txt'), 'one\nstaged\nunstaged\n', 'utf8');
+
+  fs.writeFileSync(path.join(local, '.wyren', 'memory.md'), '# Updated without touching user index\n', 'utf8');
+  const result = new GitSync().push(local, 'partial');
+  assert.equal(result.pushed, true, `wyren push should still succeed: ${JSON.stringify(result)}`);
+
+  const cached = g('diff --cached -- app.txt');
+  const unstaged = g('diff -- app.txt');
+  assert.ok(cached.includes('+staged'), `staged hunk should remain staged: ${cached}`);
+  assert.ok(!cached.includes('+unstaged'), `unstaged hunk must not become staged: ${cached}`);
+  assert.ok(unstaged.includes('+unstaged'), `unstaged hunk should remain unstaged: ${unstaged}`);
+});
+
+test('push() reports local-only commit when no remote is configured', (t) => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wyren-nopush-result-'));
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+
+  const wyrenDir = path.join(tmp, '.wyren');
+  fs.mkdirSync(path.join(wyrenDir, 'broadcast'), { recursive: true });
+  fs.mkdirSync(path.join(wyrenDir, 'state'), { recursive: true });
+  fs.writeFileSync(path.join(wyrenDir, 'memory.md'), '# Memory\n');
+  fs.writeFileSync(path.join(wyrenDir, 'broadcast', '.gitkeep'), '');
+
+  execSync(`git init ${tmp}`, { stdio: 'ignore' });
+  execSync('git config user.email test@wyren', { cwd: tmp });
+  execSync('git config user.name "Test"', { cwd: tmp });
+  execSync('git add .wyren/', { cwd: tmp });
+  execSync('git commit -m "init"', { cwd: tmp });
+
+  fs.writeFileSync(path.join(wyrenDir, 'memory.md'), '# Updated\n');
+  const result = new GitSync().push(tmp, 'nosession');
+  assert.equal(result.committed, true);
+  assert.equal(result.pushed, false);
+  assert.equal(result.reason, 'no_remote');
+});
+
+test('pull() updates worktree without staging remote memory changes', (t) => {
+  const { tmp, local } = makeGitFixture();
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+
+  const g = (args, cwd = local) =>
+    execSync(`git ${args}`, { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+
+  const clone = cloneFixture(path.join(tmp, 'remote.git'), tmp);
+  fs.writeFileSync(path.join(clone, '.wyren', 'memory.md'), '# Remote Pull Memory\n', 'utf8');
+  g('add .wyren/memory.md', clone);
+  g('commit -m "remote pull update"', clone);
+  g('push origin HEAD', clone);
+
+  new GitSync().pull(local);
+
+  const status = execSync('git status --porcelain -- .wyren/memory.md', { cwd: local, encoding: 'utf8' });
+  assert.ok(status.startsWith(' M '), `pull should leave worktree-only change, got status: ${JSON.stringify(status)}`);
+  assert.ok(!status.startsWith('M  '), `pull must not stage memory changes, got status: ${JSON.stringify(status)}`);
+});
+
+test('push() leaves local commit and worktree intact on non-NFF push rejection', (t) => {
+  const { tmp, bare, local } = makeGitFixture();
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+
+  const hookPath = path.join(bare, 'hooks', 'pre-receive');
+  fs.writeFileSync(hookPath, '#!/bin/sh\necho rejected by test hook >&2\nexit 1\n', 'utf8');
+  fs.chmodSync(hookPath, 0o755);
+
+  const memoryPath = path.join(local, '.wyren', 'memory.md');
+  fs.writeFileSync(memoryPath, '# Local update survives rejected push\n', 'utf8');
+
+  const result = new GitSync().push(local, 'hookfail');
+  assert.equal(result.committed, true);
+  assert.equal(result.pushed, false);
+  assert.equal(result.reason, 'push_failed');
+
+  const headMessage = execSync('git log -1 --format=%s', { cwd: local, encoding: 'utf8' }).trim();
+  assert.ok(headMessage.includes('[wyren] memory update'), `local Wyren commit should remain HEAD: ${headMessage}`);
+  assert.equal(fs.readFileSync(memoryPath, 'utf8'), '# Local update survives rejected push\n');
+});

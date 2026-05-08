@@ -71,6 +71,35 @@ export function shouldDistill(state) {
   return false;
 }
 
+
+export function claimTriggerLock(triggerLock, { staleMs = 60_000 } = {}) {
+  fs.mkdirSync(path.dirname(triggerLock), { recursive: true });
+  const acquire = () => {
+    const fd = fs.openSync(triggerLock, 'wx');
+    try { fs.writeSync(fd, JSON.stringify({ pid: process.pid, created_at: Date.now() })); }
+    finally { fs.closeSync(fd); }
+    return () => { try { fs.rmSync(triggerLock, { force: true }); } catch {} };
+  };
+
+  try {
+    return acquire();
+  } catch (e) {
+    if (e.code !== 'EEXIST') throw e;
+  }
+
+  let age = 0;
+  try { age = Date.now() - fs.statSync(triggerLock).mtimeMs; } catch { age = staleMs + 1; }
+  if (age < staleMs) throw new Error('LOCKED');
+
+  try { fs.unlinkSync(triggerLock); } catch {}
+  try {
+    return acquire();
+  } catch (e) {
+    if (e.code === 'EEXIST') throw new Error('LOCKED');
+    throw e;
+  }
+}
+
 export function spawnDistiller({ wyrenDir, transcriptPath, since, cwd }) {
   const distillerPath =
     process.env.CLAUDE_PLUGIN_ROOT
@@ -121,12 +150,12 @@ async function main() {
     const state = updateWatermark(wyrenDir);
 
     if (shouldDistill(state) && transcript_path) {
-      // openSync('wx') is atomic — EEXIST if another Stop hook beat us here
       const triggerLock = path.join(wyrenDir, 'state', 'distill-trigger.lock');
+      let releaseTriggerLock;
       try {
-        fs.closeSync(fs.openSync(triggerLock, 'wx'));
+        releaseTriggerLock = claimTriggerLock(triggerLock);
       } catch {
-        process.exit(0); // another process won the race
+        process.exit(0); // another fresh process won the race
       }
 
       const watermarkPath = path.join(wyrenDir, 'state', 'watermark.json');
@@ -149,7 +178,7 @@ async function main() {
       writeWatermarkAtomic(watermarkPath, state);
       // Release trigger lock only after distiller_running is written — prevents a second
       // concurrent Stop hook from passing the lock check before the flag is set.
-      try { fs.unlinkSync(triggerLock); } catch {}
+      releaseTriggerLock();
     }
   } catch (e) {
     process.stderr.write(`[wyren] stop error: ${e.message}\n`);

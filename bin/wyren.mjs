@@ -227,7 +227,10 @@ export async function wyrenDistill(targetDir, argv) {
       process.exit(2);
     }
     try {
-      sync.push(targetDir, 'manual');
+      const result = sync.push(targetDir, 'manual');
+      if (result && result.committed && !result.pushed) {
+        console.error(`wyren distill: memory committed locally but not pushed (${result.reason})`);
+      }
     } catch (e) {
       console.error(`wyren distill: push failed: ${e.message}`);
     } finally {
@@ -382,8 +385,14 @@ if (isMain(import.meta.url)) {
       throw e;
     }
     try {
-      sync.push(process.cwd(), 'broadcast');
-      console.log('Pushed to remote.');
+      const result = sync.push(process.cwd(), 'broadcast');
+      if (result?.pushed) {
+        console.log('Pushed to remote.');
+      } else if (result?.committed) {
+        console.log(`Saved locally; push did not complete (${result.reason}).`);
+      } else {
+        console.log(`No broadcast changes to push (${result?.reason || 'no_changes'}).`);
+      }
     } catch (e) {
       console.error(`wyren: push failed: ${e.message}`);
       process.exit(1);
