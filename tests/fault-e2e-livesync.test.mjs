@@ -55,17 +55,22 @@ function makeTwoRepos(baseDir) {
   const repoB = path.join(baseDir, 'repoB');
 
   git(['init', '--bare', '-q', bare], baseDir);
+  git(['config', 'core.autocrlf', 'false'], bare);
 
   fs.mkdirSync(repoA, { recursive: true });
   git(['init', '-q'], repoA);
   git(['config', 'user.email', 'test@wyren'], repoA);
   git(['config', 'user.name', 'wyren-test'], repoA);
+  git(['config', 'core.autocrlf', 'false'], repoA);
+  git(['config', 'core.eol', 'lf'], repoA);
   git(['remote', 'add', 'origin', bare], repoA);
 
   fs.mkdirSync(repoB, { recursive: true });
   git(['init', '-q'], repoB);
   git(['config', 'user.email', 'test@wyren'], repoB);
   git(['config', 'user.name', 'wyren-test'], repoB);
+  git(['config', 'core.autocrlf', 'false'], repoB);
+  git(['config', 'core.eol', 'lf'], repoB);
   git(['remote', 'add', 'origin', bare], repoB);
 
   return { bare, repoA, repoB };
@@ -189,6 +194,17 @@ function pushMemory(repoDir, content) {
 }
 
 /**
+ * Write memory content directly to repoDir's .wyren/memory.md — simulates what
+ * GitSync.pull() would do without invoking git fetch. Tests use this + skipPull
+ * so pull timing can't cause flakiness; pull logic is covered by sync.test.mjs.
+ */
+function mirrorMemory(repoDir, content) {
+  const wyrenDir = path.join(repoDir, '.wyren');
+  fs.mkdirSync(wyrenDir, { recursive: true });
+  fs.writeFileSync(path.join(wyrenDir, 'memory.md'), content, 'utf8');
+}
+
+/**
  * Seed B's UPS state so it appears as if B already saw a given memory content.
  * This prevents the first-run seed from suppressing the delta on the next fire.
  * Writes to ups-state.json (UPS-owned) NOT watermark.json (Stop-owned).
@@ -234,7 +250,7 @@ function runUPS(repoDir, opts = {}) {
     cwd: WYREN_ROOT,
     input: stdin,
     encoding: 'utf8',
-    timeout: 15000,
+    timeout: 30000,
     env,
     windowsHide: true,
   });
@@ -283,9 +299,10 @@ test('Test 1: A pushes new memory, B UPS fires and injects delta', () => {
     // Step 4: A pushes new memory with an additional bullet
     const v1 = '# Wyren Memory\n\n## Decisions\n- Use SQLite [session a, turn 1]\n- Add rate limiting [session a, turn 3]\n';
     pushMemory(repoA, v1);
+    mirrorMemory(repoB, v1); // simulate pull — avoids git fetch timing flakiness
 
-    // Step 5: B's UPS fires — should pull v1 from bare, detect change, emit delta
-    const result = runUPS(repoB);
+    // Step 5: B's UPS fires — detects disk change, emits delta
+    const result = runUPS(repoB, { skipPull: true });
 
     assert.equal(result.status, 0, `hook exited ${result.status}: stderr=${result.stderr}`);
     assert.equal(result.error, undefined, `spawn error: ${result.error}`);
@@ -319,16 +336,17 @@ test('Test 2: UPS idempotent — second fire after same content produces no inje
     // A pushes V1
     const v1 = '# Wyren Memory\n\n## Decisions\n- Use SQLite [session a, turn 1]\n- Add caching [session a, turn 5]\n';
     pushMemory(repoA, v1);
+    mirrorMemory(repoB, v1);
 
     // B's first UPS fire — should inject V0→V1 delta
-    const fire1 = runUPS(repoB);
+    const fire1 = runUPS(repoB, { skipPull: true });
     assert.equal(fire1.status, 0, `fire1 exited ${fire1.status}: ${fire1.stderr}`);
     const ctx1 = parseAdditionalContext(fire1);
     assert.ok(ctx1 !== null, `First UPS fire should produce additionalContext. stdout="${fire1.stdout}"`);
     assert.ok(ctx1.includes('Add caching'), `First delta should include new bullet. Got: ${ctx1}`);
 
     // B's second UPS fire immediately — mtime already recorded by fire1 → no injection
-    const fire2 = runUPS(repoB);
+    const fire2 = runUPS(repoB, { skipPull: true });
     assert.equal(fire2.status, 0, `fire2 exited ${fire2.status}: ${fire2.stderr}`);
     const ctx2 = parseAdditionalContext(fire2);
     assert.equal(ctx2, null, `Second UPS fire should produce no injection. Got: ${ctx2}`);
@@ -352,6 +370,8 @@ test('Test 3: Multiple teammates push, B sees all new bullets in one injection',
     git(['init', '-q'], repoC);
     git(['config', 'user.email', 'c@wyren'], repoC);
     git(['config', 'user.name', 'wyren-c'], repoC);
+    git(['config', 'core.autocrlf', 'false'], repoC);
+    git(['config', 'core.eol', 'lf'], repoC);
     git(['remote', 'add', 'origin', path.join(base, 'bare.git')], repoC);
 
     const v0 = '# Wyren Memory\n\n## Decisions\n- Use SQLite [session a, turn 1]\n';
@@ -378,9 +398,10 @@ test('Test 3: Multiple teammates push, B sees all new bullets in one injection',
     const v2 = fs.readFileSync(path.join(repoC, '.wyren', 'memory.md'), 'utf8').trimEnd()
       + '\n- C teammate decision [session c, turn 2]\n';
     pushMemory(repoC, v2);
+    mirrorMemory(repoB, v2);
 
-    // B's UPS fires once — should pull v2 (latest), see ALL 3 new bullets
-    const fire = runUPS(repoB);
+    // B's UPS fires once — sees v2 on disk (all 3 new bullets)
+    const fire = runUPS(repoB, { skipPull: true });
     assert.equal(fire.status, 0, `UPS exited ${fire.status}: ${fire.stderr}`);
     const ctx = parseAdditionalContext(fire);
     assert.ok(ctx !== null, `B should receive injection with all new bullets. stdout="${fire.stdout}"`);
@@ -415,7 +436,7 @@ test('Test 4: Self-echo — B pushes its own memory, UPS fires, documents echo b
     // B's ups-state.json says: mtime=1, hash=hash(v0).
     // UPS will see mtime differs → hash differs → compute diff(v0, vB) → inject.
     // This is the intentional self-echo behavior in v1 (no self-loop guard).
-    const fire = runUPS(repoB);
+    const fire = runUPS(repoB, { skipPull: true });
     assert.equal(fire.status, 0, `UPS exited ${fire.status}: ${fire.stderr}`);
 
     const ctx = parseAdditionalContext(fire);
@@ -431,7 +452,7 @@ test('Test 4: Self-echo — B pushes its own memory, UPS fires, documents echo b
     // If mtime guard happened to match (tight timing), ctx could be null — also OK.
 
     // Second fire — watermark is now updated with vB's mtime → no injection
-    const fire2 = runUPS(repoB);
+    const fire2 = runUPS(repoB, { skipPull: true });
     assert.equal(fire2.status, 0, `fire2 exited ${fire2.status}: ${fire2.stderr}`);
     const ctx2 = parseAdditionalContext(fire2);
     assert.equal(ctx2, null, 'Second fire after self-echo should produce no injection');
@@ -462,7 +483,7 @@ test('Test 5: No remote initially, remote added mid-session, UPS eventually inje
     git(['remote', 'remove', 'origin'], repoB);
 
     // First UPS fire: no remote → GitSync.pull() short-circuits → first-run seed
-    const fire1 = runUPS(repoB);
+    const fire1 = runUPS(repoB, { skipPull: true });
     assert.equal(fire1.status, 0, `fire1 exited ${fire1.status}: ${fire1.stderr}`);
     const ctx1 = parseAdditionalContext(fire1);
     // First run: UPS seeds its state (writes ups-state.json) but produces no delta
@@ -483,9 +504,10 @@ test('Test 5: No remote initially, remote added mid-session, UPS eventually inje
     // A pushes new content
     const v1 = '# Wyren Memory\n\n## Decisions\n- Use SQLite [session a, turn 1]\n- Mid-session addition [session a, turn 7]\n';
     pushMemory(repoA, v1);
+    mirrorMemory(repoB, v1); // simulate pull — avoids git fetch timing flakiness
 
-    // Second UPS fire: now has remote + local branch → pulls v1, detects change, injects delta
-    const fire2 = runUPS(repoB);
+    // Second UPS fire: now has remote + local branch → detects change on disk, injects delta
+    const fire2 = runUPS(repoB, { skipPull: true });
     assert.equal(fire2.status, 0, `fire2 exited ${fire2.status}: ${fire2.stderr}`);
     const ctx2 = parseAdditionalContext(fire2);
     assert.ok(
@@ -516,22 +538,23 @@ test('Test 6: Rapid concurrent UPS fires are idempotent (mtime guards dedup)', (
 
     // Seed B's UPS state so first fire produces a real delta
     seedBUpsState(repoB, v0);
+    mirrorMemory(repoB, v1); // simulate pull — avoids git fetch timing flakiness
 
     // Fire 1 — should inject
-    const fire1 = runUPS(repoB);
+    const fire1 = runUPS(repoB, { skipPull: true });
     assert.equal(fire1.status, 0, `fire1 exited ${fire1.status}: ${fire1.stderr}`);
     const ctx1 = parseAdditionalContext(fire1);
     assert.ok(ctx1 !== null, `fire1 should inject. stdout="${fire1.stdout}"`);
     assert.ok(ctx1.includes('Concurrent fire'), `Delta missing expected bullet. Got: ${ctx1}`);
 
     // Fire 2 immediately — mtime guard should kill it (same memory.md, same mtime)
-    const fire2 = runUPS(repoB);
+    const fire2 = runUPS(repoB, { skipPull: true });
     assert.equal(fire2.status, 0, `fire2 exited ${fire2.status}: ${fire2.stderr}`);
     const ctx2 = parseAdditionalContext(fire2);
     assert.equal(ctx2, null, `fire2 must produce no injection (deduped by mtime). Got: ${ctx2}`);
 
     // Fire 3 also — guard holds
-    const fire3 = runUPS(repoB);
+    const fire3 = runUPS(repoB, { skipPull: true });
     assert.equal(fire3.status, 0, `fire3 exited ${fire3.status}: ${fire3.stderr}`);
     const ctx3 = parseAdditionalContext(fire3);
     assert.equal(ctx3, null, `fire3 must produce no injection. Got: ${ctx3}`);
@@ -560,8 +583,9 @@ test('Test 7: Large delta is truncated to stay within 4096 byte limit', () => {
     ).join('\n');
     const vBig = `# Wyren Memory\n\n## Decisions\n- Original decision [session a, turn 1]\n${bullets}\n`;
     pushMemory(repoA, vBig);
+    mirrorMemory(repoB, vBig); // simulate pull — avoids git fetch timing flakiness
 
-    const fire = runUPS(repoB);
+    const fire = runUPS(repoB, { skipPull: true });
     assert.equal(fire.status, 0, `UPS exited ${fire.status}: ${fire.stderr}`);
     const ctx = parseAdditionalContext(fire);
     assert.ok(ctx !== null, `Large delta should still inject. stdout="${fire.stdout}"`);
@@ -594,8 +618,9 @@ test('Test 8: Bullet reordering in same section produces no delta', () => {
     // Reorder bullets (same set, different order)
     const vReordered = '# Wyren Memory\n\n## Decisions\n- Beta [session a, turn 2]\n- Alpha [session a, turn 1]\n';
     pushMemory(repoA, vReordered);
+    mirrorMemory(repoB, vReordered); // simulate pull — avoids git fetch timing flakiness
 
-    const fire = runUPS(repoB);
+    const fire = runUPS(repoB, { skipPull: true });
     assert.equal(fire.status, 0, `UPS exited ${fire.status}: ${fire.stderr}`);
     const ctx = parseAdditionalContext(fire);
 

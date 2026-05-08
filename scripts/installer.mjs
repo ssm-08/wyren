@@ -17,7 +17,7 @@ function isMain(metaUrl) {
   }
 }
 
-const '@ssm-08/wyren';
+const NPM_PACKAGE = '@ssm-08/wyren';
 
 // --------------------------------------------------------------------------
 // Logging
