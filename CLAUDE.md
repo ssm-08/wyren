@@ -158,3 +158,16 @@ Only then confirm "safe to clear."
 Next planned specs: distillation quality, CLAUDE.md compatibility, reliability (`wyren doctor` deep checks), sync robustness, decision traceability.
 
 Don't build: cloud sync backend, dashboard UI, MCP RAG server, permissions/auth, Cursor/Windsurf support, real-time per-turn sync, CRDT merge strategies. All designed-for but out of scope.
+
+## Long-term architectural direction — persistent graph
+
+`memory.md` is currently a culled, fixed-size file. The v2 vision: replace culling with rendering. A persistent knowledge graph stores every entry forever; `memory.md` becomes a viewport — a session-relevant slice rendered on demand. Nothing is discarded. The 60-line cap becomes a rendering limit, not a storage limit.
+
+**What this unlocks:**
+- Decisions persist through connections, not manual retention
+- Cross-time, cross-domain connectivity: past decisions resurface when relevant, regardless of when or who made them
+- Reasoning is queryable — not just what is known, but why, what it impacts, what's been tried
+
+**Mental model:** before = memory is what survived culling. After = memory is everything, selectively rendered by relevance.
+
+`memory.md` stays as the rendered output format (backwards-compatible with v1). The graph is the backing store. Do not build until a storage layer spec exists.

@@ -1,6 +1,6 @@
 ---
 title: Future
-description: Cloud sync, MCP RAG, permissions, dashboard — what comes next.
+description: Persistent memory graph, cloud sync, MCP RAG, permissions, dashboard — what comes next.
 ---
 
 Everything below is designed for but not yet built. The architecture is already pluggable — these are the natural extensions.
@@ -105,6 +105,32 @@ Current memory is a snapshot — latest state only. A future version could keep 
 ```
 
 Useful for retrospectives, post-mortems, demo narratives. Implementation: append-only log alongside the snapshot file.
+
+## Persistent memory graph
+
+Current Wyren culls. When `memory.md` fills up, the distiller drops the least load-bearing entries to stay under the 60-line cap. Old-but-valid decisions fall out.
+
+The long-term direction: replace culling with rendering. `memory.md` becomes a **viewport** into a persistent knowledge graph. Nothing is ever discarded — entries outside the current view remain in the graph, connected and queryable.
+
+**What changes:**
+
+- The 60-line cap becomes a rendering limit, not a storage limit.
+- Decisions persist through connections, not manual retention. A decision made in session 12 resurfaces in session 47 when relevant context reappears — without anyone explicitly keeping it alive.
+- Reasoning is queryable: not just *what* is known, but *why*, *what it impacts*, and *what's been tried*.
+- Cross-time, cross-domain connectivity: a rejected approach from three months ago resurfaces when the same problem recurs, regardless of who originally tried it.
+
+**Mental model shift:**
+
+| | |
+|---|---|
+| Before | Memory = what survived culling |
+| After | Memory = everything, selectively rendered by relevance |
+
+**Backwards compatibility:** `memory.md` stays as the rendered output format. The graph is the backing store. v1 consumers see no change.
+
+**Implementation sketch:** a local graph DB (SQLite + edges table) stores every distilled entry with session ID, timestamp, and source turns. On session start, a relevance query against current `cwd` and recent transcript signal determines the rendered slice. The distiller writes to the graph first, then renders `memory.md` from it.
+
+Not yet designed in detail. Building this requires settling on a storage layer and query model before touching the distiller.
 
 ## Per-module memory
 
