@@ -11,9 +11,9 @@ Wyren is a Claude Code plugin for shared team memory across sessions. Transcript
 
 ## Current state
 
-**v0.4.1 — project renamed relay → wyren.** All 6 chunks shipped. Full install/uninstall/doctor CLI. Live sync via UserPromptSubmit. npm package: `@ssm-08/wyren` (scoped — unscoped `wyren` blocked by npm similarity check). Install flow: `npm install -g @ssm-08/wyren && wyren install`. Rename pass (2026-05-07): all source files, binary (`bin/wyren.mjs`), state dir (`.wyren/`), slash command (`wyren-handoff`), env vars (`WYREN_*`), function names updated. Prior `@ssm-08/relay` unpublished.
+**v0.4.2 — project renamed relay → wyren.** All 6 chunks shipped. Full install/uninstall/doctor CLI. Live sync via UserPromptSubmit. npm package: `@ssm-08/wyren` (scoped — unscoped `wyren` blocked by npm similarity check). Install flow: `npm install -g @ssm-08/wyren && wyren install`. Rename pass (2026-05-07): all source files, binary (`bin/wyren.mjs`), state dir (`.wyren/`), slash command (`wyren-handoff`), env vars (`WYREN_*`), function names updated. Prior `@ssm-08/relay` unpublished.
 
-**Tests:** 166 unit (~15s) — 164 pass, 1 skip (POSIX-only), 1 flaky-under-load. 32 e2e (~25s). See `git log` for full history.
+**Tests:** 173 unit (~3min) — 171 pass, 2 skip (POSIX-only), 0 flaky-under-load (concurrency=1). 32 e2e (~25s). See `git log` for full history.
 
 **Known flaky:** `fault-e2e-livesync` (Test 1, Test 5) and `sync.test.mjs` fail under concurrent file load (subprocess + git-op contention); `--test-concurrency=1` serializes file execution and prevents this. CI and `npm test` both use it.
 
@@ -33,7 +33,7 @@ lib/transcript.mjs           # JSONL parse + slice + render
 lib/memory.mjs               # atomic read/write
 lib/filter.mjs               # Tier 0 weighted scoring (scoreTier0 + hasTier0Signal, dynamic threshold)
 lib/diff-memory.mjs          # parseSections, diffMemory, renderDelta, hashMemory
-lib/util.mjs                 # isMain (realpathSync junction-safe), readStdin
+lib/util.mjs                 # isMain (realpathSync junction-safe), readStdin, atomicRename
 prompts/distill.md           # distiller system prompt
 scripts/installer.mjs        # install/update/uninstall/doctor, BOM-tolerant, npm link (755)
 scripts/test-e2e.mjs         # 32 e2e tests, 8 groups (A–H)
@@ -74,7 +74,9 @@ node scripts/installer.mjs uninstall --home /tmp/fake-home
 
 1. **Trigger lock release order** (`stop.mjs`). `distill-trigger.lock` must be unlinked AFTER `distiller_running` is written to `watermark.json`. Unlinking before the write opens a window where a concurrent Stop hook passes the lock and spawns a second distiller. Current code does this correctly — don't move the `unlinkSync` earlier.
 
-2. **`writeWatermark` retry loop** (`distiller.mjs`). The local `writeWatermark` in distiller.mjs (intentionally not imported from stop.mjs — distiller runs detached) must use the same 3-attempt EPERM/EBUSY retry loop as `writeWatermarkAtomic`. A bare `fs.renameSync` on Windows will EPERM-crash on transient file contention, leaving `distiller_running: true` stuck forever.
+2. **`writeWatermark` retry loop** (`distiller.mjs`). The local `writeWatermark` in distiller.mjs (intentionally not imported from stop.mjs — distiller runs detached) must use the same 5-attempt EPERM/EBUSY/EACCES retry loop with staggered busy-wait as `writeWatermarkAtomic`. A bare `fs.renameSync` on Windows will EPERM-crash on transient file contention, leaving `distiller_running: true` stuck forever. Do NOT replace with `atomicRename` from lib/util.mjs — self-containment is required.
+
+2a. **UPS write order** (`user-prompt-submit.mjs`). Snapshot (`last-injected-memory.md`) must be written BEFORE `ups-state.json`. If killed between the two writes, upsState-first means `last_injected_mtime` matches on next run → mtime fast-path skips → delta permanently lost. Snapshot-first means next run re-diffs and gets an empty delta — benign.
 
 3. **Broadcast size cap** (`session-start.mjs`). `readBroadcastDir` caps at 50 KB/file and 200 KB total. Large skill files (code templates, PDFs) would otherwise inject megabytes into every session. Don't remove the cap.
 
@@ -108,7 +110,7 @@ node scripts/installer.mjs uninstall --home /tmp/fake-home
 - **Preferred AI call: `claude -p --bare`** — `--bare` strips global plugins/hooks from subprocess.
 - **Tier 0 filter mandatory** before any API call. ~70% of triggers skip the API entirely.
 - **Hooks never block.** SessionStart 2s, UPS 3s, Stop spawns detached. On error: log + `process.exit(0)`.
-- **Atomic writes everywhere.** Pattern: write to `.pid.timestamp.tmp`, then retry-`renameSync` (3× EPERM/EBUSY loop).
+- **Atomic writes everywhere.** Pattern: write to `.pid.timestamp.tmp`, then retry-`renameSync` via `atomicRename()` in `lib/util.mjs` (5× EPERM/EBUSY/EACCES loop with staggered busy-wait). `distiller.mjs` inlines its own copy — intentionally self-contained, no lib imports.
 - **`distiller_running` + PID liveness.** `shouldDistill` calls `process.kill(pid, 0)` — clears stale flag on ESRCH.
 - **Windows: `cmd /c claude` not `shell:true`.** Avoids DEP0190, keeps no-injection-surface rule.
 - **`git()` helper uses `spawnSync(array)`.** Never shell strings.
@@ -126,7 +128,7 @@ node scripts/installer.mjs uninstall --home /tmp/fake-home
 
 Plugin tests:
 ```bash
-npm test                                    # 166 unit tests (~15s); expect 164 pass, 1 skip, 1 flaky
+npm test                                    # 173 unit tests (~3min); expect 171 pass, 2 skip, 0 flaky
 npm run test:e2e                            # 32 e2e tests (~25s, no Claude API)
 node scripts/test-e2e.mjs --only stop       # filter to one group
 node scripts/test-e2e.mjs --verbose         # dump stdout/stderr on failure
