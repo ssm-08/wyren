@@ -54,8 +54,8 @@ if ($fromLocal) {
 }
 
 # Standard install: npm global install, then wire hooks
-Write-Host "[wyren] Installing wyren globally..."
-& npm install -g wyren
+Write-Host "[wyren] Installing @ssm-08/wyren globally..."
+& npm install -g @ssm-08/wyren
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 & wyren install @WyrenArgs

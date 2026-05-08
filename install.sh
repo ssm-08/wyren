@@ -41,7 +41,7 @@ if [ -n "$FROM_LOCAL" ]; then
 fi
 
 # Standard install: npm global install, then wire hooks
-echo "[wyren] Installing wyren globally..." >&2
-npm install -g wyren
+echo "[wyren] Installing @ssm-08/wyren globally..." >&2
+npm install -g @ssm-08/wyren
 
 exec wyren install "$@"

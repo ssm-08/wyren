@@ -14,7 +14,7 @@ description: One-liner install. Two minutes. One shared brain.
 Every teammate runs once on their machine:
 
 ```bash
-npm install -g wyren
+npm install -g @ssm-08/wyren
 wyren install
 ```
 
@@ -131,7 +131,7 @@ wyren status
 wyren update
 ```
 
-Runs `npm update -g wyren`, re-patches `settings.json` if the hook shape changed, and verifies the install.
+Runs `npm update -g @ssm-08/wyren`, re-patches `settings.json` if the hook shape changed, and verifies the install.
 
 ## Uninstalling
 
@@ -141,7 +141,7 @@ From the machine:
 wyren uninstall
 ```
 
-Removes: plugin link, Wyren entries from `settings.json`, and global `wyren` CLI registration (`npm uninstall -g wyren`).
+Removes: plugin link, Wyren entries from `settings.json`, and global `wyren` CLI registration (`npm uninstall -g @ssm-08/wyren`).
 
 From a repo you want to stop tracking:
 
@@ -169,7 +169,7 @@ See [FAQ](/faq/) for common issues.
 
 ### `wyren` command not found
 
-npm's global bin directory may not be on your PATH. Find it with `npm bin -g` and add it to your shell profile. Or reinstall: `npm install -g wyren`.
+npm's global bin directory may not be on your PATH. Find it with `npm bin -g` and add it to your shell profile. Or reinstall: `npm install -g @ssm-08/wyren`.
 
 ### settings.json comments were removed
 

@@ -11,7 +11,7 @@ Wyren is a Claude Code plugin for shared team memory across sessions. Transcript
 
 ## Current state
 
-**v0.4.1 — project renamed relay → wyren.** All 6 chunks shipped. Full install/uninstall/doctor CLI. Live sync via UserPromptSubmit. npm package: `wyren` (unscoped, not yet published — run `npm publish --access public`). Install flow: `npm install -g wyren && wyren install`. Rename pass (2026-05-07): all source files, binary (`bin/wyren.mjs`), state dir (`.wyren/`), slash command (`wyren-handoff`), env vars (`WYREN_*`), function names updated. Prior `@ssm-08/relay` unpublished.
+**v0.4.1 — project renamed relay → wyren.** All 6 chunks shipped. Full install/uninstall/doctor CLI. Live sync via UserPromptSubmit. npm package: `@ssm-08/wyren` (scoped — unscoped `wyren` blocked by npm similarity check). Install flow: `npm install -g @ssm-08/wyren && wyren install`. Rename pass (2026-05-07): all source files, binary (`bin/wyren.mjs`), state dir (`.wyren/`), slash command (`wyren-handoff`), env vars (`WYREN_*`), function names updated. Prior `@ssm-08/relay` unpublished.
 
 **Tests:** 166 unit (~15s) — 164 pass, 1 skip (POSIX-only), 1 flaky-under-load. 32 e2e (~25s). See `git log` for full history.
 

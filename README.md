@@ -45,7 +45,7 @@ tail -f .wyren/log
 ## Install
 
 ```bash
-npm install -g wyren
+npm install -g @ssm-08/wyren
 wyren install
 ```
 
