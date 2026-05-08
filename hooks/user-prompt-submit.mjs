@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
-import { readStdin, isMain } from '../lib/util.mjs';
+import { readStdin, isMain, atomicRename } from '../lib/util.mjs';
 import { readMemory, writeMemoryAtomic } from '../lib/memory.mjs';
 import { GitSync } from '../lib/sync.mjs';
 import { diffMemory, renderDelta, hashMemory } from '../lib/diff-memory.mjs';
@@ -31,18 +31,7 @@ function readUpsState(upsStatePath) {
 function writeUpsStateAtomic(upsStatePath, state) {
   const tmp = `${upsStatePath}.${process.pid}.${Date.now()}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(state, null, 2));
-  let lastErr;
-  for (let i = 0; i < 5; i++) {
-    try { fs.renameSync(tmp, upsStatePath); return; } catch (e) {
-      lastErr = e;
-      if (e.code !== 'EPERM' && e.code !== 'EBUSY' && e.code !== 'EACCES') break;
-      // Staggered busy-wait: reduces concurrent NTFS rename contention on Windows
-      const end = Date.now() + i + 1;
-      while (Date.now() < end) {}
-    }
-  }
-  try { fs.unlinkSync(tmp); } catch {}
-  throw lastErr;
+  atomicRename(tmp, upsStatePath);
 }
 
 function markInjection(cwd, event) {
@@ -163,10 +152,12 @@ async function main() {
     }
 
     // Write state updates only after successful output; never touch watermark.json.
-    writeUpsStateAtomic(upsStatePath, newUpsState);
+    // Snapshot first: if killed between writes, next run re-diffs harmlessly rather than
+    // fast-pathing on stale mtime and permanently losing the delta.
     if (newSnapshot !== null) {
       writeMemoryAtomic(snapshotPath, newSnapshot);
     }
+    writeUpsStateAtomic(upsStatePath, newUpsState);
 
     if (delta) markInjection(cwd, 'user-prompt-submit');
   } catch (e) {

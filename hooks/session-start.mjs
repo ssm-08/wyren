@@ -14,7 +14,7 @@ function isInsideDir(child, parent) {
 function truncateUtf8(s, maxBytes) {
   const buf = Buffer.from(s, 'utf8');
   if (buf.length <= maxBytes) return s;
-  return buf.subarray(0, maxBytes).toString('utf8').replace(/�$/, '');
+  return buf.subarray(0, maxBytes).toString('utf8').replace(/[�]+$/, '');
 }
 
 export function readBroadcastDir(broadcastDir) {
