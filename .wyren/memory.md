@@ -1,6 +1,6 @@
 ## Decisions
 - Wyren project: all 6 chunks + installer v1 shipped and live on master [session c02d8414, turn 30]
-- 165 tests passing (164 unit, 1 skipped POSIX-only): includes UserPromptSubmit Group I + fault-injection suites (network/git, corruption, concurrency, e2e); all pass, zero failures [session ee77f650, turn 38]
+- 187 tests passing (185 unit pass, 2 skip POSIX-only): includes sync-integrity v1 (force-push detection, stale memory detection) + UserPromptSubmit Group I + fault-injection suites; all pass, zero failures [session 19e290bc, turn 206]
 - Two-system end-to-end verified: System A distilled + pushed; System B pulled + injected at SessionStart [session c02d8414, turn 320]
 - Installer architecture: Approach A (two shell shims + shared Node helper in scripts/installer.mjs). Shell scripts thin; all logic in Node. macOS/Linux symlink, Windows junction, no admin required. CLI: `npm install -g` registers wyren globally on install; `wyren update` re-registers CLI on update; `npm uninstall -g @ssm-08/wyren` (fail-open) removes plugin link, settings.json entries, global CLI registration, and wyren clone directory at `~/.claude/wyren/`. Settings.json hook commands use absolute repoDir paths. [session 12e443d5, turn 193; updated ee77f650, turn 7]
 - setup.ps1 is a deprecation stub — real install via install.sh (macOS) or install.ps1 (Windows) [session 12e443d5, turn 265]
@@ -13,16 +13,10 @@
 - SessionStart hook timeout: 4s minimum (measured 1.9s baseline from git fetch ~1.5s + checkout ~0.5s; 2s was racing). Updated in settings.json and scripts/installer.mjs. [session 37beaeb6, turn 40]
 - Distiller: cannot use --bare flag (strips OAuth/keychain auth, causes "Not logged in" failures). Must use full auth for memory updates. Claude Code flags: --allowedTools not --tools. [session 37beaeb6, turn 76]
 - Tier0 filter acts as hard gate before distill trigger: both turns_since_distill >= threshold AND tier0 score required. Low-signal turns (e.g., "hi" exchange) score 0 → filtered → no distillation even if threshold met, no API call. [session 37beaeb6, turn 9]
-- UPS live-sync test: verified remote edits inject on next user turn. [session test, 2026-05-09]
 
 ## Rejected paths
 - Approach B (pure bash + pure PowerShell): Already hit PS 5.1 gotchas; bash equivalents (readlink -f diff BSD/GNU, sed-based JSON) compound. Drift between parallel scripts guaranteed. [session 12e443d5, turn 75]
 - Approach C (Node-only, thin shell wrappers): `node <(curl)` pattern fragile across proxies, auth, signature verification. Requires pre-verification steps. Approach A keeps platform logic in thin shells where it belongs. [session 12e443d5, turn 75]
-
-## Known broken state
-- `remote_diverged` exits 0 with no recovery guidance when distill detects local/remote divergence; should print next step: "run `git fetch && git rebase origin/master`, then re-run `wyren distill --push`" [session 910cd748, turn 6]
-- Duplicate `# Wyren Memory` header in template (lib/memory.mjs) appears on cold-start injection — cosmetic but visually odd [session 910cd748, turn 3]
-- `wyren distill --push` behavior (commits memory.md + pushes branch) not documented in `--help` output; flag help text implies distill-only [session 910cd748, turn 8]
 
 ## Scope changes
 - Deployability v1 shipped 2026-04-23: install.sh, install.ps1, scripts/installer.mjs, wyren install/update/uninstall/doctor CLI subcommands, CI matrix (ubuntu unit tests + macos/windows e2e), 26 new installer unit tests, Group H (6 e2e tests) [session 12e443d5, turn 425]
@@ -33,5 +27,4 @@
 - Test coverage for transcript.mjs (2026-04-24): unit tests added, going from zero coverage to 17 tests covering readTranscriptLines, sliceSinceUuid, lastUuid, renderForDistiller [session 6b7ed01f, turn 65]
 - Stop hook distiller state fix (2026-04-24): turns_since_distill reset made conditional on successful spawnDistiller()—if spawn fails (no PID returned), turn counter accumulates toward next trigger instead of resetting [session 6b7ed01f, turn 76]
 - Fixed distiller auth (2026-05-08): removed --bare flag that was stripping OAuth/keychain, causing permanent "Not logged in" failures. Updated claude -p invocation to use current Claude Code flags. [session 37beaeb6, turn 82]
-- Stale memory detection fix (design approved): add `Peer pushed:` timestamp to `wyren status` output + post-distill nag when --push omitted [session 19e290bc, turn 47]
-- Force-push integrity fix (design approved): UPS stores `last_remote_memory_commit` in ups-state.json, runs ancestry check after pull, warns+injects on force-push detection (fail-open) [session 19e290bc, turn 47]
+- Sync-integrity v1 shipped (2026-05-09): Stale memory detection via `Peer pushed:` line in wyren status (shows remote memory.md commit timestamp) + post-distill nag when --push omitted. Force-push detection in UPS via ancestry check (`git merge-base --is-ancestor`), warns+injects on violation, `last_remote_memory_commit` persisted in ups-state.json. 5 new tests (2 in wyren-status.test.mjs, 3 for mergeForcePushWarning). [session 19e290bc, turn 206]
