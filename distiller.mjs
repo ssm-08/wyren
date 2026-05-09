@@ -54,9 +54,7 @@ function runClaude(prompt, model) {
   return new Promise((resolve, reject) => {
     const claudeArgs = [
       '-p',
-      '--bare',
       '--no-session-persistence',
-      '--tools', '',   // empty string = no tools; --bare doesn't disable tools
       '--output-format', 'text',
       '--max-budget-usd', '1.00',
     ];

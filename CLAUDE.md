@@ -11,7 +11,7 @@ Wyren is a Claude Code plugin for shared team memory across sessions. Transcript
 
 ## Current state
 
-**v0.4.2 — project renamed relay → wyren.** All 6 chunks shipped. Full install/uninstall/doctor CLI. Live sync via UserPromptSubmit. npm package: `@ssm-08/wyren` (scoped — unscoped `wyren` blocked by npm similarity check). Install flow: `npm install -g @ssm-08/wyren && wyren install`. Rename pass (2026-05-07): all source files, binary (`bin/wyren.mjs`), state dir (`.wyren/`), slash command (`wyren-handoff`), env vars (`WYREN_*`), function names updated. Prior `@ssm-08/relay` unpublished.
+**v0.4.3 — distiller auth fix + SessionStart timeout fix.** All 6 chunks shipped. Full install/uninstall/doctor CLI. Live sync via UserPromptSubmit. npm package: `@ssm-08/wyren` (scoped — unscoped `wyren` blocked by npm similarity check). Install flow: `npm install -g @ssm-08/wyren && wyren install`. Rename pass (2026-05-07): all source files, binary (`bin/wyren.mjs`), state dir (`.wyren/`), slash command (`wyren-handoff`), env vars (`WYREN_*`), function names updated. Prior `@ssm-08/relay` unpublished. Distiller fix (2026-05-08): removed `--bare` (stripped OAuth/keychain → "Not logged in") and `--tools ''` (flag removed from CC CLI).
 
 **Tests:** 173 unit (~3min) — 171 pass, 2 skip (POSIX-only), 0 flaky-under-load (concurrency=1). 32 e2e (~25s). See `git log` for full history.
 
@@ -21,12 +21,12 @@ Wyren is a Claude Code plugin for shared team memory across sessions. Transcript
 
 ```
 bin/wyren.mjs                # CLI: all subcommands (755)
-distiller.mjs                # Haiku 4.5, cmd /c claude on Windows, windowsHide:true
+distiller.mjs                # Haiku 4.5, cmd /c claude on Windows, windowsHide:true, no --bare (OAuth required)
 hooks/session-start.mjs      # pull (1.5s/0.5s) + inject memory + broadcast (50KB/file, 200KB total cap)
 hooks/stop.mjs               # watermark + PID-tracked detached distiller spawn
 hooks/user-prompt-submit.mjs # live sync: pull (1.5s) + diff + inject delta
 hooks/run-hook.cmd           # polyglot bash+cmd dispatcher (755)
-hooks/hooks.json             # hook manifest (SessionStart 2s, Stop 5s, UPS 3s)
+hooks/hooks.json             # hook manifest (SessionStart 4s, Stop 5s, UPS 3s)
 commands/wyren-handoff.toml  # /wyren-handoff slash command
 lib/sync.mjs                 # GitSync: pull/push/lock, user-file guard in push()
 lib/transcript.mjs           # JSONL parse + slice + render
@@ -40,7 +40,7 @@ scripts/test-e2e.mjs         # 32 e2e tests, 8 groups (A–H)
 scripts/setup.ps1            # DEPRECATED stub — forwards to install.ps1
 install.sh                   # macOS/Linux one-liner shim (755)
 install.ps1                  # Windows one-liner shim
-tests/                       # 166 unit tests (node:test)
+tests/                       # 173 unit tests (node:test)
 docs-site/                   # Astro Starlight docs site
 .github/workflows/           # docs.yml (Pages deploy) + ci.yml (unit + e2e matrix)
 ```
@@ -55,7 +55,7 @@ Junction into `~/.claude/plugins/wyren` is NOT sufficient. Claude Code only fire
 
 ```json
 "hooks": {
-  "SessionStart": [{"matcher": "", "hooks": [{"type": "command", "command": "\"C:\\Users\\you\\.claude\\wyren\\hooks\\run-hook.cmd\" session-start", "timeout": 2, "statusMessage": "Loading wyren memory..."}]}],
+  "SessionStart": [{"matcher": "", "hooks": [{"type": "command", "command": "\"C:\\Users\\you\\.claude\\wyren\\hooks\\run-hook.cmd\" session-start", "timeout": 4, "statusMessage": "Loading wyren memory..."}]}],
   "Stop": [{"matcher": "", "hooks": [{"type": "command", "command": "\"C:\\Users\\you\\.claude\\wyren\\hooks\\run-hook.cmd\" stop", "timeout": 5}]}],
   "UserPromptSubmit": [{"matcher": "", "hooks": [{"type": "command", "command": "\"C:\\Users\\you\\.claude\\wyren\\hooks\\run-hook.cmd\" user-prompt-submit", "timeout": 3}]}]
 }
@@ -107,7 +107,7 @@ node scripts/installer.mjs uninstall --home /tmp/fake-home
 ## Coding conventions
 
 - **Node.js ESM `.mjs`. Zero runtime deps** — stdlib only. `@anthropic-ai/sdk` is fallback-only.
-- **Preferred AI call: `claude -p --bare`** — `--bare` strips global plugins/hooks from subprocess.
+- **Preferred AI call: `claude -p`** — do NOT use `--bare`; it strips OAuth/keychain auth and causes "Not logged in" in detached processes. Use `--no-session-persistence` instead.
 - **Tier 0 filter mandatory** before any API call. ~70% of triggers skip the API entirely.
 - **Hooks never block.** SessionStart 2s, UPS 3s, Stop spawns detached. On error: log + `process.exit(0)`.
 - **Atomic writes everywhere.** Pattern: write to `.pid.timestamp.tmp`, then retry-`renameSync` via `atomicRename()` in `lib/util.mjs` (5× EPERM/EBUSY/EACCES loop with staggered busy-wait). `distiller.mjs` inlines its own copy — intentionally self-contained, no lib imports.

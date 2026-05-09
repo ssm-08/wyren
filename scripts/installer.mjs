@@ -211,7 +211,7 @@ function buildHookEntries(repoDir) {
   return {
     SessionStart: {
       matcher: '',
-      hooks: [{ type: 'command', command: `${q} session-start`, timeout: 2, statusMessage: 'Loading wyren memory...' }],
+      hooks: [{ type: 'command', command: `${q} session-start`, timeout: 4, statusMessage: 'Loading wyren memory...' }],
     },
     Stop: {
       matcher: '',
