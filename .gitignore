@@ -25,9 +25,9 @@ Thumbs.db
 # Local Claude Code state (per-machine, may contain permissions/secrets)
 .claude/
 
-# Graphify
+# Graphify and sim
 graphify-out/
-sim/
+sim/.last-base
 
 # Git worktrees
 .worktrees/
