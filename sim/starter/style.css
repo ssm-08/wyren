@@ -1,0 +1,19 @@
+body {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  margin: 0;
+  font-size: 1.25rem;
+  font-family: sans-serif;
+}
+
+main {
+  text-align: center;
+}
+
+button {
+  padding: 8px 16px;
+  font-size: 1.25rem;
+  cursor: pointer;
+}
