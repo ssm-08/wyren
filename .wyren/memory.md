@@ -1,6 +1,6 @@
 ## Decisions
 - Wyren project: all 6 chunks + installer v1 shipped and live on master [session c02d8414, turn 30]
-- 165 tests passing (164 unit, 1 skipped POSIX-only): includes UserPromptSubmit Group I + fault-injection suites (network/git, corruption, concurrency, e2e); all pass, zero failures [session ee77f650, turn 38]
+- 182 tests passing (180 pass, 2 skipped POSIX-only): includes sim-setup.test.mjs (8 tests) [session 910cd748, turn 85]
 - Two-system end-to-end verified: System A distilled + pushed; System B pulled + injected at SessionStart [session c02d8414, turn 320]
 - Installer architecture: Approach A (two shell shims + shared Node helper in scripts/installer.mjs). Shell scripts thin; all logic in Node. macOS/Linux symlink, Windows junction, no admin required. CLI: `npm install -g` registers wyren globally on install; `wyren update` re-registers CLI on update; `npm uninstall -g @ssm-08/wyren` (fail-open) removes plugin link, settings.json entries, global CLI registration, and wyren clone directory at `~/.claude/wyren/`. Settings.json hook commands use absolute repoDir paths. [session 12e443d5, turn 193; updated ee77f650, turn 7]
 - setup.ps1 is a deprecation stub — real install via install.sh (macOS) or install.ps1 (Windows) [session 12e443d5, turn 265]
@@ -14,6 +14,8 @@
 - Distiller: cannot use --bare flag (strips OAuth/keychain auth, causes "Not logged in" failures). Must use full auth for memory updates. Claude Code flags: --allowedTools not --tools. [session 37beaeb6, turn 76]
 - Tier0 filter acts as hard gate before distill trigger: both turns_since_distill >= threshold AND tier0 score required. Low-signal turns (e.g., "hi" exchange) score 0 → filtered → no distillation even if threshold met, no API call. [session 37beaeb6, turn 9]
 - UPS live-sync test: verified remote edits inject on next user turn. [session test, 2026-05-09]
+- setup.mjs workspace dirs: workspace-a and workspace-b (not dev-a/dev-b); .simbase written to baseDir not sim/; sim-log.md as log file [session 910cd748, turn 64]
+- Two-session sim harness: locally runnable via `node sim/setup.mjs` → paste sim/prompts/dev-a.md and dev-b.md to respective workspaces → type "GO Round N" to coordinate rounds [session 910cd748, turn 109]
 
 ## Rejected paths
 - Approach B (pure bash + pure PowerShell): Already hit PS 5.1 gotchas; bash equivalents (readlink -f diff BSD/GNU, sed-based JSON) compound. Drift between parallel scripts guaranteed. [session 12e443d5, turn 75]
@@ -28,4 +30,4 @@
 - Test coverage for transcript.mjs (2026-04-24): unit tests added, going from zero coverage to 17 tests covering readTranscriptLines, sliceSinceUuid, lastUuid, renderForDistiller [session 6b7ed01f, turn 65]
 - Stop hook distiller state fix (2026-04-24): turns_since_distill reset made conditional on successful spawnDistiller()—if spawn fails (no PID returned), turn counter accumulates toward next trigger instead of resetting [session 6b7ed01f, turn 76]
 - Fixed distiller auth (2026-05-08): removed --bare flag that was stripping OAuth/keychain, causing permanent "Not logged in" failures. Updated claude -p invocation to use current Claude Code flags. [session 37beaeb6, turn 82]
-- Two-session simulation harness shipped 2026-05-08: `sim/setup.mjs` + `sim/teardown.mjs` + `sim/starter/` (counter app) + `sim/README.md` (runbook, stress table, troubleshooting). Scaffolds local bare repo + two clones (dev-a, dev-b), runs wyren init, verifies `.wyren/memory.md`. Reuses two-clone `file:///` pattern from fault-e2e-livesync tests. [session 5636eadc, turn 67]
+- Two-session simulation harness shipped 2026-05-08: `sim/setup.mjs` + `sim/teardown.mjs` + `sim/starter/` (counter app) + `sim/README.md` (runbook, stress table, troubleshooting) + `sim/prompts/dev-{a,b}.md` + `tests/sim-setup.test.mjs` (8 tests, all pass). Scaffolds local bare repo + two clones (workspace-a, workspace-b), runs wyren init, verifies `.wyren/memory.md`. Bugs fixed: dir existence check, workspace naming, .simbase location. [session 5636eadc, turn 67; updated 910cd748, turn 64]
