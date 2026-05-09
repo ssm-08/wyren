@@ -21,10 +21,8 @@
 
 ## Known broken state
 - `remote_diverged` exits 0 with no recovery guidance when distill detects local/remote divergence; should print next step: "run `git fetch && git rebase origin/master`, then re-run `wyren distill --push`" [session 910cd748, turn 6]
-- Stale memory fully undetectable — `wyren status` shows local distill/inject timestamps only; no `Peer distilled:` or `Peer pushed:` field to detect when a peer skipped `--push` [session 910cd748, turn 8]
 - Duplicate `# Wyren Memory` header in template (lib/memory.mjs) appears on cold-start injection — cosmetic but visually odd [session 910cd748, turn 3]
 - `wyren distill --push` behavior (commits memory.md + pushes branch) not documented in `--help` output; flag help text implies distill-only [session 910cd748, turn 8]
-- Memory poisoning via force-push invisible to UPS — UPS compares against last-injected local hash, not remote state, so diverged/poisoned remote is never caught before next session-start injection [session 910cd748, turn 8]
 
 ## Scope changes
 - Deployability v1 shipped 2026-04-23: install.sh, install.ps1, scripts/installer.mjs, wyren install/update/uninstall/doctor CLI subcommands, CI matrix (ubuntu unit tests + macos/windows e2e), 26 new installer unit tests, Group H (6 e2e tests) [session 12e443d5, turn 425]
@@ -35,3 +33,5 @@
 - Test coverage for transcript.mjs (2026-04-24): unit tests added, going from zero coverage to 17 tests covering readTranscriptLines, sliceSinceUuid, lastUuid, renderForDistiller [session 6b7ed01f, turn 65]
 - Stop hook distiller state fix (2026-04-24): turns_since_distill reset made conditional on successful spawnDistiller()—if spawn fails (no PID returned), turn counter accumulates toward next trigger instead of resetting [session 6b7ed01f, turn 76]
 - Fixed distiller auth (2026-05-08): removed --bare flag that was stripping OAuth/keychain, causing permanent "Not logged in" failures. Updated claude -p invocation to use current Claude Code flags. [session 37beaeb6, turn 82]
+- Stale memory detection fix (design approved): add `Peer pushed:` timestamp to `wyren status` output + post-distill nag when --push omitted [session 19e290bc, turn 47]
+- Force-push integrity fix (design approved): UPS stores `last_remote_memory_commit` in ups-state.json, runs ancestry check after pull, warns+injects on force-push detection (fail-open) [session 19e290bc, turn 47]
