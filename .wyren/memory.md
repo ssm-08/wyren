@@ -19,6 +19,13 @@
 - Approach B (pure bash + pure PowerShell): Already hit PS 5.1 gotchas; bash equivalents (readlink -f diff BSD/GNU, sed-based JSON) compound. Drift between parallel scripts guaranteed. [session 12e443d5, turn 75]
 - Approach C (Node-only, thin shell wrappers): `node <(curl)` pattern fragile across proxies, auth, signature verification. Requires pre-verification steps. Approach A keeps platform logic in thin shells where it belongs. [session 12e443d5, turn 75]
 
+## Known broken state
+- `remote_diverged` exits 0 with no recovery guidance when distill detects local/remote divergence; should print next step: "run `git fetch && git rebase origin/master`, then re-run `wyren distill --push`" [session 910cd748, turn 6]
+- Stale memory fully undetectable — `wyren status` shows local distill/inject timestamps only; no `Peer distilled:` or `Peer pushed:` field to detect when a peer skipped `--push` [session 910cd748, turn 8]
+- Duplicate `# Wyren Memory` header in template (lib/memory.mjs) appears on cold-start injection — cosmetic but visually odd [session 910cd748, turn 3]
+- `wyren distill --push` behavior (commits memory.md + pushes branch) not documented in `--help` output; flag help text implies distill-only [session 910cd748, turn 8]
+- Memory poisoning via force-push invisible to UPS — UPS compares against last-injected local hash, not remote state, so diverged/poisoned remote is never caught before next session-start injection [session 910cd748, turn 8]
+
 ## Scope changes
 - Deployability v1 shipped 2026-04-23: install.sh, install.ps1, scripts/installer.mjs, wyren install/update/uninstall/doctor CLI subcommands, CI matrix (ubuntu unit tests + macos/windows e2e), 26 new installer unit tests, Group H (6 e2e tests) [session 12e443d5, turn 425]
 - Live sync v1 shipped 2026-04-23: UserPromptSubmit hook (hooks/user-prompt-submit.mjs), lib/diff-memory.mjs, Group I (5 new e2e tests), hooks.json wired for UserPromptSubmit, plugin version 0.4.0 [session 12e443d5, turn 209]
