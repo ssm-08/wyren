@@ -13,7 +13,7 @@ Wyren is a Claude Code plugin for shared team memory across sessions. Transcript
 
 **v0.4.3 — distiller auth fix + SessionStart timeout fix.** All 6 chunks shipped. Full install/uninstall/doctor CLI. Live sync via UserPromptSubmit. npm package: `@ssm-08/wyren` (scoped — unscoped `wyren` blocked by npm similarity check). Install flow: `npm install -g @ssm-08/wyren && wyren install`. Rename pass (2026-05-07): all source files, binary (`bin/wyren.mjs`), state dir (`.wyren/`), slash command (`wyren-handoff`), env vars (`WYREN_*`), function names updated. Prior `@ssm-08/relay` unpublished. Distiller fix (2026-05-08): removed `--bare` (stripped OAuth/keychain → "Not logged in") and `--tools ''` (flag removed from CC CLI).
 
-**Tests:** 173 unit (~3min) — 171 pass, 2 skip (POSIX-only), 0 flaky-under-load (concurrency=1). 32 e2e (~25s). See `git log` for full history.
+**Tests:** 187 unit (~3min) — 185 pass, 2 skip (POSIX-only), 0 flaky-under-load (concurrency=1). 32 e2e (~25s). See `git log` for full history.
 
 **Known flaky:** `fault-e2e-livesync` (Test 1, Test 5) and `sync.test.mjs` fail under concurrent file load (subprocess + git-op contention); `--test-concurrency=1` serializes file execution and prevents this. CI and `npm test` both use it.
 
