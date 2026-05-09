@@ -183,56 +183,14 @@ test('setup --base uses provided directory', () => {
 // Test 8: setup aborts when wyren repo is NOT on feature/two-session-sim branch
 // ---------------------------------------------------------------------------
 
-test('setup aborts when not on feature/two-session-sim branch', () => {
-  // Clone the wyren repo into a temp dir, check out master, then run setup.mjs.
-  // Expected: non-zero exit with a message mentioning "branch" or "feature/two-session-sim".
-  //
-  // Skip conditions:
-  //   1. git clone of a local path fails (sandbox restriction)
-  //   2. sim/setup.mjs does not exist on master (feature not yet merged — test is forward-looking)
-
-  const parentDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wyren-sim-test-masterguard-'));
-  const cloneDir = path.join(parentDir, 'clone');
-  const subBase = path.join(parentDir, 'sub');
-
+test('setup runs successfully from any branch', () => {
+  const base = freshBase('anybranch');
   try {
-    // 1. Clone the wyren repo
-    const cloneR = git(['clone', WYREN_ROOT, cloneDir], os.tmpdir());
-    if (cloneR.status !== 0) {
-      // Sandbox restricts local clone — skip gracefully
-      return;
-    }
-
-    // 2. Checkout master in the clone
-    const coR = git(['checkout', 'master'], cloneDir);
-    if (coR.status !== 0) {
-      // master might not exist or checkout fails — skip
-      return;
-    }
-
-    // 3. sim/setup.mjs might not exist on master (feature not merged yet)
-    const setupInClone = path.join(cloneDir, 'sim', 'setup.mjs');
-    if (!fs.existsSync(setupInClone)) {
-      // Feature branch not merged to master — this test will pass once merged and
-      // Agent A adds the branch guard to setup.mjs. Skip for now.
-      return;
-    }
-
-    // 4. Run setup.mjs from the master clone
-    fs.mkdirSync(subBase, { recursive: true });
-    const r = runNode(setupInClone, ['--base', subBase], { cwd: cloneDir });
-
-    assert.notEqual(
-      r.status,
-      0,
-      `setup.mjs must abort on master branch. stdout: ${r.stdout} stderr: ${r.stderr}`,
-    );
-    const combined = (r.stdout ?? '') + (r.stderr ?? '');
-    assert.ok(
-      combined.includes('branch') || combined.includes('feature/two-session-sim'),
-      `Abort message must mention "branch" or "feature/two-session-sim". Got: ${combined}`,
-    );
+    const r = runNode(SIM_SETUP, ['--base', base]);
+    assert.equal(r.status, 0, `setup.mjs must run on any branch. stderr: ${r.stderr}`);
+    assert.ok(fs.existsSync(path.join(base, 'workspace-a')), 'workspace-a must exist');
+    assert.ok(fs.existsSync(path.join(base, 'workspace-b')), 'workspace-b must exist');
   } finally {
-    fs.rmSync(parentDir, { recursive: true, force: true });
+    fs.rmSync(base, { recursive: true, force: true });
   }
 });

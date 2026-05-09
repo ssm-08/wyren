@@ -74,19 +74,6 @@ if (args.help) {
   process.exit(0);
 }
 
-// Confirm branch is feature/two-session-sim
-const branchR = spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
-  cwd: repoRoot,
-  encoding: 'utf8',
-  windowsHide: true,
-});
-const repoBranch = (branchR.stdout || '').trim();
-if (repoBranch !== 'feature/two-session-sim') {
-  console.error(`[error] Expected branch feature/two-session-sim, got: ${repoBranch || 'unknown'}`);
-  console.error('        Switch to that branch before running setup.');
-  process.exit(1);
-}
-
 // Resolve + create base dir (create if absent; reuse if present — tests pre-create via mkdtempSync)
 const base = args.base ? path.resolve(args.base) : path.join(os.tmpdir(), `wyren-sim-${Date.now()}`);
 fs.mkdirSync(base, { recursive: true });
