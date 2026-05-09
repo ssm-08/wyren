@@ -248,6 +248,10 @@ export async function wyrenDistill(targetDir, argv) {
 
   const result = spawnSync('node', args, { stdio: 'inherit' });
 
+  if (!flags.push && !flags.dryRun && result.status === 0) {
+    console.log('Memory updated locally. Run: wyren distill --push');
+  }
+
   if (flags.push && result.status === 0 && !flags.dryRun) {
     const { GitSync } = await import('../lib/sync.mjs');
     const sync = new GitSync();
