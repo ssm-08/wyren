@@ -12,6 +12,7 @@
 - hooks/stop.mjs: TURNS_THRESHOLD (default 5) and IDLE_MS (default 120s) overridable via WYREN_TURNS_THRESHOLD and WYREN_IDLE_MS env vars — set before IDE launch for faster test cycles [session ee77f650, turn 5]
 - SessionStart hook timeout: 4s minimum (measured 1.9s baseline from git fetch ~1.5s + checkout ~0.5s; 2s was racing). Updated in settings.json and scripts/installer.mjs. [session 37beaeb6, turn 40]
 - Distiller: cannot use --bare flag (strips OAuth/keychain auth, causes "Not logged in" failures). Must use full auth for memory updates. Claude Code flags: --allowedTools not --tools. [session 37beaeb6, turn 76]
+- Tier0 filter acts as hard gate before distill trigger: both turns_since_distill >= threshold AND tier0 score required. Low-signal turns (e.g., "hi" exchange) score 0 → filtered → no distillation even if threshold met, no API call. [session 37beaeb6, turn 9]
 
 ## Rejected paths
 - Approach B (pure bash + pure PowerShell): Already hit PS 5.1 gotchas; bash equivalents (readlink -f diff BSD/GNU, sed-based JSON) compound. Drift between parallel scripts guaranteed. [session 12e443d5, turn 75]
