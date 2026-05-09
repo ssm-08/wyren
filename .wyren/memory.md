@@ -10,6 +10,8 @@
 - windowsHide:true on all spawnSync calls — prevents random cmd windows on Windows across distiller.mjs, hooks/stop.mjs, and all new hooks. [session 12e443d5, turn 36]
 - hooks/stop.mjs: shouldDistill validates distiller_running flag via PID liveness check (process.kill(pid, 0)) to prevent stuck state from OS kill; distiller_pid stored in watermark [session ee77f650, turn 8]
 - hooks/stop.mjs: TURNS_THRESHOLD (default 5) and IDLE_MS (default 120s) overridable via WYREN_TURNS_THRESHOLD and WYREN_IDLE_MS env vars — set before IDE launch for faster test cycles [session ee77f650, turn 5]
+- SessionStart hook timeout: 4s minimum (measured 1.9s baseline from git fetch ~1.5s + checkout ~0.5s; 2s was racing). Updated in settings.json and scripts/installer.mjs. [session 37beaeb6, turn 40]
+- Distiller: cannot use --bare flag (strips OAuth/keychain auth, causes "Not logged in" failures). Must use full auth for memory updates. Claude Code flags: --allowedTools not --tools. [session 37beaeb6, turn 76]
 
 ## Rejected paths
 - Approach B (pure bash + pure PowerShell): Already hit PS 5.1 gotchas; bash equivalents (readlink -f diff BSD/GNU, sed-based JSON) compound. Drift between parallel scripts guaranteed. [session 12e443d5, turn 75]
@@ -23,3 +25,4 @@
 - Git sync rebase conflict handling (2026-04-24): _rebase() checks out both memory.md and broadcast from FETCH_HEAD after conflict resolution, preventing broadcast state corruption after forced push [session 6b7ed01f, turn 65]
 - Test coverage for transcript.mjs (2026-04-24): unit tests added, going from zero coverage to 17 tests covering readTranscriptLines, sliceSinceUuid, lastUuid, renderForDistiller [session 6b7ed01f, turn 65]
 - Stop hook distiller state fix (2026-04-24): turns_since_distill reset made conditional on successful spawnDistiller()—if spawn fails (no PID returned), turn counter accumulates toward next trigger instead of resetting [session 6b7ed01f, turn 76]
+- Fixed distiller auth (2026-05-08): removed --bare flag that was stripping OAuth/keychain, causing permanent "Not logged in" failures. Updated claude -p invocation to use current Claude Code flags. [session 37beaeb6, turn 82]
