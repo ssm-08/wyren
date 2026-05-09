@@ -45,7 +45,7 @@ Fires once per Claude Code session (startup, resume, clear, or compact).
 ### Timing
 
 - Target: under 500ms.
-- Main cost: the scoped `git fetch` + `checkout` of `.wyren/memory.md` and `.wyren/broadcast/` during `GitSync.pull()`. Internal timeouts cap fetch at **1.5s** and checkout at **0.5s**; hook-level budget is **2s** total.
+- Main cost: the scoped `git fetch` + `checkout` of `.wyren/memory.md` and `.wyren/broadcast/` during `GitSync.pull()`. Internal timeouts cap fetch at **1.5s** and checkout at **0.5s**; hook-level budget is **4s** total, providing a 2s buffer for Node startup and file I/O.
 - Fail-open — individual git commands time out on their own, then fail-open.
 - On slow or offline networks, set `WYREN_SKIP_PULL=1` to short-circuit the pull entirely. Memory still injects from whatever is on disk.
 
@@ -118,6 +118,7 @@ Only emitted when the diff detects new content. If nothing changed, the hook exi
 ### Behavior
 
 1. Pull `.wyren/memory.md` from the remote (1.5s fetch cap, 3s hook budget). Skipped when `WYREN_SKIP_PULL=1`; diff still runs from disk.
+1b. If the pull succeeded, compare the last-known remote commit SHA for `.wyren/memory.md` (stored in `ups-state.json`) against the current remote SHA. If the current commit is not a descendant of the last-known commit (non-linear history), set a ⚠️ force-push warning that will be prepended to any injected delta. This protects against a teammate accidentally force-pushing a rewrite of memory.
 2. Compare the current file against the stored snapshot hash in `.wyren/state/ups-state.json`.
 3. If content has changed, compute a section-aware delta (new or modified sections only).
 4. Inject the delta as `additionalContext` so the model receives it before processing the user's prompt.

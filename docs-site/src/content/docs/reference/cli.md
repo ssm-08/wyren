@@ -107,11 +107,12 @@ Progress:   2 / 5 turns until next distill
 Injected:  2026-04-22T14:31:00.000Z (3 min ago via session-start)
 Transcript: /Users/alice/.claude/projects/.../7a2e.jsonl
 Remote:     origin → https://github.com/team/project.git
+Peer pushed:  2026-05-08T09:12:00.000Z (alice, 47 min ago)
 ```
 
 Lock line only appears when the lock is held (`Lock:  held (3s old)`). Not shown in normal state.
 
-`Distilled`/`Progress` fields come from `.wyren/state/watermark.json`. `Injected` is derived from the latest `injection:` event in `.wyren/log`.
+`Distilled`/`Progress` fields come from `.wyren/state/watermark.json`. `Injected` is derived from the latest `injection:` event in `.wyren/log`. `Peer pushed:` shows the timestamp and author of the last remote commit that touched `.wyren/memory.md`.
 
 If the repo isn't initialized, prints `Wyren not initialized in this repo. Run: wyren init` and exits 0.
 
@@ -125,7 +126,7 @@ wyren distill [--force] [--dry-run] [--push] [--transcript <path>]
 
 | Flag | Effect |
 |---|---|
-| `--force` | Bypass the Tier 0 regex filter — call the API even if no signal words are found. |
+| `--force` | Bypass the Tier 0 weighted signal filter — call the API unconditionally. |
 | `--dry-run` | Print what would happen. No writes. |
 | `--push` | After a successful distill, `git add .wyren/` + commit + push via `GitSync`. **Default is no push** — distiller writes `memory.md` locally only. |
 | `--transcript <path>` | Override the transcript source. Defaults to the last transcript recorded in the watermark. |
@@ -157,7 +158,7 @@ wyren --version   # or: wyren -v
 Reads `version` from `package.json` in the Wyren installation. Example output:
 
 ```
-wyren 0.4.1
+wyren 0.4.4
 ```
 
 ## `wyren --help`

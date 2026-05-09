@@ -24,7 +24,7 @@ Yes. Sync is over git, so any git remote (GitHub, self-hosted) works the same ov
 
 ## What if git push fails?
 
-Wyren retries with `pull --rebase` up to 3 times. On final failure, the memory update stays local — it'll push on the next successful distill. Teammates are out of sync for one cycle. Documented as acceptable.
+Wyren retries up to 3 times. On conflict, it fetches the latest remote, fast-forwards local HEAD if safe (no user commits diverged), creates a fresh wyren-only commit, and retries. If the branches have diverged (user commits not on remote), Wyren restores remote `.wyren/` files and leaves HEAD untouched — run `git fetch && git rebase origin/<branch>` then `wyren distill --push` to recover. On final failure, the memory update stays local — it will push on the next successful distill.
 
 ## Will my conversations leak to my teammates?
 
@@ -46,7 +46,7 @@ If you want to skip git fetch on a specific session (e.g. offline demo), set `WY
 
 ## How do I stop distillation on a specific turn?
 
-You can't, and you don't need to. The Tier 0 regex filter already kills ~70% of triggers. For fully private turns, disable the plugin for that session:
+You can't, and you don't need to. The Tier 0 weighted signal filter already kills ~70% of triggers. For fully private turns, disable the plugin for that session:
 
 ```
 /plugins disable wyren
@@ -77,7 +77,7 @@ In a future release, a generic "transcript watcher" daemon could support Cursor 
 
 If two teammates distill within the same second and both push, the second push fails non-fast-forward. Wyren pulls the first person's version, re-runs the distiller against that new base (idempotent — transcripts are per-session), and pushes on attempt 2.
 
-If the actual content conflicts on the same lines (rare), Wyren takes `--theirs` (the incoming version) and re-distills locally. Ships the later one.
+If branches have diverged (user has local commits not on remote), Wyren leaves HEAD untouched, restores remote `.wyren/` files, and returns `remote_diverged`. Run `git fetch && git rebase origin/<branch>` then re-run `wyren distill --push`.
 
 ## What Claude Code version is supported?
 

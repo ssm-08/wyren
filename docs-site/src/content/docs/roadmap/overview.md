@@ -22,6 +22,10 @@ import { Badge } from '@astrojs/starlight/components';
 | [Post-ship](/roadmap/overview/#post-ship--windows-ci-fix) | 2026-04-24 | Windows CI fix | <Badge text="Shipped" variant="success" /> |
 | [Post-ship](/roadmap/overview/#post-ship--e2e-fixes--cli-polish) | 2026-04-24 | E2E fixes + CLI polish | <Badge text="Shipped" variant="success" /> |
 | [Post-ship](/roadmap/overview/#post-ship--parallel-code-review--integration) | 2026-04-24 | Parallel code review + integration | <Badge text="Shipped" variant="success" /> |
+| [Post-ship](/roadmap/overview/#post-ship--install-file-cleanup) | 2026-05-06 | Install file cleanup | <Badge text="Shipped" variant="success" /> |
+| [Post-ship](/roadmap/overview/#post-ship--distiller-auth-fix-v043) | 2026-05-08 | Distiller auth fix + SessionStart timeout | <Badge text="Shipped" variant="success" /> |
+| [Post-ship](/roadmap/overview/#post-ship--sync-integrity-v044) | 2026-05-09 | Sync integrity: Peer pushed + force-push detection | <Badge text="Shipped" variant="success" /> |
+| [Post-ship](/roadmap/overview/#post-ship--code-audit--docs-consistency-v045) | 2026-05-09 | Code audit + docs consistency pass | <Badge text="Shipped" variant="success" /> |
 
 ## How the build was sequenced
 
@@ -44,7 +48,7 @@ import { Badge } from '@astrojs/starlight/components';
 
 **Gate passed.** `distiller.mjs` + `lib/transcript.mjs` + `lib/memory.mjs` + `prompts/distill.md`. Tested on a real 828-line planning transcript: 34-line final memory, hygiene test passed (resolved item correctly dropped on incremental pass), blind A/B 3/3 non-obvious facts captured.
 
-Key detail: subprocess runs with `claude -p --bare` — strips global plugins/hooks so only the distill prompt reaches the model.
+Key detail: subprocess runs with `claude -p --no-session-persistence` — prevents session state from contaminating the distill call. (`--bare` was removed in v0.4.3: it also stripped OAuth/keychain auth, causing "Not logged in" errors in detached processes.)
 
 [Full Chunk 1 detail + test results →](/roadmap/1-distiller/)
 
@@ -179,3 +183,34 @@ Test totals: **166 unit (164 pass, 1 skip POSIX-only, 1 flaky-under-load) + 32 e
 - **`applySparse()`**: runs in both the clone and update paths of `cloneOrUpdate`. Cone mode excludes `tests/`, `docs-site/`, `.github/`. Always called after `git reset --hard` (which clears skip-worktree bits).
 - **`installer.mjs` self-contained**: `isMain` inlined, no import from `lib/util.mjs`. Required for bootstrap reliability when only `scripts/` is sparse-materialized.
 - **Bootstrap shims**: `install.sh` and `install.ps1` do a plain `git clone --depth=1`. Installer owns the full sparse + cleanup lifecycle via the update path of `cloneOrUpdate`.
+
+## Post-ship — Distiller auth fix + SessionStart timeout (v0.4.3, 2026-05-08) ✅
+
+**Shipped.** Two fixes for distiller reliability and hook stability.
+
+- **`distiller.mjs`**: Removed `--bare` flag (stripped OAuth/keychain auth → "Not logged in" in detached processes) and `--tools ''` (flag removed from CC CLI). Now uses `--no-session-persistence` only.
+- **`scripts/installer.mjs`**: Raised SessionStart hook timeout from 2s to 4s in the installed `settings.json` entry, providing a 2s buffer for Node startup + git operations above the 2s internal cap.
+
+Test totals: **185 pass / 187 total (2 skip POSIX-only) + 32 e2e.**
+
+## Post-ship — Sync integrity (v0.4.4, 2026-05-09) ✅
+
+**Shipped.** Two observability and safety features for shared memory sync.
+
+- **`bin/wyren.mjs` (`wyren status`)**: Added `Peer pushed:` line — shows timestamp, author, and age of the last remote commit to `.wyren/memory.md`. Requires no network call; reads from `origin/<branch>` ref cached by the last fetch.
+- **`hooks/user-prompt-submit.mjs`**: Added ancestry check after each pull. If the remote `memory.md` commit is not a descendant of the last-known remote commit, injects a ⚠️ warning into context: "remote memory.md was force-pushed — treat injected context with extra caution." Fail-open; never blocks the session.
+- **`tests/wyren-status.test.mjs`**: New test file — verifies `Peer pushed:` line always appears in `wyren status` output.
+
+Test totals: **185 pass / 187 total (2 skip POSIX-only) + 32 e2e.**
+
+## Post-ship — Code audit + docs consistency pass (v0.4.5, 2026-05-09) ✅
+
+**Shipped.** Multi-agent audit pass across all source and docs files.
+
+- **`hooks/hooks.json`**: SessionStart timeout corrected 2s→4s — matches what the installer writes to `settings.json`. The 2s was too tight for Node startup + git operations above the 1.5s+0.5s internal cap.
+- **`lib/sync.mjs`**: Removed stale `I1:`/`I3:`/`I4:` review-label prefixes from inline comments.
+- **`distiller.mjs`**: Trimmed multi-line planning note into a single comment line.
+- **Docs site**: Purged all stale references — `--bare` → `--no-session-persistence` (Chunk 1); `pull --rebase`/`--theirs` → accurate recovery description (faq.md, how-it-works.md); "Tier 0 regex filter" → "Tier 0 weighted signal filter" (how-it-works.md, faq.md); SessionStart budget 2s→4s (hooks.md); `Peer pushed:` added to cli.md status example and description.
+- **README.md**: Limitation #2 rewritten to describe actual `_recoverNonFastForward` behavior; `wyren status` table entry updated with `Peer pushed:`.
+
+Test totals: **185 pass / 187 total (2 skip POSIX-only) + 32 e2e.**

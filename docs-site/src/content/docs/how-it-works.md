@@ -86,11 +86,11 @@ If Bob is working concurrently and his distiller pushes an update, Alice's next 
 
 1. Reads the transcript JSONL from the `transcript_path` hook input.
 2. Slices from the last-processed UUID to the end.
-3. Runs **Tier 0 regex filter** — skips if no signal words (`decide`, `won't`, `workaround`, `rejected`, ...) found. Kills ~70% of triggers for free.
+3. Runs **Tier 0 weighted signal filter** — scores the transcript across decision, rejection, hack, scope-change, and structural signals (session length, edit count). Skips the API call if the score falls below threshold. Kills ~70% of triggers for free.
 4. For slices with signal: shells out to `claude -p` (headless Claude Code) with the distiller prompt + current memory + transcript slice.
 5. Gets back a full new `memory.md` — hygiene-respecting (replaces superseded entries, removes resolved workarounds, never blindly appends).
 6. Atomic write (`.tmp` + rename).
-7. `WyrenSync.push()` → `git add .wyren/memory.md && git commit && git push`. Retries on rebase conflict.
+7. `WyrenSync.push()` → commit `.wyren/memory.md` via temp index, push. On non-fast-forward, fetches remote, fast-forwards HEAD if safe, and retries with a fresh wyren commit (up to 3 attempts).
 8. Updates watermark.
 
 Alice's `.wyren/memory.md` now contains:
@@ -132,9 +132,9 @@ Zero context re-establishment. Bob picks up where Alice stopped.
 Everything else in the implementation plan is engineering to make that loop reliable across:
 
 - **Flaky networks** — timeboxed hooks, best-effort sync, log-and-continue on failure.
-- **Concurrent distillation** — advisory lock + retry-on-rebase.
+- **Concurrent distillation** — advisory lock + safe HEAD recovery on push conflict.
 - **Long transcripts** — watermark-based slicing, never re-read what was already processed.
-- **Cost pressure** — Tier 0 regex filter kills free triggers; Haiku for routine; Sonnet for cleanup.
+- **Cost pressure** — Tier 0 weighted signal filter kills free triggers; Haiku for routine; Sonnet for cleanup.
 
 ## Next
 

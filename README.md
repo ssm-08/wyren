@@ -90,7 +90,7 @@ Teammates install the plugin on their machine (`curl | sh` above), then just `gi
 | Command | What it does |
 |---|---|
 | `wyren init` | Bootstrap this repo — creates `.wyren/`, seeds `memory.md`, updates `.gitignore`. One teammate, once. |
-| `wyren status` | Shows memory file size, when distillation last ran, and git sync state. Run this if memory seems stale. |
+| `wyren status` | Shows memory file size, distillation state, last injection, git sync state, and when a teammate last pushed memory (`Peer pushed:`). Run this if memory seems stale. |
 | `wyren log [--lines N]` | Tail the Wyren log. Use this to watch distillation and injection events. |
 | `wyren distill [--force] [--push]` | Run distillation manually. `--force` skips the signal filter. `--push` commits and pushes the result. Useful after a long session. |
 | `wyren broadcast-skill <file>` | Copy skill file to `.wyren/broadcast/skills/` and push to teammates. |
@@ -152,7 +152,7 @@ node scripts/installer.mjs uninstall --home /tmp/fake-home
 
 1. **Distillation requires Claude Code authentication.** Wyren calls the `claude` CLI using your existing Claude Code session — no separate API key. Memory reads and injection work offline; distillation and git push require network access. Run `claude auth login` if distillation is being skipped silently. Check `.wyren/log` for the error.
 
-2. **Concurrent pushes retry automatically.** If two teammates distill at the same moment, the second push retries with `pull --rebase`. Resolves within one session without data loss.
+2. **Concurrent pushes retry automatically.** If two teammates distill at the same moment and one push fails non-fast-forward, Wyren fetches the latest remote, fast-forwards HEAD if safe (no user commits lost), creates a fresh wyren-only commit, and retries — up to 3 attempts. If the branches have diverged (user commits not on remote), Wyren restores remote `.wyren/` files and leaves HEAD untouched. Resolves without data loss in the common case.
 
 3. **Transcript format is Claude Code-specific.** Wyren reads Claude Code's JSONL session files directly. If a future Claude Code update changes that format, distillation may skip some turns until Wyren is updated. Monitor `.wyren/log` if memory stops updating after a Claude Code upgrade.
 

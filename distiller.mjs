@@ -155,8 +155,7 @@ async function main() {
   const outPath = args.out;
   const since = args.since && args.since !== 'true' ? args.since : '';
   const cwd = args.cwd && args.cwd !== 'true' ? args.cwd : '';
-  // Model defaults to Haiku 4.5. To override, pass --model to distiller directly (wyren distill
-  // does not yet expose WYREN_MODEL env var; that's a planned follow-up).
+  // Defaults to Haiku 4.5; pass --model to override.
   const model = args.model && args.model !== 'true' ? args.model : 'claude-haiku-4-5-20251001';
   const dryRun = !!args['dry-run'];
   const force = !!args['force'];
