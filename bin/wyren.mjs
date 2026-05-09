@@ -151,6 +151,38 @@ export function wyrenStatus(targetDir) {
     console.log(`${label('Remote:')} (none configured)`);
   }
 
+  // Peer pushed: last remote commit touching memory.md
+  {
+    let peerLine = '(unavailable)';
+    try {
+      const branchR = spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+        cwd: targetDir, encoding: 'utf8', windowsHide: true, timeout: 2_000,
+      });
+      const branch = (branchR.stdout || '').trim();
+      if (branchR.status === 0 && branch) {
+        const logR = spawnSync(
+          'git', ['log', `origin/${branch}`, '-n1', '--format=%ci%x09%an', '--', '.wyren/memory.md'],
+          { cwd: targetDir, encoding: 'utf8', windowsHide: true, timeout: 3_000 }
+        );
+        if (logR.status === 0) {
+          const out = (logR.stdout || '').trim();
+          if (out) {
+            const [ts, author] = out.split('\t');
+            const ago = ts ? Math.round((Date.now() - new Date(ts).getTime()) / 60_000) : null;
+            peerLine = ago !== null
+              ? `${new Date(ts).toISOString()} (${author || 'unknown'}, ${ago} min ago)`
+              : out;
+          } else {
+            peerLine = '(never)';
+          }
+        } else {
+          peerLine = '(no remote)';
+        }
+      }
+    } catch {}
+    console.log(`${label('Peer pushed:')} ${peerLine}`);
+  }
+
   // Only show lock when held — not held is the normal state, not worth showing
   const lockPath = path.join(wyrenDir, 'state', '.lock');
   if (fs.existsSync(lockPath)) {
