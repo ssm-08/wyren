@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { buildInjection } from '../hooks/user-prompt-submit.mjs';
+import { buildInjection, mergeForcePushWarning } from '../hooks/user-prompt-submit.mjs';
 import { hashMemory } from '../lib/diff-memory.mjs';
 
 function makeTmpDir() {
@@ -170,6 +170,29 @@ test('ups-state write does NOT include Stop-owned keys (no cross-contamination)'
   } finally {
     fs.rmSync(dir, { recursive: true });
   }
+});
+
+test('mergeForcePushWarning: null warning → result unchanged', () => {
+  const result = { delta: 'some delta', newUpsState: { a: 1 }, newSnapshot: null };
+  const out = mergeForcePushWarning(result, null);
+  assert.deepEqual(out, result);
+});
+
+test('mergeForcePushWarning: warning + delta result → warning prepended', () => {
+  const result = { delta: 'existing delta', newUpsState: { a: 1 }, newSnapshot: 'snap' };
+  const out = mergeForcePushWarning(result, 'WARN');
+  assert.ok(out.delta.startsWith('WARN'));
+  assert.ok(out.delta.includes('existing delta'));
+  assert.deepEqual(out.newUpsState, { a: 1 });
+  assert.equal(out.newSnapshot, 'snap');
+});
+
+test('mergeForcePushWarning: warning + result with null delta → warning becomes delta', () => {
+  const result = { delta: null, newUpsState: { b: 2 }, newSnapshot: 'snap' };
+  const out = mergeForcePushWarning(result, 'WARN');
+  assert.equal(out.delta, 'WARN');
+  assert.deepEqual(out.newUpsState, { b: 2 });
+  assert.equal(out.newSnapshot, 'snap');
 });
 
 test('ups-state and watermark.json remain independent after concurrent UPS+Stop', () => {

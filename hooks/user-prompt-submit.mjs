@@ -1,12 +1,36 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { readStdin, isMain, atomicRename } from '../lib/util.mjs';
 import { readMemory, writeMemoryAtomic } from '../lib/memory.mjs';
 import { GitSync } from '../lib/sync.mjs';
 import { diffMemory, renderDelta, hashMemory } from '../lib/diff-memory.mjs';
 
 const SNAPSHOT_FILE = 'last-injected-memory.md';
+
+/**
+ * Merge a force-push warning into a non-null buildInjection result.
+ * Pure function — no I/O. Exported for unit testing.
+ * Only call when result is non-null; null result is handled separately in main().
+ */
+export function mergeForcePushWarning(result, warningText) {
+  if (!warningText) return result;
+  return {
+    ...result,
+    delta: result.delta ? `${warningText}\n\n${result.delta}` : warningText,
+  };
+}
+
+/** Runs a git command, returns trimmed stdout or null on any failure. */
+function tryGit(args, cwd, timeout = 1_000) {
+  const r = spawnSync('git', args, {
+    cwd, encoding: 'utf8', timeout, windowsHide: true,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  if (r.error || r.status !== 0) return null;
+  return (r.stdout || '').trim() || null;
+}
 
 /**
  * UPS owns its own state file — separate from watermark.json (owned by stop.mjs).
@@ -119,8 +143,10 @@ async function main() {
     if (!fs.existsSync(wyrenDir)) { process.exit(0); }
 
     // Pull latest memory from remote with tight timeout (stay within 2s hook budget)
+    let pullSucceeded = false;
     try {
       new GitSync().pull(cwd, { fetchTimeoutMs: 1500, checkoutTimeoutMs: 500 });
+      pullSucceeded = true;
     } catch (e) {
       appendLog(cwd, `pull failed: ${e.message}`);
       // Fail-open: proceed with whatever is on disk
@@ -131,11 +157,63 @@ async function main() {
     const snapshotPath = path.join(stateDir, SNAPSHOT_FILE);
     const memoryPath = path.join(wyrenDir, 'memory.md');
 
+    // Force-push detection: verify remote memory.md commit ancestry (fail-open throughout)
+    let forcePushWarning = null;
+    let currentRemoteSha = null;
+    if (pullSucceeded) {
+      try {
+        const remote =
+          tryGit(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'], cwd) ||
+          (() => {
+            const branch = tryGit(['rev-parse', '--abbrev-ref', 'HEAD'], cwd);
+            return branch ? `origin/${branch}` : null;
+          })();
+
+        if (remote) {
+          currentRemoteSha = tryGit(
+            ['log', remote, '-n1', '--format=%H', '--', '.wyren/memory.md'], cwd
+          );
+          const st = readUpsState(upsStatePath);
+          const lastSha = st.last_remote_memory_commit;
+
+          if (currentRemoteSha && lastSha && lastSha !== currentRemoteSha) {
+            const r = spawnSync('git', ['merge-base', '--is-ancestor', lastSha, currentRemoteSha], {
+              cwd, timeout: 1_000, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'],
+            });
+            if (!r.error && r.status === 1) {
+              forcePushWarning =
+                '⚠️ Wyren: remote memory.md was force-pushed (non-linear history). ' +
+                'Treat injected context with extra caution.';
+              appendLog(cwd, `force-push detected: last=${lastSha} current=${currentRemoteSha}`);
+            }
+          }
+        }
+      } catch (e) {
+        appendLog(cwd, `force-push check error: ${e.message}`);
+      }
+    }
+
     const result = buildInjection({ cwd, wyrenDir, upsStatePath, snapshotPath, memoryPath });
 
-    if (!result) { process.exit(0); }
+    // Null result: nothing new to inject. If force-push detected, still warn + persist SHA.
+    if (!result) {
+      if (forcePushWarning && currentRemoteSha) {
+        fs.mkdirSync(stateDir, { recursive: true });
+        const curSt = readUpsState(upsStatePath);
+        writeUpsStateAtomic(upsStatePath, { ...curSt, last_remote_memory_commit: currentRemoteSha });
+        process.stdout.write(JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: 'UserPromptSubmit',
+            additionalContext: forcePushWarning,
+          },
+        }) + '\n');
+        markInjection(cwd, 'user-prompt-submit');
+      }
+      process.exit(0);
+    }
 
-    const { delta, newUpsState, newSnapshot } = result;
+    const finalResult = mergeForcePushWarning(result, forcePushWarning);
+    const { delta, newUpsState, newSnapshot } = finalResult;
 
     fs.mkdirSync(stateDir, { recursive: true });
 
@@ -157,7 +235,10 @@ async function main() {
     if (newSnapshot !== null) {
       writeMemoryAtomic(snapshotPath, newSnapshot);
     }
-    writeUpsStateAtomic(upsStatePath, newUpsState);
+    const stateToWrite = currentRemoteSha
+      ? { ...newUpsState, last_remote_memory_commit: currentRemoteSha }
+      : newUpsState;
+    writeUpsStateAtomic(upsStatePath, stateToWrite);
 
     if (delta) markInjection(cwd, 'user-prompt-submit');
   } catch (e) {
