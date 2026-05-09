@@ -230,6 +230,14 @@ export async function wyrenDistill(targetDir, argv) {
       const result = sync.push(targetDir, 'manual');
       if (result && result.committed && !result.pushed) {
         console.error(`wyren distill: memory committed locally but not pushed (${result.reason})`);
+        if (result.reason === 'remote_diverged' || result.reason === 'push_failed') {
+          const branchR = spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+            cwd: targetDir, encoding: 'utf8', windowsHide: true,
+          });
+          const branch = (branchR.stdout || '').trim() || 'master';
+          console.error(`  Next step: git fetch && git rebase origin/${branch}`);
+          console.error(`  Then re-run: wyren distill --push`);
+        }
       }
     } catch (e) {
       console.error(`wyren distill: push failed: ${e.message}`);
@@ -287,6 +295,7 @@ const HELP_TEXT =
   `  status            Show memory, watermark, and sync state\n` +
   `  log               Show distiller log [--lines <n>] (default 50)\n` +
   `  distill           Run distiller manually [--transcript <path>] [--force] [--dry-run] [--push]\n` +
+  `                    --push: commit memory.md to git and push to remote after distilling\n` +
   `  broadcast-skill <file>   Copy a skill file to .wyren/broadcast/skills/ and push to teammates\n` +
   `  install           Install wyren hooks on this machine [--from-local <path>] [--home <path>]\n` +
   `  update            Update wyren to latest version\n` +

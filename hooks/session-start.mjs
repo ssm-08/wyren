@@ -72,7 +72,10 @@ export function buildContext(cwd) {
   const { content: broadcast, skillFiles } = readBroadcastDir(path.join(wyrenDir, 'broadcast'));
 
   const parts = [];
-  if (memory.trim()) parts.push(`# Wyren Memory\n\n${memory.trim()}`);
+  // Strip leading "# Wyren Memory" header from content — init template includes it,
+  // and we always re-wrap with our own header to avoid a duplicate on cold-start injection.
+  const memoryBody = memory.trim().replace(/^#\s*Wyren Memory\s*\n?/i, '').trim();
+  if (memoryBody) parts.push(`# Wyren Memory\n\n${memoryBody}`);
   if (broadcast.trim()) {
     let broadcastSection = `# Wyren Broadcast\n\n${broadcast.trim()}`;
     if (skillFiles.length > 0) {
