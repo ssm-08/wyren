@@ -1,6 +1,6 @@
 ## Decisions
 - Wyren project: all 6 chunks + installer v1 shipped and live on master [session c02d8414, turn 30]
-- 182 tests passing (180 pass, 2 skipped POSIX-only): includes sim-setup.test.mjs (8 tests) [session 910cd748, turn 85]
+- 172 tests passing (174 total with 2 skipped POSIX-only): includes UserPromptSubmit Group I + fault-injection suites; all pass, zero failures [session 910cd748, turn 30]
 - Two-system end-to-end verified: System A distilled + pushed; System B pulled + injected at SessionStart [session c02d8414, turn 320]
 - Installer architecture: Approach A (two shell shims + shared Node helper in scripts/installer.mjs). Shell scripts thin; all logic in Node. macOS/Linux symlink, Windows junction, no admin required. CLI: `npm install -g` registers wyren globally on install; `wyren update` re-registers CLI on update; `npm uninstall -g @ssm-08/wyren` (fail-open) removes plugin link, settings.json entries, global CLI registration, and wyren clone directory at `~/.claude/wyren/`. Settings.json hook commands use absolute repoDir paths. [session 12e443d5, turn 193; updated ee77f650, turn 7]
 - setup.ps1 is a deprecation stub — real install via install.sh (macOS) or install.ps1 (Windows) [session 12e443d5, turn 265]
@@ -14,13 +14,14 @@
 - Distiller: cannot use --bare flag (strips OAuth/keychain auth, causes "Not logged in" failures). Must use full auth for memory updates. Claude Code flags: --allowedTools not --tools. [session 37beaeb6, turn 76]
 - Tier0 filter acts as hard gate before distill trigger: both turns_since_distill >= threshold AND tier0 score required. Low-signal turns (e.g., "hi" exchange) score 0 → filtered → no distillation even if threshold met, no API call. [session 37beaeb6, turn 9]
 - UPS live-sync test: verified remote edits inject on next user turn. [session test, 2026-05-09]
-- setup.mjs workspace dirs: workspace-a and workspace-b (not dev-a/dev-b); .simbase written to baseDir not sim/; sim-log.md as log file [session 910cd748, turn 64]
-- Two-session sim harness: locally runnable via `node sim/setup.mjs` → paste sim/prompts/dev-a.md and dev-b.md to respective workspaces → type "GO Round N" to coordinate rounds [session 910cd748, turn 109]
-- UPS is primary signal channel for inter-session memory injection; SessionStart empty on cold-start is expected (no prior distillation yet) [session 910cd748, turn 6]
 
 ## Rejected paths
 - Approach B (pure bash + pure PowerShell): Already hit PS 5.1 gotchas; bash equivalents (readlink -f diff BSD/GNU, sed-based JSON) compound. Drift between parallel scripts guaranteed. [session 12e443d5, turn 75]
 - Approach C (Node-only, thin shell wrappers): `node <(curl)` pattern fragile across proxies, auth, signature verification. Requires pre-verification steps. Approach A keeps platform logic in thin shells where it belongs. [session 12e443d5, turn 75]
+
+## Known broken state
+- Stale memory fully undetectable — `wyren status` shows local distill/inject timestamps only; no `Peer distilled:` or `Peer pushed:` field to detect when a peer skipped `--push` [session 910cd748, turn 8]
+- Memory poisoning via force-push invisible to UPS — UPS compares against last-injected local hash, not remote state, so diverged/poisoned remote is never caught before next session-start injection [session 910cd748, turn 8]
 
 ## Scope changes
 - Deployability v1 shipped 2026-04-23: install.sh, install.ps1, scripts/installer.mjs, wyren install/update/uninstall/doctor CLI subcommands, CI matrix (ubuntu unit tests + macos/windows e2e), 26 new installer unit tests, Group H (6 e2e tests) [session 12e443d5, turn 425]
@@ -30,13 +31,4 @@
 - Git sync rebase conflict handling (2026-04-24): _rebase() checks out both memory.md and broadcast from FETCH_HEAD after conflict resolution, preventing broadcast state corruption after forced push [session 6b7ed01f, turn 65]
 - Test coverage for transcript.mjs (2026-04-24): unit tests added, going from zero coverage to 17 tests covering readTranscriptLines, sliceSinceUuid, lastUuid, renderForDistiller [session 6b7ed01f, turn 65]
 - Stop hook distiller state fix (2026-04-24): turns_since_distill reset made conditional on successful spawnDistiller()—if spawn fails (no PID returned), turn counter accumulates toward next trigger instead of resetting [session 6b7ed01f, turn 76]
-- Fixed distiller auth (2026-05-08): removed --bare flag that was stripping OAuth/keychain, causing permanent "Not logged in" failures. Updated claude -p invocation to use current Claude Code flags. [session 37beaeb6, turn 82]
-- Two-session simulation harness shipped 2026-05-08: `sim/setup.mjs` + `sim/teardown.mjs` + `sim/starter/` (counter app) + `sim/README.md` (runbook, stress table, troubleshooting) + `sim/prompts/dev-{a,b}.md` + `tests/sim-setup.test.mjs` (8 tests, all pass). Scaffolds local bare repo + two clones (workspace-a, workspace-b), runs wyren init, verifies `.wyren/memory.md`. Bugs fixed: dir existence check, workspace naming, .simbase location. [session 5636eadc, turn 67; updated 910cd748, turn 64]
-- Two-session simulation (Rounds 1-2) executed 2026-05-09: Rounds 1-2 tested simultaneous distill, memory merge, conflict recovery, live-sync injection; identified 5 real wyren bugs for future work [session 910cd748, turn 8]
-
-## Known broken state
-- `remote_diverged` exits 0 with no recovery guidance when distill detects local/remote divergence; should print next step: "run `git fetch && git rebase origin/master`, then re-run `wyren distill --push`" [session 910cd748, turn 6]
-- Stale memory fully undetectable — `wyren status` shows local distill/inject timestamps only; no `Peer distilled:` or `Peer pushed:` field to detect when a peer skipped `--push` [session 910cd748, turn 8]
-- Duplicate `# Wyren Memory` header in template (lib/memory.mjs) appears on cold-start injection — cosmetic but visually odd [session 910cd748, turn 3]
-- `wyren distill --push` behavior (commits memory.md + pushes branch) not documented in `--help` output; flag help text implies distill-only [session 910cd748, turn 8]
-- Memory poisoning via force-push invisible to UPS — UPS compares against last-injected local hash, not remote state, so diverged/poisoned remote is never caught before next session-start injection [session 910cd748, turn 8]
+- Bug fixes (2026-05-08): removed duplicate `# Wyren Memory` header in session-start.mjs on cold-start injection (hooks/session-start.mjs:75); added recovery guidance for `remote_diverged` error (bin/wyren.mjs); documented `--push` commits+pushes memory.md to git in `--help` text. [session 910cd748, turn 22–26]
