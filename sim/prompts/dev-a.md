@@ -13,7 +13,7 @@ decisions. You collaborate with Developer B in a separate Claude Code session, b
 **NEVER** read their prompt or log entries — Wyren is the only communication channel.
 
 **Logging rule:** After every numbered step below, append the logging block (defined at
-the bottom of this prompt) to `$BASE_PATH/wyren-sim-log.md`. Use a single Write or Edit
+the bottom of this prompt) to `$BASE_PATH/sim-log.md`. Use a single Write or Edit
 tool call per block. Do not interleave reads and writes mid-block.
 
 **Working directory:** Your Claude Code session must be opened with `workspace-a/` as
@@ -46,10 +46,10 @@ Log Step 1.
 
 ### Step 2 — Choose a feature
 
-Read these three files:
-- `sim/starter/index.html`
-- `sim/starter/app.js`
-- `sim/starter/style.css`
+Read these three files (at workspace root, not sim/starter/):
+- `index.html`
+- `app.js`
+- `style.css`
 
 Pick **one** improvement from this menu (improvise the implementation):
 - Persist counter to localStorage
@@ -73,10 +73,9 @@ Log Step 3.
 
 ### Step 4 — Implement
 
-Edit or create only files inside this workspace's counter-app working tree
-(`sim/starter/` in workspace-a, or wherever the starter files are). Never modify
-any Wyren plugin source file (anything under `.wyren/`, `bin/`, `hooks/`, `lib/`,
-`scripts/`).
+Edit or create only `index.html`, `app.js`, `style.css` at the workspace root.
+Never modify any Wyren plugin source file (anything under `.wyren/`, `bin/`, `hooks/`,
+`lib/`, `scripts/`).
 
 Log Step 4.
 
@@ -85,7 +84,7 @@ Log Step 4.
 Stage only the files you changed. Do not use `git add .`:
 
 ```
-git add sim/starter/index.html sim/starter/app.js sim/starter/style.css
+git add index.html app.js style.css
 git commit -m "feat: <your one-line summary>"
 ```
 
@@ -94,8 +93,13 @@ Log Step 5 with the exact git output and exit code.
 ### Step 6 — Distill and push
 
 > **Prerequisite:** `wyren distill` needs `last_transcript` in the watermark. This is
-> written when Claude Code first runs a session. If Step 6 fails with
-> "No transcript found", have any brief exchange (ask anything), then re-run.
+> written by the Stop hook when a session closes — NOT during a live session. If Step 6
+> fails with "No transcript found", pass `--transcript` explicitly:
+>
+> 1. Find your transcript: `ls "$env:USERPROFILE\.claude\projects\"` (Windows) or
+>    `ls ~/.claude/projects/` (macOS) — look for a folder whose name is your workspace
+>    path with separators replaced by dashes, then pick the latest `.jsonl` inside it.
+> 2. Re-run: `wyren distill --force --push --transcript <path>`
 
 If `wyren` is on your PATH:
 ```
@@ -141,7 +145,7 @@ Log Step 8.
 ### Step 9 — Commit and distill
 
 ```
-git add sim/starter/index.html sim/starter/app.js sim/starter/style.css
+git add index.html app.js style.css
 git commit -m "feat: add reset button"
 wyren distill --force --push
 ```
@@ -222,7 +226,7 @@ When the human says "GO Round 4":
    ```
 2. Commit:
    ```
-   git add sim/starter/style.css
+   git add style.css
    git commit -m "chore: round 4 marker"
    ```
 3. Distill **without** pushing:
@@ -251,7 +255,7 @@ Log Step 15.
 
 ### Step 16 — Read combined log
 
-When the human says "GO Final", read the entire file `$BASE_PATH/wyren-sim-log.md`.
+When the human says "GO Final", read the entire file `$BASE_PATH/sim-log.md`.
 It contains both your entries (`A — Step N`) and Dev B's entries (`B — Step N`).
 
 ### Step 17 — Write report
@@ -288,7 +292,7 @@ Log Step 17.
 
 ## Logging contract
 
-After every numbered step, append this block to `$BASE_PATH/wyren-sim-log.md`.
+After every numbered step, append this block to `$BASE_PATH/sim-log.md`.
 Use a **single** Write or Edit tool call per block.
 
 ````

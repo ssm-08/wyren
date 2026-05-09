@@ -16,7 +16,7 @@ A's prompt or Dev A's log entries — Wyren is the only communication channel. Y
 valid signal.
 
 **Logging rule:** After every numbered step below, append the logging block (defined at
-the bottom of this prompt) to `$BASE_PATH/wyren-sim-log.md`. Use a single Write or Edit
+the bottom of this prompt) to `$BASE_PATH/sim-log.md`. Use a single Write or Edit
 tool call per block. Do not interleave reads and writes mid-block.
 
 **Working directory:** Your Claude Code session must be opened with `workspace-b/` as
@@ -80,8 +80,8 @@ Log Step 3.
 
 ### Step 4 — Implement
 
-Edit or create only files inside this workspace's counter-app working tree. Never
-modify any Wyren plugin source file (anything under `.wyren/`, `bin/`, `hooks/`,
+Edit or create only `index.html`, `app.js`, `style.css` at the workspace root.
+Never modify any Wyren plugin source file (anything under `.wyren/`, `bin/`, `hooks/`,
 `lib/`, `scripts/`).
 
 Log Step 4.
@@ -91,7 +91,7 @@ Log Step 4.
 Stage only the files you changed:
 
 ```
-git add sim/starter/index.html sim/starter/app.js sim/starter/style.css
+git add index.html app.js style.css
 git commit -m "feat: <your one-line summary>"
 ```
 
@@ -99,9 +99,14 @@ Log Step 5 with exact git output and exit code.
 
 ### Step 6 — Distill and push
 
-> **Prerequisite:** `wyren distill` needs `last_transcript` in the watermark. Step 2
-> should have created one. If this step fails with "No transcript found", have any brief
-> exchange first, then re-run.
+> **Prerequisite:** `wyren distill` needs `last_transcript` in the watermark. This is
+> written by the Stop hook when a session closes — NOT during a live session. If Step 6
+> fails with "No transcript found", pass `--transcript` explicitly:
+>
+> 1. Find your transcript: `ls "$env:USERPROFILE\.claude\projects\"` (Windows) or
+>    `ls ~/.claude/projects/` (macOS) — look for a folder whose name is your workspace
+>    path with separators replaced by dashes, then pick the latest `.jsonl` inside it.
+> 2. Re-run: `wyren distill --force --push --transcript <path>`
 
 If `wyren` is on your PATH:
 ```
@@ -147,7 +152,7 @@ Log Step 8.
 ### Step 9 — Commit and distill
 
 ```
-git add sim/starter/index.html sim/starter/app.js sim/starter/style.css
+git add index.html app.js style.css
 git commit -m "feat: add set-to-zero button"
 wyren distill --force --push
 ```
@@ -253,7 +258,7 @@ Log Step 15.
 
 ## Logging contract
 
-After every numbered step, append this block to `$BASE_PATH/wyren-sim-log.md`.
+After every numbered step, append this block to `$BASE_PATH/sim-log.md`.
 Use a **single** Write or Edit tool call per block.
 
 ````

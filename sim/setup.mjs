@@ -14,19 +14,17 @@ const repoRoot = path.resolve(__dirname, '..');
 // ---------------------------------------------------------------------------
 
 function usage() {
-  console.log('Usage: node sim/setup.mjs [--base <path>] [--keep] [--help]');
+  console.log('Usage: node sim/setup.mjs [--base <path>] [--help]');
   console.log('');
   console.log('Options:');
   console.log('  --base <path>  Target base directory (default: tmpdir/wyren-sim-<timestamp>)');
-  console.log('  --keep         Reuse existing base directory instead of erroring');
   console.log('  --help         Print usage and exit');
 }
 
 function parseArgs(argv) {
-  const result = { base: null, keep: false, help: false };
+  const result = { base: null, help: false };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--help') { result.help = true; }
-    else if (argv[i] === '--keep') { result.keep = true; }
     else if (argv[i] === '--base' && argv[i + 1]) { result.base = argv[++i]; }
   }
   return result;
@@ -76,33 +74,24 @@ if (args.help) {
   process.exit(0);
 }
 
-// Step 2: confirm branch is feature/two-session-sim
+// Confirm branch is feature/two-session-sim
 const branchR = spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
   cwd: repoRoot,
   encoding: 'utf8',
   windowsHide: true,
 });
-const branch = (branchR.stdout || '').trim();
-if (branch !== 'feature/two-session-sim') {
-  console.error(`[error] Expected branch feature/two-session-sim, got: ${branch || 'unknown'}`);
+const repoBranch = (branchR.stdout || '').trim();
+if (repoBranch !== 'feature/two-session-sim') {
+  console.error(`[error] Expected branch feature/two-session-sim, got: ${repoBranch || 'unknown'}`);
   console.error('        Switch to that branch before running setup.');
   process.exit(1);
 }
 
-// Step 3: resolve + create base dir
+// Resolve + create base dir (create if absent; reuse if present — tests pre-create via mkdtempSync)
 const base = args.base ? path.resolve(args.base) : path.join(os.tmpdir(), `wyren-sim-${Date.now()}`);
+fs.mkdirSync(base, { recursive: true });
 
-if (fs.existsSync(base)) {
-  if (!args.keep) {
-    console.error(`[error] Base directory already exists: ${base}`);
-    console.error('        Pass --keep to reuse it, or choose a different --base.');
-    process.exit(1);
-  }
-} else {
-  fs.mkdirSync(base, { recursive: true });
-}
-
-// Step 4: create bare repo
+// Create bare repo
 const bare = path.join(base, 'bare.git');
 fs.mkdirSync(bare, { recursive: true });
 run('git', ['init', '--bare', '-q'], bare, 'git init --bare inside bare.git');
@@ -110,72 +99,91 @@ run('git', ['config', 'core.autocrlf', 'false'], bare, 'git config autocrlf in b
 
 const bareUrl = toBareUrl(bare);
 
-// Step 5: create dev-a
-const devA = path.join(base, 'dev-a');
-fs.mkdirSync(devA, { recursive: true });
+// Create workspace-a
+const workspaceA = path.join(base, 'workspace-a');
+fs.mkdirSync(workspaceA, { recursive: true });
 
 // git init -b master; fallback for git < 2.28
-const initA = tryRun('git', ['init', '-b', 'master', '-q'], devA);
+const initA = tryRun('git', ['init', '-b', 'master', '-q'], workspaceA);
 if (initA.error || initA.status !== 0) {
-  run('git', ['init', '-q'], devA, 'git init in dev-a (fallback)');
-  run('git', ['symbolic-ref', 'HEAD', 'refs/heads/master'], devA, 'set master branch in dev-a');
+  run('git', ['init', '-q'], workspaceA, 'git init in workspace-a (fallback)');
+  run('git', ['symbolic-ref', 'HEAD', 'refs/heads/master'], workspaceA, 'set master branch in workspace-a');
 }
 
-run('git', ['config', 'user.email', 'sim@local'], devA, 'git config user.email in dev-a');
-run('git', ['config', 'user.name', 'sim'], devA, 'git config user.name in dev-a');
-run('git', ['config', 'core.autocrlf', 'false'], devA, 'git config autocrlf in dev-a');
-run('git', ['config', 'core.eol', 'lf'], devA, 'git config eol in dev-a');
+run('git', ['config', 'user.email', 'sim@local'], workspaceA, 'git config user.email in workspace-a');
+run('git', ['config', 'user.name', 'sim'], workspaceA, 'git config user.name in workspace-a');
+run('git', ['config', 'core.autocrlf', 'false'], workspaceA, 'git config autocrlf in workspace-a');
+run('git', ['config', 'core.eol', 'lf'], workspaceA, 'git config eol in workspace-a');
 
+// Copy starter app into workspace-a as the shared project
 const starterDir = path.join(__dirname, 'starter');
-copyDir(starterDir, devA);
+copyDir(starterDir, workspaceA);
 
-run('git', ['add', '.'], devA, 'git add starter files in dev-a');
-run('git', ['commit', '-m', 'feat(starter): initial counter app'], devA, 'git commit starter in dev-a');
-run('git', ['remote', 'add', 'origin', bareUrl], devA, 'git remote add origin in dev-a');
-run('git', ['push', '-u', 'origin', 'master'], devA, 'git push starter to bare');
+run('git', ['add', '.'], workspaceA, 'git add starter files in workspace-a');
+run('git', ['commit', '-m', 'feat(starter): initial counter app'], workspaceA, 'git commit starter in workspace-a');
+run('git', ['remote', 'add', 'origin', bareUrl], workspaceA, 'git remote add origin in workspace-a');
+run('git', ['push', '-u', 'origin', 'HEAD'], workspaceA, 'git push starter to bare');
 
-// Step 6: create dev-b via clone
-const devB = path.join(base, 'dev-b');
-fs.mkdirSync(devB, { recursive: true });
-run('git', ['clone', bareUrl, '.'], devB, 'git clone bare into dev-b');
-run('git', ['config', 'user.email', 'sim@local'], devB, 'git config user.email in dev-b');
-run('git', ['config', 'user.name', 'sim'], devB, 'git config user.name in dev-b');
-run('git', ['config', 'core.autocrlf', 'false'], devB, 'git config autocrlf in dev-b');
-run('git', ['config', 'core.eol', 'lf'], devB, 'git config eol in dev-b');
+// Detect actual branch name after push
+const actualBranchR = spawnSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+  cwd: workspaceA,
+  encoding: 'utf8',
+  windowsHide: true,
+});
+const simBranch = (actualBranchR.stdout || '').trim() || 'master';
 
-// Step 7: wyren init in dev-a, commit + push
-run('node', [path.join(repoRoot, 'bin', 'wyren.mjs'), 'init'], devA, 'wyren init in dev-a');
-run('git', ['add', '.wyren/', '.gitignore'], devA, 'git add .wyren/ in dev-a');
-run('git', ['commit', '-m', 'feat(wyren): init memory'], devA, 'git commit wyren init in dev-a');
-run('git', ['push'], devA, 'git push wyren init to bare');
+// Create workspace-b via clone
+const workspaceB = path.join(base, 'workspace-b');
+fs.mkdirSync(workspaceB, { recursive: true });
+run('git', ['clone', bareUrl, '.'], workspaceB, 'git clone bare into workspace-b');
+run('git', ['config', 'user.email', 'sim@local'], workspaceB, 'git config user.email in workspace-b');
+run('git', ['config', 'user.name', 'sim'], workspaceB, 'git config user.name in workspace-b');
+run('git', ['config', 'core.autocrlf', 'false'], workspaceB, 'git config autocrlf in workspace-b');
+run('git', ['config', 'core.eol', 'lf'], workspaceB, 'git config eol in workspace-b');
 
-// Step 8: dev-b pulls wyren init + verify
-run('git', ['pull', 'origin', 'master'], devB, 'git pull in dev-b');
-const memPath = path.join(devB, '.wyren', 'memory.md');
-if (!fs.existsSync(memPath)) {
-  console.error('[error] .wyren/memory.md not found in dev-b after pull');
+// wyren init in workspace-a, commit + push
+run('node', [path.join(repoRoot, 'bin', 'wyren.mjs'), 'init'], workspaceA, 'wyren init in workspace-a');
+run('git', ['add', '.wyren/', '.gitignore'], workspaceA, 'git add .wyren/ in workspace-a');
+run('git', ['commit', '-m', 'feat(wyren): init memory'], workspaceA, 'git commit wyren init in workspace-a');
+run('git', ['push'], workspaceA, 'git push wyren init to bare');
+
+// workspace-b pulls wyren init
+run('git', ['pull', 'origin', simBranch], workspaceB, 'git pull in workspace-b');
+
+// Verify both workspaces have .wyren/memory.md
+const memA = path.join(workspaceA, '.wyren', 'memory.md');
+const memB = path.join(workspaceB, '.wyren', 'memory.md');
+if (!fs.existsSync(memA)) {
+  console.error('[error] .wyren/memory.md not found in workspace-a');
+  process.exit(1);
+}
+if (!fs.existsSync(memB)) {
+  console.error('[error] .wyren/memory.md not found in workspace-b after pull');
   process.exit(1);
 }
 
-// Step 9: create shared log file
-const logPath = path.join(base, 'wyren-sim-log.md');
+// Create shared sim log file
+const logPath = path.join(base, 'sim-log.md');
 fs.writeFileSync(logPath, '', 'utf8');
 
-// Step 10: write .last-base for teardown
+// Write .simbase in baseDir for teardown
+fs.writeFileSync(path.join(base, '.simbase'), base, 'utf8');
+
+// Also write sim/.last-base for teardown fallback (no --base given)
 const lastBasePath = path.join(__dirname, '.last-base');
 fs.writeFileSync(lastBasePath, base, 'utf8');
 
-// Step 11: print runbook
+// Print runbook
 console.log('');
-console.log(`[ok] base:    ${base}`);
-console.log(`[ok] bare:    ${bare}`);
-console.log(`[ok] dev-a:   ${devA}   (paste sim/prompts/dev-a.md here)`);
-console.log(`[ok] dev-b:   ${devB}   (paste sim/prompts/dev-b.md here)`);
-console.log(`[ok] log:     ${logPath}`);
+console.log(`[ok] base:        ${base}`);
+console.log(`[ok] bare:        ${bare}`);
+console.log(`[ok] workspace-a: ${workspaceA}   (Dev A — paste sim/prompts/dev-a.md)`);
+console.log(`[ok] workspace-b: ${workspaceB}   (Dev B — paste sim/prompts/dev-b.md)`);
+console.log(`[ok] sim-log:     ${logPath}`);
 console.log('');
 console.log('Next steps:');
-console.log(`  1. Open Claude Code, cd to ${devA}, paste sim/prompts/dev-a.md.`);
-console.log(`  2. Open a second Claude Code, cd to ${devB}, paste sim/prompts/dev-b.md.`);
+console.log(`  1. Open Claude Code, cd to ${workspaceA}, paste sim/prompts/dev-a.md.`);
+console.log(`  2. Open a second Claude Code, cd to ${workspaceB}, paste sim/prompts/dev-b.md.`);
 console.log('  3. Conduct the rounds with "GO" cues per the prompts.');
 console.log('  4. When the sim is done, run: node sim/teardown.mjs --yes');
 console.log('');

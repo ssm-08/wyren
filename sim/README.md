@@ -20,7 +20,7 @@ the full loop: session work → distill → push → pull → inject at next tur
   ```
 - Two terminal windows capable of running Claude Code (can be the same
   machine; each window gets its own `cwd`).
-- Working directory: repo root (`C:\...\Vibejam` or wherever you cloned).
+- Working directory: repo root (`C:\...\Project` or wherever you cloned).
 - Branch: `feature/two-session-sim`.
 
 ---
