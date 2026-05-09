@@ -1,6 +1,6 @@
 ## Decisions
 - Wyren project: all 6 chunks + installer v1 shipped and live on master [session c02d8414, turn 30]
-- 172 tests passing (174 total with 2 skipped POSIX-only): includes UserPromptSubmit Group I + fault-injection suites; all pass, zero failures [session 910cd748, turn 30]
+- 165 tests passing (164 unit, 1 skipped POSIX-only): includes UserPromptSubmit Group I + fault-injection suites (network/git, corruption, concurrency, e2e); all pass, zero failures [session ee77f650, turn 38]
 - Two-system end-to-end verified: System A distilled + pushed; System B pulled + injected at SessionStart [session c02d8414, turn 320]
 - Installer architecture: Approach A (two shell shims + shared Node helper in scripts/installer.mjs). Shell scripts thin; all logic in Node. macOS/Linux symlink, Windows junction, no admin required. CLI: `npm install -g` registers wyren globally on install; `wyren update` re-registers CLI on update; `npm uninstall -g @ssm-08/wyren` (fail-open) removes plugin link, settings.json entries, global CLI registration, and wyren clone directory at `~/.claude/wyren/`. Settings.json hook commands use absolute repoDir paths. [session 12e443d5, turn 193; updated ee77f650, turn 7]
 - setup.ps1 is a deprecation stub — real install via install.sh (macOS) or install.ps1 (Windows) [session 12e443d5, turn 265]
@@ -20,7 +20,10 @@
 - Approach C (Node-only, thin shell wrappers): `node <(curl)` pattern fragile across proxies, auth, signature verification. Requires pre-verification steps. Approach A keeps platform logic in thin shells where it belongs. [session 12e443d5, turn 75]
 
 ## Known broken state
+- `remote_diverged` exits 0 with no recovery guidance when distill detects local/remote divergence; should print next step: "run `git fetch && git rebase origin/master`, then re-run `wyren distill --push`" [session 910cd748, turn 6]
 - Stale memory fully undetectable — `wyren status` shows local distill/inject timestamps only; no `Peer distilled:` or `Peer pushed:` field to detect when a peer skipped `--push` [session 910cd748, turn 8]
+- Duplicate `# Wyren Memory` header in template (lib/memory.mjs) appears on cold-start injection — cosmetic but visually odd [session 910cd748, turn 3]
+- `wyren distill --push` behavior (commits memory.md + pushes branch) not documented in `--help` output; flag help text implies distill-only [session 910cd748, turn 8]
 - Memory poisoning via force-push invisible to UPS — UPS compares against last-injected local hash, not remote state, so diverged/poisoned remote is never caught before next session-start injection [session 910cd748, turn 8]
 
 ## Scope changes
@@ -31,4 +34,4 @@
 - Git sync rebase conflict handling (2026-04-24): _rebase() checks out both memory.md and broadcast from FETCH_HEAD after conflict resolution, preventing broadcast state corruption after forced push [session 6b7ed01f, turn 65]
 - Test coverage for transcript.mjs (2026-04-24): unit tests added, going from zero coverage to 17 tests covering readTranscriptLines, sliceSinceUuid, lastUuid, renderForDistiller [session 6b7ed01f, turn 65]
 - Stop hook distiller state fix (2026-04-24): turns_since_distill reset made conditional on successful spawnDistiller()—if spawn fails (no PID returned), turn counter accumulates toward next trigger instead of resetting [session 6b7ed01f, turn 76]
-- Bug fixes (2026-05-08): removed duplicate `# Wyren Memory` header in session-start.mjs on cold-start injection (hooks/session-start.mjs:75); added recovery guidance for `remote_diverged` error (bin/wyren.mjs); documented `--push` commits+pushes memory.md to git in `--help` text. [session 910cd748, turn 22–26]
+- Fixed distiller auth (2026-05-08): removed --bare flag that was stripping OAuth/keychain, causing permanent "Not logged in" failures. Updated claude -p invocation to use current Claude Code flags. [session 37beaeb6, turn 82]

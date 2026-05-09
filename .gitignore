@@ -27,6 +27,7 @@ Thumbs.db
 
 # Graphify
 graphify-out/
+sim/
 
 # Git worktrees
 .worktrees/
