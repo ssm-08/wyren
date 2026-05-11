@@ -68,7 +68,7 @@ The filter was initially a simple regex presence-check, then upgraded to a weigh
 Current implementation uses `scoreTier0(transcriptText, lines)`:
 
 ```js
-// Categories with weights 1-3
+// Text-pattern categories (weights 1-3)
 const SIGNALS = [
   { weight: 3, pattern: /\b(decided?|we('re| are) going with|chose|picked|settled on|agreed)\b/i },
   { weight: 3, pattern: /\b(rejected?|doesn'?t work|won'?t work|tried .{0,30} (but|and it)|abandoned|reverted)\b/i },
@@ -79,13 +79,14 @@ const SIGNALS = [
   { weight: 1, pattern: /\b(actually|instead|broken|later|for now)\b/i },
 ];
 
-// File edits are strong signal — weight 3, capped at 4×
+// File edits = ground truth (work actually happened). Loudest signal.
 const EDIT_TOOL_REGEX = /\[tool_use (Edit|Write|MultiEdit)\]/;
+const EDIT_WEIGHT = 4;  // capped at 4× → max 16
 
-// Structural signals (scored on raw JSONL lines, not rendered text)
+// Structural signals (raw JSONL lines, not rendered text)
 // +2 if >= 10 turns, +2 more if >= 20 turns
 // +2 if avg user message length > 200 chars
-// +2 if >= 3 file edits, +2 more if >= 8 file edits
+// +2 if >= 2 edits, +3 if >= 5 edits, +3 more if >= 10 edits
 
 export function hasTier0Signal(transcriptText, lines = []) { ... }  // backwards-compat
 export function scoreTier0(transcriptText, lines = []) { ... }       // returns { score, passes, breakdown }
