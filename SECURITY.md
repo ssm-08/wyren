@@ -25,3 +25,19 @@ transcripts, writes to `.wyren/` in your repo, and calls the `claude` CLI subpro
 
 Out of scope: vulnerabilities in Claude Code itself, npm, git, or Node.js — report those to
 their respective maintainers.
+
+## Privacy considerations
+
+`.wyren/memory.md` is committed to your git repo. It contains distilled session context —
+decisions, rejected approaches, and live workarounds. If your repo is **public**, this file
+is publicly readable.
+
+**Keep your repo private unless you are comfortable with your team's working memory being
+publicly visible.** Treat `.wyren/memory.md` like any other committed file that may contain
+sensitive project context.
+
+Verbatim transcripts never leave your machine. The distiller extracts conclusions only — no
+code snippets, no conversation quotes. But conclusions can still be sensitive.
+
+To audit memory: `cat .wyren/memory.md`. Hand-edit or delete entries at any time — Wyren
+treats your edits as trusted state.

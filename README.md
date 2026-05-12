@@ -46,6 +46,14 @@ Watch the writing happen live:
 tail -f .wyren/log
 ```
 
+## Privacy
+
+`.wyren/memory.md` is a regular committed file — if your repo is **public**, that file is readable by anyone. The distiller captures conclusions (decisions, rejected approaches, live workarounds), not verbatim quotes, but sensitive project context can still end up there.
+
+**Keep your repo private unless you're comfortable with your team's working memory being publicly visible.** This is the same consideration as any other committed file — treat `.wyren/memory.md` like you would `.env.example` or a design doc.
+
+If you're unsure what's in memory: `cat .wyren/memory.md`. You can hand-edit or delete any entry at any time.
+
 ## Prerequisites
 
 - [Claude Code](https://claude.ai/code) installed and authenticated (`claude auth login`)

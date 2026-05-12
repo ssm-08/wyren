@@ -32,6 +32,27 @@ No. Only the *distilled* memory is pushed. Verbatim transcripts never leave your
 
 That said: if you say something secret in a session on a shared repo, the *conclusion* of it may end up in memory. Treat `.wyren/memory.md` like any other committed file.
 
+## Should I keep my repo private when using Wyren?
+
+**Yes, strongly recommended — unless you're deliberately okay with public memory.**
+
+`.wyren/memory.md` is a regular committed file. If your repo is public, that file is readable by anyone on the internet. The distiller writes things like:
+
+- Technical decisions and the reasoning behind them
+- Approaches that were tried and rejected (and why)
+- Known workarounds and shortcuts still in the code
+- Scope changes and what was deliberately cut
+
+None of this is verbatim transcript — but it's real project context that you probably don't want public. If you're working on an open-source project and want Wyren, audit `.wyren/memory.md` regularly and remove anything sensitive before pushing, or just keep the repo private while in active development.
+
+To inspect current memory at any time:
+
+```bash
+cat .wyren/memory.md
+```
+
+To redact an entry: hand-edit the file. Wyren treats your edits as trusted state and will not undo them.
+
 ## How do I disable Wyren temporarily?
 
 Use the Claude Code slash command:

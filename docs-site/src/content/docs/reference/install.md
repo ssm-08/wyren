@@ -67,6 +67,14 @@ node scripts/installer.mjs install --from-local . --home "$env:TEMP\fake-home"
 
 ## Step 2 — Initialize the repo
 
+:::caution[Privacy — read before committing]
+`.wyren/memory.md` is a regular committed file. Once you push it, anyone with read access to your repo can read your team's distilled working memory — decisions made, approaches rejected, live workarounds still in the code.
+
+**Keep your repo private unless you're okay with that content being publicly visible.** This is the same consideration as any other committed file.
+
+If you ever need to audit or redact memory: `cat .wyren/memory.md` and hand-edit freely. Wyren treats your edits as trusted state.
+:::
+
 One teammate, once per repo:
 
 ```bash
